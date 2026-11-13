@@ -50,7 +50,7 @@ list shows a progress bar and “n of 6 sections complete”.
 3. **Property type** – House / Flat / Bungalow / Maisonette / Bedsit / Other, style (houses and
    bungalows), floor level (flats), bedrooms, storeys; **property photo** (the first one is shown
    at the top of the PDF); **Works required** – tap to select (green): Fit key safe (on by
-   default), Gain entry, Renew door cylinder (pop-up: Front door pre-ticked, Back, Patio, Shed,
+   default), Gain entry, Renew locks (pop-up: Front door pre-ticked, Back, Patio, Shed,
    Gate, Garage, Windows, Post box – pick any), Property clearance (pop-up: Full, Partial,
    Needle sweep, Environmental, Pest control, and by Operatives / Contractor), and Key safe
    details (location, code, photos – the same details as on the Keys & key safe screen).

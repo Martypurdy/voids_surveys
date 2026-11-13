@@ -52,7 +52,7 @@ export function worksSummary(w) {
   const out = [];
   if (w.keySafe) out.push(['Fit key safe', '']);
   if (w.gainEntry) out.push(['Gain entry', '']);
-  if (w.cylinders?.length) out.push(['Renew door cylinder', w.cylinders.join(', ')]);
+  if (w.cylinders?.length) out.push(['Renew locks', w.cylinders.join(', ')]);
   if (w.clearance.length || w.clearanceBy.length) {
     out.push(['Property clearance', [w.clearance.join(', '), w.clearanceBy.length ? `by ${w.clearanceBy.join(' / ')}` : '']
       .filter(Boolean).join(' – ')]);

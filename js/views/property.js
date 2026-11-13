@@ -69,11 +69,11 @@ export default async function property(root, { id }) {
     list.replaceChildren(
       item('Fit key safe', '', w.keySafe, () => { w.keySafe = !w.keySafe; save(); renderList(); }),
       item('Gain entry', '', w.gainEntry, () => { w.gainEntry = !w.gainEntry; save(); renderList(); }),
-      item('Renew door cylinder', w.cylinders?.length ? w.cylinders.join(', ') : 'Tap to choose doors',
+      item('Renew locks', w.cylinders?.length ? w.cylinders.join(', ') : 'Tap to choose locks',
         Boolean(w.cylinders?.length), async () => {
           const r = await multiSelect({
-            title: 'Renew door cylinder',
-            message: 'Select every lock that needs a new cylinder.',
+            title: 'Renew locks',
+            message: 'Select every lock that needs renewing.',
             groups: [{ options: CYLINDER_OPTIONS, selected: w.cylinders ?? CYLINDER_DEFAULT }],
           });
           if (!r) return;
