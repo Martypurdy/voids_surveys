@@ -68,10 +68,17 @@ still appear in the PDF.
 **Take photos** opens the app’s own full-screen camera: tap the shutter as many times as you
 like – there’s no review step after each shot – then tap **Done**. Zoom buttons **.5× / 1× / 2×**
 are always shown:
-- **.5×** uses the wide lens. On iPhone the browser exposes it directly. On Android, if the
-  browser doesn’t say which lens is wide, tapping .5× again cycles through the rear lenses
-  (the one you settle on is remembered). If the browser offers no wider lens at all, it offers
-  *Use phone camera for .5×* (the phone’s own camera app).
+- **.5×** zooms **out** to the wide lens – it never guesses:
+  - phones whose browser offers zoom below 1× use that;
+  - on iPhone it switches straight to the *Ultra Wide* lens;
+  - otherwise (many Android phones don’t say which lens is which) the first tap runs a
+    one-time **wide lens setup**: each rear lens is shown with *“Is this picture WIDER than
+    normal?”* – tap **Yes** on the wide one and it’s remembered on that phone. Zoom (telephoto)
+    lenses are never offered, and lenses that fail or show no picture are skipped;
+  - if there’s no wide lens available to the browser, it offers *Use phone camera for .5×*
+    and *Try lens setup again*.
+
+  Zoom buttons are greyed out while a lens is switching, so repeated taps can’t jam it.
 - **2×** uses real zoom where available, otherwise a digital crop (lower resolution).
 - A torch button appears where supported. The first time, the browser asks for camera
   permission; if it’s refused, the phone’s own camera app is offered instead.

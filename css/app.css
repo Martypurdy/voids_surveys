@@ -530,3 +530,7 @@ body.no-scroll { overflow: hidden; }
 }
 .cam-message p { margin: 0 0 8px; }
 .cam-message p:last-child { margin: 0; }
+.cam-msg-buttons { display: flex; flex-direction: column; gap: 8px; }
+.cam-msg-buttons button { min-height: 48px; background: rgb(255 255 255 / .12); color: #fff; border-color: rgb(255 255 255 / .35); font-weight: 700; }
+.cam-msg-buttons .btn-primary { background: var(--done-line); border-color: var(--done-line); color: #fff; }
+.cam-zoom button:disabled { opacity: .45; }
