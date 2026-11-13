@@ -4,6 +4,8 @@ import { flushSave } from './db.js';
 
 route('/', () => import('./views/jobList.js'));
 route('/job/:id', () => import('./views/jobAddress.js'));
+route('/job/:id/rooms', () => import('./views/items.js'), { kind: 'rooms' });
+route('/job/:id/externals', () => import('./views/items.js'), { kind: 'externals' });
 
 start(document.getElementById('app'));
 
