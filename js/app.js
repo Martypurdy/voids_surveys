@@ -6,6 +6,9 @@ route('/', () => import('./views/jobList.js'));
 route('/job/:id', () => import('./views/jobAddress.js'));
 route('/job/:id/rooms', () => import('./views/items.js'), { kind: 'rooms' });
 route('/job/:id/externals', () => import('./views/items.js'), { kind: 'externals' });
+route('/job/:id/keys', () => import('./views/keys.js'));
+route('/job/:id/keysafe', () => import('./views/keySafe.js'));
+route('/job/:id/meters', () => import('./views/meters.js'));
 
 start(document.getElementById('app'));
 
