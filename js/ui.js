@@ -171,6 +171,51 @@ export async function confirmDialog(message, { title = 'Are you sure?', ok = 'De
   return v === true;
 }
 
+/**
+ * Pop-up of toggle buttons; pick as many as needed.
+ * groups: [{ label, options: string[], selected: string[] }]
+ * Resolves with an array of selected arrays (one per group), or null if cancelled.
+ */
+export async function multiSelect({ title, message, groups }) {
+  const state = groups.map((g) => new Set(g.selected || []));
+  const grids = groups.map((g, gi) => {
+    const grid = h('div', { class: 'choice-grid choice-grid-2', role: 'group', 'aria-label': g.label || title });
+    const render = () => grid.replaceChildren(...g.options.map((opt) => h('button', {
+      type: 'button',
+      'aria-pressed': String(state[gi].has(opt)),
+      onclick: () => {
+        if (state[gi].has(opt)) state[gi].delete(opt);
+        else state[gi].add(opt);
+        render();
+      },
+    }, state[gi].has(opt) ? `✓ ${opt}` : opt)));
+    render();
+    grid.render = render;
+    return grid;
+  });
+  const content = h('div', null, groups.map((g, gi) => [
+    g.label ? h('span', { class: 'field-label', style: 'margin-top:10px' }, g.label) : null,
+    grids[gi],
+  ]));
+  const v = await choose({
+    title,
+    message,
+    content,
+    buttons: [
+      { label: 'Done', value: 'done', class: 'btn-primary' },
+      {
+        label: 'Clear all',
+        value: 'clear',
+      },
+      { label: 'Cancel', value: null },
+    ],
+  });
+  if (v === 'clear') return groups.map(() => []);
+  if (v !== 'done') return null;
+  // Keep the options' original order.
+  return groups.map((g, gi) => g.options.filter((o) => state[gi].has(o)));
+}
+
 // ---------- Toast & busy overlay ----------
 
 let toastEl = null;

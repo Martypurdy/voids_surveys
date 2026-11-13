@@ -48,7 +48,12 @@ list shows a progress bar and “n of 6 sections complete”.
    **Surveyor** – pick from a list saved on this device; *+ Add* adds a name, *Remove* takes it
    off the list. The last surveyor picked is filled in automatically on new surveys.
 3. **Property type** – House / Flat / Bungalow / Maisonette / Bedsit / Other, style (houses and
-   bungalows), floor level (flats), bedrooms, storeys, notes.
+   bungalows), floor level (flats), bedrooms, storeys; **property photo** (the first one is shown
+   at the top of the PDF); **Works required** – tap to select (green): Fit key safe (on by
+   default), Gain entry, Renew door cylinder (pop-up: Front door pre-ticked, Back, Patio, Shed,
+   Gate, Garage, Windows, Post box – pick any), Property clearance (pop-up: Full, Partial,
+   Needle sweep, Environmental, Pest control, and by Operatives / Contractor), and Key safe
+   details (location, code, photos – the same details as on the Keys & key safe screen).
 4. **Keys & key safe** – key register (key set, quantity, received from, issued to, date,
    photos) and the key safe (location, masked code – *Show* to reveal, GPS pin, photos).
 5. **Meters** – gas, electric, water (add more if needed): type (Credit / Prepayment / Smart),
@@ -57,8 +62,10 @@ list shows a progress bar and “n of 6 sections complete”.
 6. **Rooms / Externals** – add from presets (Bedroom auto-numbers) or a custom name; each has
    condition (Good / Fair / Poor / N/A), notes and photos.
 
-**Photos:** *+ Add photos* lets iOS offer Take Photo / Photo Library; the camera button opens
-the rear camera directly. Photos are resized on the device to 1600 px JPEG.
+**Photos:** *Add photos* asks **Take photos** (opens the phone’s own camera with its zoom and
+lens controls; after each shot tap *Take another* or *Done*, so you can snap away) or **Upload
+from phone** (pick several at once).
+Photos are resized on the device to 1600 px JPEG.
 
 ## Exports & backups
 

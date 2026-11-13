@@ -1,7 +1,7 @@
 // Photo capture, on-device compression and the reusable photo field widget.
 import { putPhoto, getPhoto, getPhotos, deletePhotos, scheduleSave, flushSave } from './db.js';
 import { uid, nowISO } from './model.js';
-import { h, icon, ICONS, objectUrl, confirmDialog, toast } from './ui.js';
+import { h, icon, ICONS, objectUrl, confirmDialog, choose, toast } from './ui.js';
 
 export const FULL_MAX = 1600;
 export const FULL_QUALITY = 0.82;
@@ -59,8 +59,12 @@ export async function makeThumb(blob) {
 }
 
 /**
- * Photo field: "Add photos" (iOS shows Take Photo / Photo Library) + a camera
- * shortcut button (opens the rear camera directly) + thumbnail grid.
+ * Photo field: one "Add photos" button that asks "Take photos" or "Upload from
+ * phone", plus a thumbnail grid.
+ *
+ * "Take photos" opens the phone's own camera app (with its zoom/lens controls).
+ * A web page can only receive one shot per camera launch, so after each shot a
+ * "Take another / Done" prompt keeps the session going.
  *
  * @param {object} job   the job (saved after every change)
  * @param {string[]} list  the photos array to manage – mutated in place
@@ -92,12 +96,57 @@ export function photoField(job, list, onChange = () => {}) {
     status.textContent = '';
     if (failed) toast(`${failed} photo${failed > 1 ? 's' : ''} couldn't be read`);
     onChange();
+    return files.length - failed;
   };
 
-  // No capture attribute: iOS offers Take Photo / Photo Library / Choose File.
+  // Upload: no capture attribute, multiple allowed (iOS shows Photo Library / Take Photo / Files).
   const pickInput = h('input', { type: 'file', accept: 'image/*', multiple: true, hidden: true, onchange: (e) => handleFiles(e.target) });
-  // Direct to rear camera (and a fallback for Android pickers that hide the camera).
-  const camInput = h('input', { type: 'file', accept: 'image/*', capture: 'environment', hidden: true, onchange: (e) => handleFiles(e.target) });
+  // Camera: opens the phone's rear camera directly.
+  const camInput = h('input', {
+    type: 'file',
+    accept: 'image/*',
+    capture: 'environment',
+    hidden: true,
+    onchange: async (e) => {
+      const added = await handleFiles(e.target);
+      if (added) cameraSession(added);
+    },
+  });
+
+  // ----- "Snap away" session: Take another / Done after each shot -----
+  let sessionCount = 0;
+  const cameraSession = async (added) => {
+    sessionCount += added;
+    const preview = h('img', { class: 'session-preview', alt: 'Last photo taken' });
+    const lastId = list[list.length - 1];
+    getPhoto(lastId).then((rec) => { if (rec) preview.src = objectUrl(rec.thumb || rec.blob); });
+    await choose({
+      title: `📷 ${sessionCount} photo${sessionCount === 1 ? '' : 's'} taken`,
+      content: preview,
+      buttons: [
+        // Runs inside the tap, so the browser allows opening the camera again.
+        { label: '📷 Take another', value: 'more', class: 'btn-primary btn-big', onClick: () => camInput.click() },
+        { label: '✓ Done', value: 'done', class: 'btn-big' },
+      ],
+    });
+  };
+
+  const addPhotos = () => choose({
+    title: 'Add photos',
+    buttons: [
+      {
+        label: '📷 Take photos',
+        value: 'camera',
+        class: 'btn-primary btn-big',
+        onClick: () => {
+          sessionCount = 0;
+          camInput.click();
+        },
+      },
+      { label: '🖼 Upload from phone', value: 'upload', class: 'btn-big', onClick: () => pickInput.click() },
+      { label: 'Cancel', value: null },
+    ],
+  });
 
   const thumbButton = (id) => {
     const img = h('img', { alt: 'Photo', loading: 'lazy' });
@@ -147,8 +196,7 @@ export function photoField(job, list, onChange = () => {}) {
 
   return h('div', { class: 'photo-field' },
     h('div', { class: 'photo-actions' },
-      h('button', { type: 'button', class: 'add-photos', onclick: () => pickInput.click() }, '+ Add photos'),
-      h('button', { type: 'button', class: 'camera-btn', 'aria-label': 'Take photo with camera', title: 'Camera', onclick: () => camInput.click() }, icon(ICONS.camera))),
+      h('button', { type: 'button', class: 'add-photos', onclick: addPhotos }, icon(ICONS.camera), ' Add photos')),
     pickInput,
     camInput,
     status,

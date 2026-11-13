@@ -1,6 +1,6 @@
 // .json job file: full backup / transfer, photos embedded as base64.
 import { getJob, saveJob, deleteJob, putPhotos } from '../db.js';
-import { SCHEMA, allPhotoIds, remapPhotoIds, uid, nowISO, slug, jobTitle, todayLocal, newKeySafe, upgradeJob } from '../model.js';
+import { SCHEMA, allPhotoIds, remapPhotoIds, uid, nowISO, slug, jobTitle, todayLocal, newKeySafe, upgradeJob, photoLists } from '../model.js';
 import { loadPhotos, makeThumb } from '../photos.js';
 import { choose, toast, busy } from '../ui.js';
 
@@ -109,7 +109,7 @@ export async function importJobFile(file) {
     }
     // Drop references to photos that weren't in the file.
     const have = new Set(recs.map((r) => r.id));
-    for (const list of [...job.rooms, ...job.externals, ...job.keys, ...job.meters, job.keySafe].map((x) => x.photos)) {
+    for (const list of photoLists(job)) {
       for (let i = list.length - 1; i >= 0; i--) if (!have.has(list[i])) list.splice(i, 1);
     }
     await putPhotos(recs);

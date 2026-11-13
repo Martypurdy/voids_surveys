@@ -1,5 +1,5 @@
 // PDF report (jsPDF, loaded on demand from /vendor).
-import { addressLines, jobTitle, fmtDate, fmtDateTime, slug, todayLocal, allPhotoIds } from '../model.js';
+import { addressLines, jobTitle, fmtDate, fmtDateTime, slug, todayLocal, allPhotoIds, worksSummary } from '../model.js';
 import { loadPhotos, resizeImage } from '../photos.js';
 
 // Photos are re-encoded smaller for the PDF so reports stay emailable.
@@ -157,6 +157,21 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
   font(20, 'bold', BRAND);
   doc.text('Void Property Survey', M, y + 7);
   y += 13;
+
+  // Property photo (first one taken on the Property type screen) at the top.
+  const [coverId, ...otherPropertyPhotos] = job.property.photos;
+  if (coverId) {
+    const [rec] = await loadPhotos([coverId]);
+    if (rec) {
+      onProgress('Adding property photo…');
+      const big = await resizeImage(rec.blob, 1400, 0.78);
+      const s = Math.min(CW / big.w, 95 / big.h);
+      const w = big.w * s, hgt = big.h * s;
+      doc.addImage(new Uint8Array(await big.blob.arrayBuffer()), 'JPEG', M + (CW - w) / 2, y, w, hgt, undefined, 'NONE');
+      y += hgt + 6;
+    }
+  }
+
   const addr = addressLines(job.address);
   para(addr.length ? addr.join('\n') : 'Address not recorded', { size: 12, style: 'bold' });
   y += 3;
@@ -181,7 +196,8 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
   // ---------- sections ----------
   // Same order as the app's tabs: property, keys & key safe, meters, rooms, externals.
   const prop = job.property;
-  if (prop.type || prop.style || prop.bedrooms || prop.storeys || prop.floor || prop.notes) {
+  const works = worksSummary(job.works);
+  if (prop.type || prop.style || prop.bedrooms || prop.storeys || prop.floor || prop.notes || works.length || otherPropertyPhotos.length) {
     heading('Property');
     kv([
       ['Type', prop.type],
@@ -190,7 +206,16 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
       ['Storeys', prop.storeys],
       ['Floor level', prop.floor],
     ]);
-    para(prop.notes);
+    para(prop.notes); // older jobs only
+    if (works.length) {
+      y += 2;
+      subheading('Works required');
+      for (const [label, detail] of works) {
+        para(`-  ${label}${detail ? `: ${detail}` : ''}`, { size: 10.5 });
+        y += 0.8;
+      }
+    }
+    await photoGrid(otherPropertyPhotos);
     y += 2;
   }
 

@@ -27,7 +27,37 @@ export const PROPERTY_TYPES = ['House', 'Flat', 'Bungalow', 'Maisonette', 'Bedsi
 export const PROPERTY_STYLES = ['Detached', 'Semi-detached', 'Mid-terrace', 'End-terrace'];
 
 export function newProperty() {
-  return { type: '', style: '', bedrooms: '', storeys: '', floor: '', notes: '' };
+  // notes is no longer shown (replaced by the property photo) but kept for older jobs.
+  return { type: '', style: '', bedrooms: '', storeys: '', floor: '', notes: '', photos: [] };
+}
+
+// ----- Works required (Property type screen) -----
+export const CYLINDER_OPTIONS = ['Front door', 'Back door', 'Patio door', 'Shed', 'Gate', 'Garage', 'Windows', 'Post box'];
+export const CYLINDER_DEFAULT = ['Front door'];
+export const CLEARANCE_OPTIONS = ['Full clearance', 'Partial clearance', 'Needle sweep', 'Environmental', 'Pest control'];
+export const CLEARANCE_BY = ['Operatives', 'Contractor'];
+
+export function newWorks() {
+  return {
+    keySafe: true, // "Fit key safe" is selected by default
+    gainEntry: false,
+    cylinders: null, // null = never chosen (pop-up pre-ticks Front door); [] = none
+    clearance: [],
+    clearanceBy: [],
+  };
+}
+
+/** Selected works as [label, detail] pairs, for summaries and the PDF. */
+export function worksSummary(w) {
+  const out = [];
+  if (w.keySafe) out.push(['Fit key safe', '']);
+  if (w.gainEntry) out.push(['Gain entry', '']);
+  if (w.cylinders?.length) out.push(['Renew door cylinder', w.cylinders.join(', ')]);
+  if (w.clearance.length || w.clearanceBy.length) {
+    out.push(['Property clearance', [w.clearance.join(', '), w.clearanceBy.length ? `by ${w.clearanceBy.join(' / ')}` : '']
+      .filter(Boolean).join(' – ')]);
+  }
+  return out;
 }
 
 /** Section progress: undefined (not started) | 'started' | 'complete'. */
@@ -39,6 +69,8 @@ export function upgradeJob(job) {
   normalizeAddress(job.address);
   job.progress ??= {};
   job.property = { ...newProperty(), ...(job.property || {}) };
+  if (!Array.isArray(job.property.photos)) job.property.photos = [];
+  job.works = { ...newWorks(), ...(job.works || {}) };
   return job;
 }
 
@@ -68,6 +100,7 @@ export function newJob({ surveyor = '' } = {}) {
     voidRef: '', // no longer shown in the app; kept so older files still import
     surveyor,
     property: newProperty(),
+    works: newWorks(),
     progress: {},
     rooms: [],
     externals: [],
@@ -118,6 +151,7 @@ export function nextNumberedName(items, base) {
 /** Every photos[] array in a job (live references). */
 export function photoLists(job) {
   return [
+    job.property?.photos || [],
     ...job.rooms.map((x) => x.photos),
     ...job.externals.map((x) => x.photos),
     ...job.keys.map((x) => x.photos),
