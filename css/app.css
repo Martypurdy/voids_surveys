@@ -517,4 +517,16 @@ body.no-scroll { overflow: hidden; }
   font-weight: 800;
   font-size: 1.05rem;
 }
-.cam-message { position: absolute; top: 40%; left: 16px; right: 16px; text-align: center; }
+.cam-message {
+  position: absolute;
+  top: calc(70px + env(safe-area-inset-top));
+  left: 16px;
+  right: 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgb(0 0 0 / .72);
+  text-align: center;
+  font-weight: 600;
+}
+.cam-message p { margin: 0 0 8px; }
+.cam-message p:last-child { margin: 0; }

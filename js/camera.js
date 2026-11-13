@@ -1,37 +1,46 @@
 // In-app camera: live viewfinder, tap the shutter as many times as you like
-// (no per-photo review), zoom 0.5x / 1x / 2x where possible, torch where
-// supported, then Done.
+// (no per-photo review), zoom .5x / 1x / 2x, torch where supported, then Done.
 //
-// Zoom strategy, best first:
-//   1. iPhone "Dual Wide" / "Triple" virtual camera with hardware zoom:
-//      zoom 1 = 0.5x (ultra-wide), 2 = 1x, 4 = 2x – lens switching is automatic.
-//   2. Any camera with a hardware zoom range (many Android phones).
-//   3. 0.5x by switching to a camera labelled "Ultra Wide" (iPhone).
-//   4. 2x by digital crop (always works, lower resolution).
+// .5x (wide) – tried in this order:
+//   1. iPhone "Dual Wide"/"Triple" virtual camera: hardware zoom 1 = 0.5x.
+//   2. Hardware zoom that goes below 1x (some Android phones, e.g. 0.6x).
+//   3. A camera labelled "Ultra Wide" (iPhone Safari lists each lens).
+//   4. Other rear cameras (Android lists them without names): tapping .5x
+//      cycles through them; the one used is remembered on this device.
+//   5. Nothing wider available: offer the phone's own camera app.
+// 2x – hardware zoom if available, otherwise a digital crop.
 import { h } from './ui.js';
 
 export const cameraSupported = () => Boolean(navigator.mediaDevices?.getUserMedia);
 
 const MAX_SIDE = 1600;
 const QUALITY = 0.85;
-const LEVELS = [0.5, 1, 2];
+const WIDE_KEY = 'voids.wideLens';
+
+const remember = (k, v) => { try { localStorage.setItem(k, v); } catch { /* ignore */ } };
+const recall = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
 
 /**
  * Open the camera full screen.
- * @param {{ onCapture: (blob: Blob) => void }} opts  called for every shot
- * @returns {Promise<{ count: number, error?: Error }>} when the user taps Done
+ * @param {{ onCapture: (blob: Blob) => void, onNative?: () => void }} opts
+ *   onCapture – called for every shot; onNative – called (inside a tap) when the
+ *   user chooses the phone's own camera app instead.
+ * @returns {Promise<{ count: number, error?: Error }>} when closed
  */
-export function openCamera({ onCapture }) {
+export function openCamera({ onCapture, onNative }) {
   return new Promise((resolve) => {
     let stream = null;
     let track = null;
     let count = 0;
-    let digital = 1; // digital crop factor when hardware zoom isn't available
+    let digital = 1;
     let level = 1;
-    let factor = 1; // hardware zoom value for "1x" (2 on iPhone virtual wide cameras)
+    let wideLabel = '.5×';
+    let factor = 1; // hardware zoom value meaning "1x" (2 on iPhone virtual wide cameras)
+    let mainId = null; // the normal (1x) rear camera
     let torchOn = false;
     let devices = [];
     let closed = false;
+    let msgTimer = 0;
 
     const video = h('video', { class: 'cam-video', playsinline: true, autoplay: true, muted: true });
     video.muted = true;
@@ -40,7 +49,7 @@ export function openCamera({ onCapture }) {
     const lastThumb = h('img', { class: 'cam-last', alt: '' });
     const zoomBar = h('div', { class: 'cam-zoom', role: 'group', 'aria-label': 'Zoom' });
     const torchBtn = h('button', { type: 'button', class: 'cam-torch', hidden: true, 'aria-pressed': 'false', onclick: toggleTorch }, '⚡ Torch');
-    const message = h('div', { class: 'cam-message', hidden: true });
+    const message = h('div', { class: 'cam-message', hidden: true, role: 'status' });
     const shutter = h('button', { type: 'button', class: 'cam-shutter', 'aria-label': 'Take photo', onclick: snap });
     const doneBtn = h('button', { type: 'button', class: 'cam-done', onclick: () => close() }, 'Done');
 
@@ -53,10 +62,18 @@ export function openCamera({ onCapture }) {
     document.body.append(overlay);
     document.body.classList.add('no-scroll');
 
-    // ---------- stream handling ----------
+    function showMessage(text, action) {
+      clearTimeout(msgTimer);
+      message.replaceChildren(h('p', null, text), action || '');
+      message.hidden = false;
+      if (!action) msgTimer = setTimeout(() => { message.hidden = true; }, 3500);
+    }
+
+    // ---------- stream ----------
     const caps = () => (track?.getCapabilities ? track.getCapabilities() : {});
-    const isVirtualWide = () => /dual wide|triple/i.test(track?.label || '');
-    const isUltraWide = () => /ultra ?wide/i.test(track?.label || '');
+    const label = () => track?.label || '';
+    const isVirtualWide = () => /dual wide|triple/i.test(label());
+    const currentId = () => track?.getSettings?.().deviceId;
 
     function stopStream() {
       stream?.getTracks().forEach((t) => t.stop());
@@ -82,17 +99,18 @@ export function openCamera({ onCapture }) {
     }
 
     const hwZoom = () => caps().zoom; // { min, max } or undefined
-    const canHw = (v) => { const z = hwZoom(); return z && v >= z.min - 1e-6 && v <= z.max + 1e-6; };
+    const canHw = (v) => { const z = hwZoom(); return Boolean(z) && v >= z.min - 1e-6 && v <= z.max + 1e-6; };
     const findDevice = (re) => devices.find((d) => re.test(d.label));
+    const rearCameras = () => devices.filter((d) => !/front|user|face/i.test(d.label));
 
     async function boot() {
       try {
         await start();
         devices = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput');
-        // Prefer an iPhone virtual multi-lens camera: smooth 0.5x–2x with one stream.
+        // Prefer an iPhone virtual multi-lens camera: smooth .5x–2x on one stream.
         const virtual = findDevice(/back (triple|dual wide) camera/i);
-        if (virtual && track.getSettings().deviceId !== virtual.deviceId) {
-          const before = track.getSettings().deviceId;
+        if (virtual && currentId() !== virtual.deviceId) {
+          const before = currentId();
           try {
             await start(virtual.deviceId);
             if (!hwZoom()) await start(before);
@@ -100,6 +118,7 @@ export function openCamera({ onCapture }) {
             await start(before);
           }
         }
+        mainId = currentId();
         await setLevel(1);
       } catch (err) {
         close(err);
@@ -107,44 +126,91 @@ export function openCamera({ onCapture }) {
     }
 
     // ---------- zoom ----------
-    function availableLevels() {
-      return LEVELS.filter((l) => {
-        if (l !== 0.5) return true;
-        return canHw(0.5 * factor) || Boolean(findDevice(/ultra ?wide/i)) || isUltraWide();
-      });
-    }
-
     function renderZoom() {
-      zoomBar.replaceChildren(...availableLevels().map((l) => h('button', {
+      zoomBar.replaceChildren(...[0.5, 1, 2].map((l) => h('button', {
         type: 'button',
         'aria-pressed': String(l === level),
         onclick: () => setLevel(l),
-      }, `${l === 0.5 ? '.5' : l}×`)));
+      }, l === 0.5 ? wideLabel : `${l}×`)));
+    }
+
+    async function applyZoom(v) {
+      if (canHw(v)) {
+        await track.applyConstraints({ advanced: [{ zoom: v }] });
+        return true;
+      }
+      return false;
+    }
+
+    async function toMain() {
+      if (mainId && currentId() !== mainId) await start(mainId);
+    }
+
+    /** Try every way of getting a wider view. Returns true if something wider is showing. */
+    async function goWide(cycle) {
+      wideLabel = '.5×';
+      // 1 & 2: hardware zoom on the main camera.
+      await toMain();
+      if (await applyZoom(0.5 * factor)) return true;
+      const z = hwZoom();
+      if (z && z.min < factor - 0.05) {
+        await applyZoom(z.min);
+        wideLabel = `.${Math.round((z.min / factor) * 10)}×`;
+        return true;
+      }
+      // 3: a lens the browser names "Ultra Wide".
+      const uw = findDevice(/ultra ?wide/i);
+      if (uw) {
+        await start(uw.deviceId);
+        return true;
+      }
+      // 4: unnamed rear cameras (Android) – cycle through them.
+      const others = rearCameras().filter((d) => d.deviceId !== mainId);
+      if (others.length) {
+        const saved = others.findIndex((d) => d.deviceId === recall(WIDE_KEY));
+        let i = saved >= 0 ? saved : 0;
+        if (cycle) {
+          const cur = others.findIndex((d) => d.deviceId === currentId());
+          i = (cur + 1) % others.length;
+        }
+        await start(others[i].deviceId);
+        remember(WIDE_KEY, others[i].deviceId);
+        if (others.length > 1 || cycle) {
+          showMessage(`Lens ${i + 1} of ${others.length}. If this isn’t the wide view, tap ${wideLabel} again to try the next lens.`);
+        }
+        return true;
+      }
+      return false;
     }
 
     async function setLevel(l) {
+      const again = l === 0.5 && level === 0.5;
       level = l;
       digital = 1;
       try {
-        if (l === 0.5 && !canHw(0.5 * factor)) {
-          const uw = findDevice(/ultra ?wide/i);
-          if (uw && !isUltraWide()) await start(uw.deviceId);
-        } else if (l !== 0.5 && isUltraWide()) {
-          // Back from the ultra-wide lens to the main camera.
-          const main = findDevice(/^back camera$/i) || devices.find((d) => /back|environment|rear/i.test(d.label) && !/ultra|tele|front/i.test(d.label));
-          await start(main?.deviceId);
-        }
-        if (!isUltraWide()) {
-          const want = l * factor;
-          if (canHw(want)) await track.applyConstraints({ advanced: [{ zoom: want }] });
-          else {
-            if (hwZoom()) await track.applyConstraints({ advanced: [{ zoom: Math.max(hwZoom().min, factor) }] }).catch(() => {});
+        if (l === 0.5) {
+          if (!(await goWide(again))) {
+            level = 1;
+            await toMain();
+            await applyZoom(factor);
+            showMessage('This phone’s browser doesn’t give apps the wide (.5×) lens.', onNative
+              ? h('button', {
+                type: 'button',
+                class: 'btn-primary',
+                onclick: () => { close(); onNative(); },
+              }, 'Use phone camera for .5×')
+              : null);
+          }
+        } else {
+          await toMain();
+          if (!(await applyZoom(l * factor))) {
+            if (hwZoom()) await applyZoom(Math.max(hwZoom().min, Math.min(factor, hwZoom().max))).catch(() => {});
             digital = l > 1 ? l : 1;
           }
         }
       } catch (e) {
         console.warn('Zoom change failed', e);
-        digital = l > 1 ? l : 1;
+        if (l > 1) digital = l;
       }
       video.style.transform = digital > 1 ? `scale(${digital})` : '';
       renderZoom();
@@ -162,9 +228,8 @@ export function openCamera({ onCapture }) {
       canvas.width = Math.round(sw * scale);
       canvas.height = Math.round(sh * scale);
       canvas.getContext('2d').drawImage(video, (vw - sw) / 2, (vh - sh) / 2, sw, sh, 0, 0, canvas.width, canvas.height);
-      // Instant feedback; encoding/saving happens in the background.
       flash.classList.remove('go');
-      void flash.offsetWidth; // restart the animation
+      void flash.offsetWidth;
       flash.classList.add('go');
       navigator.vibrate?.(25);
       count++;
@@ -191,7 +256,7 @@ export function openCamera({ onCapture }) {
     // The OS stops the camera when the app is backgrounded – restart on return.
     const onVisible = () => {
       if (document.visibilityState === 'visible' && !closed && (!track || track.readyState === 'ended')) {
-        start(track?.getSettings?.().deviceId).then(() => setLevel(level)).catch((e) => close(e));
+        start(currentId() || mainId).then(() => setLevel(level)).catch((e) => close(e));
       }
     };
     document.addEventListener('visibilitychange', onVisible);
@@ -205,6 +270,7 @@ export function openCamera({ onCapture }) {
     function close(error) {
       if (closed) return;
       closed = true;
+      clearTimeout(msgTimer);
       stopStream();
       document.removeEventListener('visibilitychange', onVisible);
       document.removeEventListener('keydown', onKey);

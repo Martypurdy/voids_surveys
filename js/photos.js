@@ -132,7 +132,7 @@ export function photoField(job, list, onChange = () => {}) {
 
   const takePhotos = async () => {
     if (!cameraSupported()) return camInput.click();
-    const { error } = await openCamera({ onCapture: saveShot });
+    const { error } = await openCamera({ onCapture: saveShot, onNative: () => camInput.click() });
     if (error) {
       console.warn(error);
       // A fresh tap is needed before the browser will open the phone's camera app.

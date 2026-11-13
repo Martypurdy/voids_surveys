@@ -240,20 +240,22 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
     await photoGrid(ks.photos);
   }
 
-  const meters = job.meters.filter((m) => m.serial || m.reading || m.type || m.supply || m.location || m.photos.length);
-  if (meters.length) {
-    heading('Meters');
+  const meters = job.meters.filter((m) => m.location || m.photos.length || m.serial || m.reading || m.type || m.supply);
+  if (meters.length || job.heating.length) {
+    heading('Meters & heating');
+    kv([['Heating type', job.heating.join(', ')]]);
     for (const m of meters) {
       ensure(45); // keep a meter's heading with its details
       subheading(`${m.utility} meter`);
       kv([
+        ['Location', m.location],
+        // Older surveys recorded these too – print them if present.
         ['Type', m.type],
         ['Supply', m.supply],
         ['Prepay balance', m.type === 'Prepayment' && m.balance !== '' ? `${m.balanceType} £${m.balance}` : ''],
         ['Serial number', m.serial],
         ['Reading', m.reading],
-        ['Date read', fmtDate(m.date)],
-        ['Location', m.location],
+        ['Date read', m.reading ? fmtDate(m.date) : ''],
       ]);
       await photoGrid(m.photos);
       y += 3;

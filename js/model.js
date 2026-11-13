@@ -10,14 +10,14 @@ export const EXTERNAL_PRESETS = ['Front garden', 'Rear garden', 'Boundaries', 'G
 export const UTILITIES = ['Gas', 'Electric', 'Water'];
 export const METER_TYPES = ['Credit', 'Prepayment', 'Smart'];
 export const SUPPLY_STATUSES = ['On', 'Off', 'Capped', 'Not found'];
+export const HEATING_TYPES = ['Gas boiler', 'Electric heaters', 'Heat pump'];
 
 export const BACKUP_WARN_DAYS = 7;
 
 /** Survey sections in tab order: [key, label, route path under #/job/:id]. */
 export const SECTIONS = [
   ['address', 'Address', ''],
-  ['property', 'Property type', 'property'],
-  ['keys', 'Keys & key safe', 'keys'],
+  ['property', 'Property', 'property'],
   ['meters', 'Meters', 'meters'],
   ['rooms', 'Rooms', 'rooms'],
   ['externals', 'Externals', 'externals'],
@@ -71,6 +71,7 @@ export function upgradeJob(job) {
   job.property = { ...newProperty(), ...(job.property || {}) };
   if (!Array.isArray(job.property.photos)) job.property.photos = [];
   job.works = { ...newWorks(), ...(job.works || {}) };
+  if (!Array.isArray(job.heating)) job.heating = [];
   return job;
 }
 
@@ -101,6 +102,7 @@ export function newJob({ surveyor = '' } = {}) {
     surveyor,
     property: newProperty(),
     works: newWorks(),
+    heating: [],
     progress: {},
     rooms: [],
     externals: [],

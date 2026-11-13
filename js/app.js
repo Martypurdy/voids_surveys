@@ -7,9 +7,9 @@ route('/', () => import('./views/jobList.js'));
 route('/job/:id', () => import('./views/jobAddress.js'));
 route('/job/:id/rooms', () => import('./views/items.js'), { kind: 'rooms' });
 route('/job/:id/externals', () => import('./views/items.js'), { kind: 'externals' });
-route('/job/:id/keys', () => import('./views/keys.js'));
+route('/job/:id/keys', () => import('./views/property.js')); // old tab -> key safe now lives on Property
 route('/job/:id/property', () => import('./views/property.js'));
-route('/job/:id/keysafe', () => import('./views/keys.js')); // old link -> merged screen
+route('/job/:id/keysafe', () => import('./views/property.js'));
 route('/job/:id/meters', () => import('./views/meters.js'));
 
 start(document.getElementById('app'));

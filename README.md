@@ -32,10 +32,11 @@ Open devices will show “A new version is available – Reload”.
 
 ## Using it
 
-Each job has six sections, shown as tabs in this order. A tab turns **amber** when you open
-it and **green ✓** when you tap the *Mark … complete* button at the bottom of that screen
-(which then moves you to the next unfinished section). *Reopen section* undoes it. The job
-list shows a progress bar and “n of 6 sections complete”.
+Each job has five sections, shown as tabs in this order: **Address, Property, Meters, Rooms,
+Externals**. A tab turns **amber** when you open it and **green ✓** when you tap the
+*Mark … complete* button at the bottom of that screen (which then moves you to the next
+unfinished section). *Reopen section* undoes it. The job list shows a progress bar and
+“n of 5 sections complete”.
 
 1. **Jobs** – create, open, import a `.json` job file; ⋮ on a job gives PDF / backup / delete.
 2. **Address** – enter the postcode at the top and tap *Look up*: the street, area, town and
@@ -47,27 +48,33 @@ list shows a progress bar and “n of 6 sections complete”.
    street – then the first line is left blank for you to fill in.
    **Surveyor** – pick from a list saved on this device; *+ Add* adds a name, *Remove* takes it
    off the list. The last surveyor picked is filled in automatically on new surveys.
-3. **Property type** – House / Flat / Bungalow / Maisonette / Bedsit / Other, style (houses and
+3. **Property** – House / Flat / Bungalow / Maisonette / Bedsit / Other, style (houses and
    bungalows), floor level (flats), bedrooms, storeys; **property photo** (the first one is shown
    at the top of the PDF); **Works required** – tap to select (green): Fit key safe (on by
    default), Gain entry, Renew locks (pop-up: Front door pre-ticked, Back, Patio, Shed,
    Gate, Garage, Windows, Post box – pick any), Property clearance (pop-up: Full, Partial,
-   Needle sweep, Environmental, Pest control, and by Operatives / Contractor), and Key safe
-   details (location, code, photos – the same details as on the Keys & key safe screen).
-4. **Keys & key safe** – key register (key set, quantity, received from, issued to, date,
-   photos) and the key safe (location, masked code – *Show* to reveal, GPS pin, photos).
-5. **Meters** – gas, electric, water (add more if needed): type (Credit / Prepayment / Smart),
-   supply status (On / Off / Capped / Not found), credit/debt balance for prepayment, serial,
-   reading, date, location, photos.
-6. **Rooms / Externals** – add from presets (Bedroom auto-numbers) or a custom name; each has
+   Needle sweep, Environmental, Pest control, and by Operatives / Contractor), and **Key safe
+   details** (location, masked code – *Show* to reveal, GPS pin, photos).
+4. **Meters** – **Heating type** pop-up (Gas boiler, Electric heaters, Heat pump – pick any),
+   then gas, electric and water meters, each with **meter location** and photos
+   (*+ Add another meter* for extras).
+5. **Rooms / Externals** – add from presets (Bedroom auto-numbers) or a custom name; each has
    condition (Good / Fair / Poor / N/A), notes and photos.
+
+Surveys made with older versions keep any key register or meter readings they recorded; these
+still appear in the PDF.
 
 **Photos:** *Add photos* asks **Take photos** or **Upload from phone** (pick several at once).
 **Take photos** opens the app’s own full-screen camera: tap the shutter as many times as you
-like – there’s no review step after each shot – then tap **Done**. Zoom buttons (.5× / 1× / 2×)
-and a torch appear where the phone’s browser allows (0.5× needs a phone and browser that expose
-the ultra-wide lens; otherwise 2× is a digital crop). If camera access is refused, it offers the
-phone’s own camera app instead. The first time, the browser asks for camera permission.
+like – there’s no review step after each shot – then tap **Done**. Zoom buttons **.5× / 1× / 2×**
+are always shown:
+- **.5×** uses the wide lens. On iPhone the browser exposes it directly. On Android, if the
+  browser doesn’t say which lens is wide, tapping .5× again cycles through the rear lenses
+  (the one you settle on is remembered). If the browser offers no wider lens at all, it offers
+  *Use phone camera for .5×* (the phone’s own camera app).
+- **2×** uses real zoom where available, otherwise a digital crop (lower resolution).
+- A torch button appears where supported. The first time, the browser asks for camera
+  permission; if it’s refused, the phone’s own camera app is offered instead.
 Photos are resized on the device to 1600 px JPEG.
 
 ## Exports & backups
