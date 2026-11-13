@@ -52,7 +52,7 @@ unfinished section). *Reopen section* undoes it. The job list shows a progress b
    bungalows), floor level (flats), bedrooms, storeys; **property photo** (the first one is shown
    at the top of the PDF); **Works required** – tap to select (green): Fit key safe (on by
    default), Gain entry, Renew locks (pop-up: Front door pre-ticked, Back, Patio, Shed,
-   Gate, Garage, Windows, Post box – pick any), Property clearance (pop-up: Full, Partial,
+   Gate, Garage, Windows, Post box, Communal key / fob – pick any), Property clearance (pop-up: Full, Partial,
    Needle sweep, Environmental, Pest control, and by Operatives / Contractor), and **Key safe
    details** (location, masked code – *Show* to reveal, GPS pin, photos).
 4. **Services** – **Heating type** pop-up (Gas boiler, Electric heaters, Heat pump – pick any),

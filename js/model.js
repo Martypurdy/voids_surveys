@@ -36,7 +36,7 @@ export function newProperty() {
 }
 
 // ----- Works required (Property type screen) -----
-export const CYLINDER_OPTIONS = ['Front door', 'Back door', 'Patio door', 'Shed', 'Gate', 'Garage', 'Windows', 'Post box'];
+export const CYLINDER_OPTIONS = ['Front door', 'Back door', 'Patio door', 'Shed', 'Gate', 'Garage', 'Windows', 'Post box', 'Communal key / fob'];
 export const CYLINDER_DEFAULT = ['Front door'];
 export const CLEARANCE_OPTIONS = ['Full clearance', 'Partial clearance', 'Needle sweep', 'Environmental', 'Pest control'];
 export const CLEARANCE_BY = ['Operatives', 'Contractor'];
