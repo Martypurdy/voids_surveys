@@ -1,6 +1,6 @@
 // Service worker: precache the app shell, serve it cache-first so the app works offline.
 // Bump VERSION whenever any file below changes, so devices pick up the update.
-const VERSION = 'v9';
+const VERSION = 'v10';
 const CACHE = `voids-${VERSION}`;
 
 const ASSETS = [
@@ -14,6 +14,8 @@ const ASSETS = [
   'icons/icon-512.png',
   'vendor/idb-keyval.js',
   'vendor/jspdf.umd.min.js',
+  'vendor/pdf.min.js',
+  'vendor/pdf.worker.min.js',
   'js/app.js',
   'js/router.js',
   'js/db.js',
@@ -37,6 +39,7 @@ const ASSETS = [
   'js/export/deliver.js',
   'js/export/json.js',
   'js/export/pdf.js',
+  'js/export/preview.js',
 ];
 
 self.addEventListener('install', (event) => {

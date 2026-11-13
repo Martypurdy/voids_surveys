@@ -26,13 +26,32 @@ export async function jobActions(job) {
     title: jobTitle(job),
     content,
     buttons: [
-      { label: 'PDF report', value: 'pdf', class: 'btn-primary' },
+      { label: '👁 Preview report', value: 'preview', class: 'btn-primary' },
+      { label: 'Export PDF report', value: 'pdf', class: 'btn-primary' },
       { label: 'Backup file (.json)', value: 'json', class: 'btn-primary' },
       { label: 'Delete job', value: 'delete', class: 'btn-danger' },
       { label: 'Cancel', value: null },
     ],
   });
   const includeCode = hasCode && codeBox.checked;
+
+  if (action === 'preview') {
+    const progress = busy('Building preview…');
+    try {
+      const [{ buildPdf, pdfFilename }, { previewPdf }] = await Promise.all([
+        import('../export/pdf.js'),
+        import('../export/preview.js'),
+      ]);
+      const blob = await buildPdf(job, { includeCode, onProgress: progress.update });
+      progress.close();
+      await previewPdf(blob, pdfFilename(job));
+    } catch (e) {
+      console.error(e);
+      progress.close();
+      toast(`Preview failed: ${e.message}`);
+    }
+    return null;
+  }
 
   if (action === 'pdf') {
     const progress = busy('Building report…');

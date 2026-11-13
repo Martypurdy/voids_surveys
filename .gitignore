@@ -19,3 +19,10 @@ exports/
 .env
 *.local
 tmp/
+
+# SOR spreadsheet and anything derived from it – licensed / private, never publish
+private/
+*.xlsx
+*.xls
+*.xlsm
+*.csv

@@ -178,6 +178,7 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
           para(`${part.label}: OK - no work required`, { size: 10 });
           continue;
         }
+        ensure(lineH(10) * 3); // keep the part heading with its first defect
         para(`${part.label}:`, { size: 10, style: 'bold' });
         for (const d of p.defects) {
           const def = defectById(part, d.id) || { label: d.id, unit: 'nr' };
