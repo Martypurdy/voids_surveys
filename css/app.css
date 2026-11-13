@@ -659,3 +659,5 @@ body.no-scroll { overflow: hidden; }
 .removed-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--border); }
 .removed-row .defect-text { flex: 1; }
 .defect-restore { width: 44px; min-height: 44px; padding: 0; font-size: 1.4rem; font-weight: 700; color: var(--done-line); border-color: var(--done-line); }
+
+.defect-also { font-size: .78rem; font-weight: 700; color: var(--started-ink); }

@@ -125,8 +125,19 @@ export default async function roomPage(root, { id, roomId }) {
 
     const defaultQty = (u) => (UNITS[u]?.count ? '1' : (u === 'm2' || u === 'm') && prefill ? String(prefill) : '');
 
+    // SORs already recorded on this room's other parts (e.g. per-room items like
+    // "Prep for decoration" offered on both Walls and Ceiling) – flag to avoid double counting.
+    const elsewhere = new Map();
+    for (const other of PARTS) {
+      if (other.key === part.key) continue;
+      for (const d of room.parts?.[other.key]?.defects || []) {
+        elsewhere.set(d.id, [...(elsewhere.get(d.id) || []), other.label]);
+      }
+    }
+
     const row = (opt, { removable = false } = {}) => {
       const on = chosen.has(opt.c);
+      const alsoOn = elsewhere.get(opt.c);
       const unit = UNITS[opt.u] || UNITS.nr;
       const lib = library ? libraryItem(library, opt.c) : null;
       const info = h('div', { class: 'defect-info', hidden: true }, lib?.l || '');
@@ -144,7 +155,8 @@ export default async function roomPage(root, { id, roomId }) {
         h('span', { class: 'works-tick', 'aria-hidden': 'true' }, on ? '✓' : ''),
         h('span', { class: 'defect-text' },
           h('span', { class: 'defect-label' }, opt.d),
-          library ? h('span', { class: 'defect-code' }, `${opt.c} · ${unit.label}${opt.note ? ` · ${opt.note}` : ''}`) : null)),
+          library ? h('span', { class: 'defect-code' }, `${opt.c} · ${unit.label}${opt.note ? ` · ${opt.note}` : ''}`) : null,
+          alsoOn ? h('span', { class: 'defect-also' }, `⚠ already on ${alsoOn.join(' & ')} in this room`) : null)),
         on
           ? h('label', { class: 'defect-qty' },
             h('input', {
