@@ -1,0 +1,21 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+
+# Node (only used for `npx serve`; nothing is installed)
+node_modules/
+npm-debug.log*
+
+# Survey exports – never commit real job data
+*.json
+*.pdf
+exports/
+
+# Local env / scratch
+.env
+*.local
+tmp/
