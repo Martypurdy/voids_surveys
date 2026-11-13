@@ -3,7 +3,7 @@ import { scheduleSave, flushSave, deletePhotos } from '../db.js';
 import { newMeter, UTILITIES, METER_TYPES, SUPPLY_STATUSES } from '../model.js';
 import { h, textField, selectField, confirmDialog } from '../ui.js';
 import { photoField } from '../photos.js';
-import { loadJobOr404, jobChrome } from './jobAddress.js';
+import { loadJobOr404, jobChrome, completeFooter } from './chrome.js';
 
 export default async function meters(root, { id }) {
   const job = await loadJobOr404(id);
@@ -84,5 +84,6 @@ export default async function meters(root, { id }) {
           container.append(card);
           card.scrollIntoView({ behavior: 'smooth', block: 'start' });
         },
-      }, '+ Add another meter')));
+      }, '+ Add another meter'),
+      completeFooter(job, 'meters')));
 }

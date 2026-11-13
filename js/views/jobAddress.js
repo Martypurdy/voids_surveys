@@ -1,35 +1,10 @@
-// Screen 2: job details – postcode lookup, address, GPS, navigate, void ref, surveyor.
-import { getJob, scheduleSave } from '../db.js';
+// Screen: address – postcode lookup, address, GPS, navigate, surveyor.
+import { scheduleSave } from '../db.js';
 import { jobTitle, fmtDateTime } from '../model.js';
-import { h, pageHeader, jobTabs, textField, toast, icon, ICONS, confirmDialog } from '../ui.js';
+import { h, textField, toast, confirmDialog } from '../ui.js';
 import { lookupPostcode, lookupStreet, formatPostcode, getPosition, directionsUrl, pinUrl } from '../geo.js';
-import { LAST_SURVEYOR } from './jobList.js';
-import { jobActions } from './jobActions.js';
-import { go } from '../router.js';
-
-export async function loadJobOr404(id) {
-  const job = await getJob(id);
-  if (!job) throw new Error('Job not found on this device');
-  return job;
-}
-
-/** Header + tabs shared by all job screens. */
-export function jobChrome(job, active) {
-  return [
-    pageHeader(jobTitle(job), {
-      back: '#/',
-      actions: h('button', {
-        type: 'button',
-        class: 'icon-btn',
-        'aria-label': 'Export / job actions',
-        onclick: async () => {
-          if ((await jobActions(job)) === 'deleted') go('/');
-        },
-      }, icon(ICONS.share)),
-    }),
-    jobTabs(job.id, active),
-  ];
-}
+import { surveyorField } from '../surveyors.js';
+import { loadJobOr404, jobChrome, completeFooter } from './chrome.js';
 
 export default async function jobAddress(root, { id }) {
   const job = await loadJobOr404(id);
@@ -153,7 +128,7 @@ export default async function jobAddress(root, { id }) {
   }, 'Use my location');
 
   root.append(
-    ...jobChrome(job, ''),
+    ...jobChrome(job, 'address'),
     h('div', { class: 'content' },
       h('h2', null, 'Address'),
       h('div', { class: 'input-row' }, postcodeField, lookupBtn),
@@ -162,18 +137,9 @@ export default async function jobAddress(root, { id }) {
       coords,
       h('div', { class: 'btn-row' }, nav, gpsBtn),
 
-      h('h2', null, 'Job'),
-      textField('Void reference', job.voidRef, (v) => {
-        job.voidRef = v;
-        save();
-        updateDerived();
-      }, { autocapitalize: 'characters' }),
-      textField('Surveyor', job.surveyor, (v) => {
-        job.surveyor = v;
-        try { localStorage.setItem(LAST_SURVEYOR, v); } catch { /* ignore */ }
-        save();
-      }, { autocapitalize: 'words' }),
-      h('p', { class: 'hint' }, `Created ${fmtDateTime(job.created)}`)));
+      h('div', { style: 'margin-top:20px' }, surveyorField(job, save)),
+      h('p', { class: 'hint' }, `Survey created ${fmtDateTime(job.created)}`),
+      completeFooter(job, 'address')));
 
   updateDerived();
 }

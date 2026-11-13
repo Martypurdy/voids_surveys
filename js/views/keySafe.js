@@ -1,13 +1,11 @@
-// Screen 5: key safe – location, masked code, GPS pin, photos.
+// Key safe section – location, masked code, GPS pin, photos.
 // The code is masked on screen and excluded from exports unless the user opts in.
 import { scheduleSave } from '../db.js';
 import { h, textField, toast } from '../ui.js';
 import { photoField } from '../photos.js';
 import { getPosition, pinUrl } from '../geo.js';
-import { loadJobOr404, jobChrome } from './jobAddress.js';
-
-export default async function keySafe(root, { id }) {
-  const job = await loadJobOr404(id);
+/** Key safe section (shown on the "Keys & key safe" screen). */
+export function keySafeSection(job) {
   const ks = job.keySafe;
   const save = () => scheduleSave(job);
 
@@ -69,18 +67,18 @@ export default async function keySafe(root, { id }) {
   }, 'Pin my location');
   syncPin();
 
-  root.append(
-    ...jobChrome(job, 'keysafe'),
-    h('div', { class: 'content' },
-      textField('Location', ks.location, (v) => {
+  return h('section', null,
+    h('h2', { class: 'section-title' }, 'Key safe'),
+    h('div', null,
+      textField('Key safe location', ks.location, (v) => {
         ks.location = v;
         save();
       }, { multiline: true, placeholder: 'e.g. Left of front door, behind downpipe, 1 m high', autocapitalize: 'sentences' }),
       h('div', { class: 'input-row' }, codeField, toggle),
       h('p', { class: 'hint' }, 'The code is hidden on screen and left out of PDF and backup exports unless you tick “Include key safe code” when exporting.'),
-      h('h2', null, 'GPS pin'),
+      h('span', { class: 'field-label' }, 'GPS pin'),
       pin,
       h('div', { class: 'btn-row' }, pinBtn, clearBtn),
-      h('h2', null, 'Photos'),
+      h('span', { class: 'field-label' }, 'Key safe photos'),
       photoField(job, ks.photos)));
 }

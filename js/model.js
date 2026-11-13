@@ -13,6 +13,35 @@ export const SUPPLY_STATUSES = ['On', 'Off', 'Capped', 'Not found'];
 
 export const BACKUP_WARN_DAYS = 7;
 
+/** Survey sections in tab order: [key, label, route path under #/job/:id]. */
+export const SECTIONS = [
+  ['address', 'Address', ''],
+  ['property', 'Property type', 'property'],
+  ['keys', 'Keys & key safe', 'keys'],
+  ['meters', 'Meters', 'meters'],
+  ['rooms', 'Rooms', 'rooms'],
+  ['externals', 'Externals', 'externals'],
+];
+
+export const PROPERTY_TYPES = ['House', 'Flat', 'Bungalow', 'Maisonette', 'Bedsit', 'Other'];
+export const PROPERTY_STYLES = ['Detached', 'Semi-detached', 'Mid-terrace', 'End-terrace'];
+
+export function newProperty() {
+  return { type: '', style: '', bedrooms: '', storeys: '', floor: '', notes: '' };
+}
+
+/** Section progress: undefined (not started) | 'started' | 'complete'. */
+export const sectionState = (job, key) => job.progress?.[key];
+export const completedCount = (job) => SECTIONS.filter(([k]) => job.progress?.[k] === 'complete').length;
+
+/** Bring a job saved by an older version up to the current shape (in place). */
+export function upgradeJob(job) {
+  normalizeAddress(job.address);
+  job.progress ??= {};
+  job.property = { ...newProperty(), ...(job.property || {}) };
+  return job;
+}
+
 export function uid() {
   if (crypto.randomUUID) return crypto.randomUUID();
   const b = crypto.getRandomValues(new Uint8Array(16));
@@ -36,8 +65,10 @@ export function newJob({ surveyor = '' } = {}) {
     updated: t,
     lastExported: null,
     address: { postcode: '', text: '', lat: null, lng: null },
-    voidRef: '',
+    voidRef: '', // no longer shown in the app; kept so older files still import
     surveyor,
+    property: newProperty(),
+    progress: {},
     rooms: [],
     externals: [],
     keys: [],
@@ -138,7 +169,7 @@ export function jobTitle(job) {
   const first = textLines(a)[0] || '';
   const pc = (a.postcode || '').trim();
   const title = [first, pc && !squash(first).includes(squash(pc)) ? pc : ''].filter(Boolean).join(', ');
-  return title || job.voidRef.trim() || 'New survey';
+  return title || 'New survey';
 }
 
 /**

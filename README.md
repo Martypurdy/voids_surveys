@@ -32,6 +32,11 @@ Open devices will show “A new version is available – Reload”.
 
 ## Using it
 
+Each job has six sections, shown as tabs in this order. A tab turns **amber** when you open
+it and **green ✓** when you tap the *Mark … complete* button at the bottom of that screen
+(which then moves you to the next unfinished section). *Reopen section* undoes it. The job
+list shows a progress bar and “n of 6 sections complete”.
+
 1. **Jobs** – create, open, import a `.json` job file; ⋮ on a job gives PDF / backup / delete.
 2. **Address** – enter the postcode at the top and tap *Look up*: the street, area, town and
    postcode are filled into a single address box with the cursor at the start, ready for the
@@ -40,13 +45,17 @@ Open devices will show “A new version is available – Reload”.
    Maps* shows the pin; *Use my location* stores the GPS position.
    Free postcode data has no house numbers, and a few postcodes (large sites, PO boxes) have no
    street – then the first line is left blank for you to fill in.
-3. **Rooms / Externals** – add from presets (Bedroom auto-numbers) or a custom name; each has
-   condition (Good / Fair / Poor / N/A), notes and photos.
-4. **Keys** – key set, quantity, received from, issued to, date, photos.
-5. **Key safe** – location, masked code (*Show* to reveal), GPS pin, photos.
-6. **Meters** – gas, electric, water (add more if needed): type (Credit / Prepayment / Smart),
+   **Surveyor** – pick from a list saved on this device; *+ Add* adds a name, *Remove* takes it
+   off the list. The last surveyor picked is filled in automatically on new surveys.
+3. **Property type** – House / Flat / Bungalow / Maisonette / Bedsit / Other, style (houses and
+   bungalows), floor level (flats), bedrooms, storeys, notes.
+4. **Keys & key safe** – key register (key set, quantity, received from, issued to, date,
+   photos) and the key safe (location, masked code – *Show* to reveal, GPS pin, photos).
+5. **Meters** – gas, electric, water (add more if needed): type (Credit / Prepayment / Smart),
    supply status (On / Off / Capped / Not found), credit/debt balance for prepayment, serial,
    reading, date, location, photos.
+6. **Rooms / Externals** – add from presets (Bedroom auto-numbers) or a custom name; each has
+   condition (Good / Fair / Poor / N/A), notes and photos.
 
 **Photos:** *+ Add photos* lets iOS offer Take Photo / Photo Library; the camera button opens
 the rear camera directly. Photos are resized on the device to 1600 px JPEG.

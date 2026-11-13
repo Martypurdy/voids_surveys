@@ -340,3 +340,58 @@ dialog::backdrop { background: rgb(0 0 0 / .45); }
 @media (min-width: 600px) {
   .content { padding: 16px 20px; }
 }
+
+/* ---------- Section progress (tabs, job list, complete button) ---------- */
+:root {
+  --started-bg: #fff1d6;
+  --started-ink: #8a5300;
+  --started-line: #e09b1a;
+  --done-bg: #ddf3e3;
+  --done-ink: #17652f;
+  --done-line: #1e7d3a;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --started-bg: #3d2c0c;
+    --started-ink: #ffcc70;
+    --started-line: #f0b44c;
+    --done-bg: #12351f;
+    --done-ink: #8ee0a6;
+    --done-line: #5cc97c;
+  }
+}
+
+.tabs { gap: 4px; padding: 6px 6px 0; }
+.tabs a { border-radius: 8px 8px 0 0; padding: 12px 12px 10px; }
+.tabs a[data-state="started"] { background: var(--started-bg); color: var(--started-ink); }
+.tabs a[data-state="complete"] { background: var(--done-bg); color: var(--done-ink); }
+.tabs a[data-state="started"][aria-current="page"] { border-bottom-color: var(--started-line); }
+.tabs a[data-state="complete"][aria-current="page"] { border-bottom-color: var(--done-line); }
+
+.progress { display: flex; gap: 3px; margin: 6px 0 4px; max-width: 220px; }
+.progress span { flex: 1; height: 6px; border-radius: 3px; background: var(--border); }
+.progress span[data-state="started"] { background: var(--started-line); }
+.progress span[data-state="complete"] { background: var(--done-line); }
+
+.complete-footer { margin: 28px 0 8px; padding-top: 16px; border-top: 1px solid var(--border); }
+.btn-complete {
+  min-height: 56px;
+  background: var(--done-line);
+  border-color: var(--done-line);
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+@media (prefers-color-scheme: dark) { .btn-complete { color: #0d2416; } }
+.complete-note { margin: 0 0 8px; padding: 10px 12px; border-radius: 10px; background: var(--done-bg); color: var(--done-ink); font-weight: 700; text-align: center; }
+
+.section-title { margin-top: 8px; }
+section > .section-title { margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--border); }
+
+.choice-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+.choice-grid button { padding: 0 6px; font-weight: 600; }
+.choice-grid button[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: var(--primary-ink); }
+
+/* Toasts must never block taps on what's underneath (e.g. the Complete button). */
+.toast { pointer-events: none; }
+.toast button { pointer-events: auto; }

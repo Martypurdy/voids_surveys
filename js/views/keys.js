@@ -1,9 +1,10 @@
-// Screen 4: key register.
+// Screen: keys & key safe – key register plus the key safe section.
 import { scheduleSave, flushSave, deletePhotos } from '../db.js';
 import { newKey, fmtDate } from '../model.js';
 import { h, textField, confirmDialog } from '../ui.js';
 import { photoField } from '../photos.js';
-import { loadJobOr404, jobChrome } from './jobAddress.js';
+import { loadJobOr404, jobChrome, completeFooter } from './chrome.js';
+import { keySafeSection } from './keySafe.js';
 
 export default async function keys(root, { id }) {
   const job = await loadJobOr404(id);
@@ -61,6 +62,7 @@ export default async function keys(root, { id }) {
   root.append(
     ...jobChrome(job, 'keys'),
     h('div', { class: 'content' },
+      h('h2', { class: 'section-title' }, 'Key register'),
       h('button', {
         type: 'button',
         class: 'btn-primary btn-block',
@@ -76,5 +78,7 @@ export default async function keys(root, { id }) {
         },
       }, '+ Add key set'),
       container,
-      empty));
+      empty,
+      keySafeSection(job),
+      completeFooter(job, 'keys')));
 }

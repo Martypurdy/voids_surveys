@@ -1,11 +1,11 @@
 // Screen 1: job list – create, open, actions (export / delete), import.
 import { listJobs, saveJob, requestPersist, storageInfo } from '../db.js';
-import { newJob, jobTitle, backupStatus, fmtDate, allPhotoIds } from '../model.js';
+import { newJob, jobTitle, backupStatus, fmtDate, allPhotoIds, SECTIONS, completedCount, sectionState } from '../model.js';
 import { h, icon, ICONS, pageHeader } from '../ui.js';
 import { go, refresh } from '../router.js';
 import { jobActions } from './jobActions.js';
 
-const LAST_SURVEYOR = 'voids.lastSurveyor';
+import { getLastSurveyor } from '../surveyors.js';
 
 export default async function jobList(root) {
   const jobs = await listJobs();
@@ -37,9 +37,7 @@ export default async function jobList(root) {
 }
 
 async function createJob() {
-  let surveyor = '';
-  try { surveyor = localStorage.getItem(LAST_SURVEYOR) || ''; } catch { /* storage blocked */ }
-  const job = newJob({ surveyor });
+  const job = newJob({ surveyor: getLastSurveyor() });
   await saveJob(job);
   // Ask the browser to keep our data (helps against eviction, esp. on iOS).
   requestPersist();
@@ -52,11 +50,13 @@ function jobCard(job) {
     `${job.rooms.length} room${job.rooms.length === 1 ? '' : 's'}`,
     `${allPhotoIds(job).length} photo${allPhotoIds(job).length === 1 ? '' : 's'}`,
   ].join(' · ');
-  const sub = job.voidRef ? `Ref ${job.voidRef}` : '';
+  const done = completedCount(job);
+  const sub = [job.surveyor, `${done} of ${SECTIONS.length} sections complete`].filter(Boolean).join(' · ');
   return h('div', { class: 'card job-card' },
     h('a', { href: `#/job/${job.id}` },
       h('div', { class: 'job-title' }, jobTitle(job)),
-      sub ? h('div', { class: 'job-sub' }, sub) : null,
+      h('div', { class: 'job-sub' }, sub),
+      h('div', { class: 'progress', 'aria-hidden': 'true' }, SECTIONS.map(([k]) => h('span', { dataset: { state: sectionState(job, k) || 'todo' } }))),
       h('div', { class: 'job-meta' }, `Created ${fmtDate(job.created)} · ${counts}`),
       status.stale ? h('span', { class: 'warn' }, '⚠ ', status.text) : null),
     h('button', {
@@ -80,4 +80,3 @@ function footnote() {
   return el;
 }
 
-export { LAST_SURVEYOR };

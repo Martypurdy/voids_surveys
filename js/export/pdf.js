@@ -23,7 +23,7 @@ function loadJsPDF() {
 }
 
 export function pdfFilename(job) {
-  return `Void survey - ${slug(job.voidRef || jobTitle(job))} - ${todayLocal()}.pdf`;
+  return `Void survey - ${slug(jobTitle(job))} - ${todayLocal()}.pdf`;
 }
 
 // The built-in PDF fonts only cover Latin-1, so normalise common "smart" characters.
@@ -161,7 +161,6 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
   para(addr.length ? addr.join('\n') : 'Address not recorded', { size: 12, style: 'bold' });
   y += 3;
   kv([
-    ['Void reference', job.voidRef],
     ['Surveyor', job.surveyor],
     ['Survey started', fmtDateTime(job.created)],
     ['Report generated', fmtDateTime(new Date().toISOString())],
@@ -180,8 +179,20 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
   }
 
   // ---------- sections ----------
-  await itemSection('Rooms', job.rooms);
-  await itemSection('Externals', job.externals);
+  // Same order as the app's tabs: property, keys & key safe, meters, rooms, externals.
+  const prop = job.property;
+  if (prop.type || prop.style || prop.bedrooms || prop.storeys || prop.floor || prop.notes) {
+    heading('Property');
+    kv([
+      ['Type', prop.type],
+      ['Style', prop.style],
+      ['Bedrooms', prop.bedrooms],
+      ['Storeys', prop.storeys],
+      ['Floor level', prop.floor],
+    ]);
+    para(prop.notes);
+    y += 2;
+  }
 
   if (job.keys.length) {
     heading('Key register');
@@ -224,9 +235,12 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
     }
   }
 
+  await itemSection('Rooms', job.rooms);
+  await itemSection('Externals', job.externals);
+
   // ---------- footers ----------
   const pages = doc.getNumberOfPages();
-  const footer = [jobTitle(job), job.voidRef && `Ref ${job.voidRef}`].filter(Boolean).join(' · ');
+  const footer = jobTitle(job);
   for (let p = 1; p <= pages; p++) {
     doc.setPage(p);
     font(8, 'normal', [110, 118, 126]);

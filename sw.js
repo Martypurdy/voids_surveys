@@ -1,6 +1,6 @@
 // Service worker: precache the app shell, serve it cache-first so the app works offline.
 // Bump VERSION whenever any file below changes, so devices pick up the update.
-const VERSION = 'v2';
+const VERSION = 'v3';
 const CACHE = `voids-${VERSION}`;
 
 const ASSETS = [
@@ -21,6 +21,9 @@ const ASSETS = [
   'js/ui.js',
   'js/geo.js',
   'js/photos.js',
+  'js/surveyors.js',
+  'js/views/chrome.js',
+  'js/views/property.js',
   'js/views/jobList.js',
   'js/views/jobActions.js',
   'js/views/jobAddress.js',

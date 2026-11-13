@@ -2,7 +2,7 @@
 //   jobs   – job objects (photos referenced by id only)
 //   photos – { id, jobId, blob, thumb, w, h, created }
 import { createStore, get, set, del, values, getMany, setMany, delMany } from '../vendor/idb-keyval.js';
-import { allPhotoIds, nowISO, normalizeAddress } from './model.js';
+import { allPhotoIds, nowISO, upgradeJob } from './model.js';
 
 const jobStore = createStore('voids-jobs', 'jobs');
 const photoStore = createStore('voids-photos', 'photos');
@@ -11,19 +11,13 @@ const photoStore = createStore('voids-photos', 'photos');
 
 export async function listJobs() {
   const jobs = await values(jobStore);
-  jobs.forEach(upgrade);
+  jobs.forEach(upgradeJob);
   return jobs.sort((a, b) => (b.updated || '').localeCompare(a.updated || ''));
 }
 
 export async function getJob(id) {
   const job = await get(id, jobStore);
-  return job && upgrade(job);
-}
-
-/** Bring jobs saved by older versions up to the current shape. */
-function upgrade(job) {
-  normalizeAddress(job.address);
-  return job;
+  return job && upgradeJob(job);
 }
 
 export async function saveJob(job) {

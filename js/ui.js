@@ -51,27 +51,6 @@ export function pageHeader(title, { back, actions = [] } = {}) {
     actions);
 }
 
-const JOB_TABS = [
-  ['', 'Address'],
-  ['rooms', 'Rooms'],
-  ['externals', 'Externals'],
-  ['keys', 'Keys'],
-  ['keysafe', 'Key safe'],
-  ['meters', 'Meters'],
-];
-
-export function jobTabs(jobId, active) {
-  const nav = h('nav', { class: 'tabs', 'aria-label': 'Survey sections' },
-    JOB_TABS.map(([path, label]) =>
-      h('a', {
-        href: `#/job/${jobId}${path ? '/' + path : ''}`,
-        'aria-current': path === active ? 'page' : null,
-      }, label)));
-  // Keep the active tab visible on narrow screens.
-  requestAnimationFrame(() => nav.querySelector('[aria-current]')?.scrollIntoView({ inline: 'center', block: 'nearest' }));
-  return nav;
-}
-
 // ---------- Fields ----------
 
 /**

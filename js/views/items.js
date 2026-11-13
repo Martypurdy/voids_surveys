@@ -3,7 +3,7 @@ import { scheduleSave, flushSave, deletePhotos } from '../db.js';
 import { ROOM_PRESETS, EXTERNAL_PRESETS, newItem, nextNumberedName } from '../model.js';
 import { h, textField, conditionPicker, badge, confirmDialog } from '../ui.js';
 import { photoField } from '../photos.js';
-import { loadJobOr404, jobChrome } from './jobAddress.js';
+import { loadJobOr404, jobChrome, completeFooter } from './chrome.js';
 
 const NUMBERED = new Set(['Bedroom']);
 
@@ -101,5 +101,6 @@ export default async function items(root, { id, kind }) {
         h('div', { class: 'field' }, customInput),
         h('button', { type: 'button', onclick: addCustom }, 'Add')),
       container,
-      empty));
+      empty,
+      completeFooter(job, kind)));
 }

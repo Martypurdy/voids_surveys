@@ -1,6 +1,6 @@
 // .json job file: full backup / transfer, photos embedded as base64.
 import { getJob, saveJob, deleteJob, putPhotos } from '../db.js';
-import { SCHEMA, allPhotoIds, remapPhotoIds, uid, nowISO, slug, jobTitle, todayLocal, newKeySafe, normalizeAddress } from '../model.js';
+import { SCHEMA, allPhotoIds, remapPhotoIds, uid, nowISO, slug, jobTitle, todayLocal, newKeySafe, upgradeJob } from '../model.js';
 import { loadPhotos, makeThumb } from '../photos.js';
 import { choose, toast, busy } from '../ui.js';
 
@@ -23,7 +23,7 @@ function base64ToBlob(b64, type) {
 }
 
 export function jsonFilename(job) {
-  return `void-survey-${slug(job.voidRef || jobTitle(job))}-${todayLocal()}.json`;
+  return `void-survey-${slug(jobTitle(job))}-${todayLocal()}.json`;
 }
 
 /** Build the backup file. The key safe code is blanked unless includeCode. */
@@ -52,7 +52,8 @@ function validate(data) {
   const j = data.job;
   for (const k of ['rooms', 'externals', 'keys', 'meters']) if (!Array.isArray(j[k])) j[k] = [];
   j.keySafe = { ...newKeySafe(), ...(j.keySafe || {}) };
-  j.address = normalizeAddress(j.address || {});
+  j.address ||= {};
+  upgradeJob(j);
   for (const list of [...j.rooms, ...j.externals, ...j.keys, ...j.meters]) {
     if (!Array.isArray(list.photos)) list.photos = [];
   }
