@@ -32,7 +32,7 @@ Open devices will show “A new version is available – Reload”.
 
 ## Using it
 
-Each job has five sections, shown as tabs in this order: **Address, Property, Meters, Rooms,
+Each job has five sections, shown as tabs in this order: **Address, Property, Services, Rooms,
 Externals**. A tab turns **amber** when you open it and **green ✓** when you tap the
 *Mark … complete* button at the bottom of that screen (which then moves you to the next
 unfinished section). *Reopen section* undoes it. The job list shows a progress bar and
@@ -55,9 +55,9 @@ unfinished section). *Reopen section* undoes it. The job list shows a progress b
    Gate, Garage, Windows, Post box – pick any), Property clearance (pop-up: Full, Partial,
    Needle sweep, Environmental, Pest control, and by Operatives / Contractor), and **Key safe
    details** (location, masked code – *Show* to reveal, GPS pin, photos).
-4. **Meters** – **Heating type** pop-up (Gas boiler, Electric heaters, Heat pump – pick any),
-   then gas, electric and water meters, each with **meter location** and photos
-   (*+ Add another meter* for extras).
+4. **Services** – **Heating type** pop-up (Gas boiler, Electric heaters, Heat pump – pick any),
+   then **Fuse board**, **Mains stop tap**, and the gas, electric and water meters – each with a
+   **location** description and photos (*+ Add another meter / service* for extras).
 5. **Rooms** – add rooms from presets (Bedroom auto-numbers) or a custom name. Each room is a
    button: **amber** = not finished, **red** = work needed, **green** = all OK. Tap a room:
    - **Room size** – length × width × height; the app works out emulsion (ceiling and wall m²),

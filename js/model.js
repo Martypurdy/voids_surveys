@@ -7,7 +7,11 @@ export const CONDITIONS = ['Good', 'Fair', 'Poor', 'N/A'];
 export const ROOM_PRESETS = ['Hall', 'Landing', 'Living room', 'Kitchen', 'Bathroom', 'WC', 'Bedroom', 'Porch'];
 export const EXTERNAL_PRESETS = ['Front garden', 'Rear garden', 'Boundaries', 'Garage', 'Shed'];
 
-export const UTILITIES = ['Gas', 'Electric', 'Water'];
+// Services tab, in display order. The first of each is always present.
+export const UTILITIES = ['Fuse board', 'Mains stop tap', 'Gas', 'Electric', 'Water'];
+const METER_TYPES_SET = new Set(['Gas', 'Electric', 'Water']);
+/** 'Gas' -> 'Gas meter'; 'Fuse board' stays as is. */
+export const serviceTitle = (u) => (METER_TYPES_SET.has(u) ? `${u} meter` : u);
 export const METER_TYPES = ['Credit', 'Prepayment', 'Smart'];
 export const SUPPLY_STATUSES = ['On', 'Off', 'Capped', 'Not found'];
 export const HEATING_TYPES = ['Gas boiler', 'Electric heaters', 'Heat pump'];
@@ -18,7 +22,7 @@ export const BACKUP_WARN_DAYS = 7;
 export const SECTIONS = [
   ['address', 'Address', ''],
   ['property', 'Property', 'property'],
-  ['meters', 'Meters', 'meters'],
+  ['meters', 'Services', 'meters'],
   ['rooms', 'Rooms', 'rooms'],
   ['externals', 'Externals', 'externals'],
 ];
@@ -72,6 +76,10 @@ export function upgradeJob(job) {
   if (!Array.isArray(job.property.photos)) job.property.photos = [];
   job.works = { ...newWorks(), ...(job.works || {}) };
   if (!Array.isArray(job.heating)) job.heating = [];
+  // Older surveys: add Fuse board and Mains stop tap at the top of Services.
+  for (const u of ['Mains stop tap', 'Fuse board']) {
+    if (!job.meters.some((m) => m.utility === u)) job.meters.unshift(newMeter(u));
+  }
   for (const r of job.rooms) {
     r.parts ??= {};
     r.size ??= { length: '', width: '', height: '' };

@@ -1,5 +1,5 @@
 // PDF report (jsPDF, loaded on demand from /vendor).
-import { addressLines, jobTitle, fmtDate, fmtDateTime, slug, todayLocal, allPhotoIds, worksSummary, roomStatus, roomAreas } from '../model.js';
+import { addressLines, jobTitle, fmtDate, fmtDateTime, slug, todayLocal, allPhotoIds, worksSummary, roomStatus, roomAreas, serviceTitle } from '../model.js';
 import { PARTS, UNITS, defectInfo, qtyText as unitQty } from '../data/parts.js';
 import { loadPhotos, resizeImage } from '../photos.js';
 
@@ -316,11 +316,11 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
 
   const meters = job.meters.filter((m) => m.location || m.photos.length || m.serial || m.reading || m.type || m.supply);
   if (meters.length || job.heating.length) {
-    heading('Meters & heating');
+    heading('Services');
     kv([['Heating type', job.heating.join(', ')]]);
     for (const m of meters) {
       ensure(45); // keep a meter's heading with its details
-      subheading(`${m.utility} meter`);
+      subheading(serviceTitle(m.utility));
       kv([
         ['Location', m.location],
         // Older surveys recorded these too – print them if present.

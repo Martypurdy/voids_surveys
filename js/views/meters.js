@@ -1,11 +1,18 @@
-// Screen: meters & heating – heating type (pop-up), then each meter's location and photos.
+// Screen: services – heating, fuse board, stop tap & meters – heating type (pop-up), then each meter's location and photos.
 import { scheduleSave, flushSave, deletePhotos } from '../db.js';
-import { newMeter, UTILITIES, HEATING_TYPES } from '../model.js';
+import { newMeter, UTILITIES, HEATING_TYPES, serviceTitle } from '../model.js';
 import { h, textField, selectField, confirmDialog, multiSelect } from '../ui.js';
 import { photoField } from '../photos.js';
 import { loadJobOr404, jobChrome, completeFooter } from './chrome.js';
 
-const DEFAULT_UTILITIES = new Set(UTILITIES); // the first gas/electric/water meters can't be deleted
+const DEFAULT_UTILITIES = new Set(UTILITIES);
+const LOCATION_HINTS = {
+  'Fuse board': 'e.g. Under stairs cupboard, above front door',
+  'Mains stop tap': 'e.g. Under kitchen sink, in front garden',
+  Gas: 'e.g. External box at front of property',
+  Electric: 'e.g. Under stairs cupboard',
+  Water: 'e.g. Pavement outside, under kitchen sink',
+}; // the first gas/electric/water meters can't be deleted
 
 export default async function meters(root, { id }) {
   const job = await loadJobOr404(id);
@@ -44,7 +51,7 @@ export default async function meters(root, { id }) {
     const title = h('span', { class: 'summary-title' });
     const meta = h('span', { class: 'summary-meta' });
     const sync = () => {
-      title.textContent = `${m.utility} meter`;
+      title.textContent = serviceTitle(m.utility);
       meta.textContent = [m.location.trim() ? 'Located' : '', m.photos.length ? `📷 ${m.photos.length}` : ''].filter(Boolean).join(' · ');
     };
     sync();
@@ -54,13 +61,13 @@ export default async function meters(root, { id }) {
       h('summary', null, title, meta),
       h('div', { class: 'card-body' },
         removable
-          ? selectField('Meter', m.utility, UTILITIES, (v) => { m.utility = v; sync(); save(); }, { placeholder: null })
+          ? selectField('Type', m.utility, UTILITIES.map((u) => [u, serviceTitle(u)]), (v) => { m.utility = v; sync(); save(); }, { placeholder: null })
           : null,
-        textField('Meter location', m.location, (v) => {
+        textField('Location', m.location, (v) => {
           m.location = v;
           sync();
           save();
-        }, { placeholder: 'e.g. Under stairs cupboard, external box at front', autocapitalize: 'sentences' }),
+        }, { placeholder: LOCATION_HINTS[m.utility] || 'e.g. Under stairs cupboard', autocapitalize: 'sentences' }),
         h('span', { class: 'field-label' }, 'Photos'),
         photoField(job, m.photos, sync),
         removable
@@ -69,7 +76,7 @@ export default async function meters(root, { id }) {
               type: 'button',
               class: 'btn-danger btn-small',
               onclick: async () => {
-                if (!(await confirmDialog(`Delete this ${m.utility.toLowerCase()} meter?`))) return;
+                if (!(await confirmDialog(`Delete this ${serviceTitle(m.utility).toLowerCase()}?`))) return;
                 job.meters.splice(job.meters.indexOf(m), 1);
                 await deletePhotos(m.photos);
                 scheduleSave(job, 0);
@@ -88,7 +95,7 @@ export default async function meters(root, { id }) {
     h('div', { class: 'content' },
       h('h2', null, 'Heating'),
       h('div', { class: 'works-list' }, heatingBtn),
-      h('h2', null, 'Meters'),
+      h('h2', null, 'Fuse board, stop tap & meters'),
       container,
       h('button', {
         type: 'button',
@@ -101,6 +108,6 @@ export default async function meters(root, { id }) {
           container.append(card);
           card.scrollIntoView({ behavior: 'smooth', block: 'start' });
         },
-      }, '+ Add another meter'),
+      }, '+ Add another meter / service'),
       completeFooter(job, 'meters')));
 }
