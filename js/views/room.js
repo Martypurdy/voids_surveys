@@ -6,7 +6,7 @@ import { scheduleSave, flushSave, deletePhotos } from '../db.js';
 import { roomPart, roomAreas, roomStatus } from '../model.js';
 import { PARTS, UNITS, qtyText, defectInfo } from '../data/parts.js';
 import { getLibrary, searchLibrary, preloadFor, libraryItem } from '../sor.js';
-import { hiddenFor, setHidden, roomTypeLabel } from '../templates.js';
+import { hiddenFor, setHidden, addedFor, setAdded, roomTypeLabel } from '../templates.js';
 import { h, textField, confirmDialog, toast } from '../ui.js';
 import { photoField } from '../photos.js';
 import { go } from '../router.js';
@@ -109,11 +109,21 @@ export default async function roomPage(root, { id, roomId }) {
     const options = library
       ? preloadFor(library, part.key, areas.ceiling)
       : part.defects.map((d) => ({ k: d.id, c: d.id, d: d.label, u: d.unit }));
-    // This device's template: options removed for this type of room (Bedroom 1/2/3 share one).
+    // This device's template for this type of room (Bedroom 1/2/3 share one):
+    // SORs removed with − and SORs pinned with 📌.
     const typeLabel = roomTypeLabel(room.name);
+    const listName = `${typeLabel} ${part.label.toLowerCase()}`;
     let hidden = hiddenFor(room.name, part.key);
-    const visibleOptions = () => options.filter((o) => !hidden.has(o.k));
+    let pinned = addedFor(room.name, part.key);
+    const baseCodes = new Set(options.map((o) => o.c));
+    const pinnedOptions = () => pinned.filter((x) => !baseCodes.has(x.c))
+      .map((x) => ({ k: `pin:${x.c}`, c: x.c, d: x.d, u: x.u, pinned: true }));
+    const visibleOptions = () => [...options.filter((o) => !hidden.has(o.k)), ...pinnedOptions()];
     const removedOptions = () => options.filter((o) => hidden.has(o.k));
+    const refreshTemplate = () => {
+      hidden = hiddenFor(room.name, part.key);
+      pinned = addedFor(room.name, part.key);
+    };
 
     // Working copy: code -> { qty, d, u }. Only Save changes the room.
     const chosen = new Map(p.defects.map((d) => {
@@ -135,7 +145,7 @@ export default async function roomPage(root, { id, roomId }) {
       }
     }
 
-    const row = (opt, { removable = false } = {}) => {
+    const row = (opt, { removable = false, pinnable = false } = {}) => {
       const on = chosen.has(opt.c);
       const alsoOn = elsewhere.get(opt.c);
       const unit = UNITS[opt.u] || UNITS.nr;
@@ -155,7 +165,7 @@ export default async function roomPage(root, { id, roomId }) {
         h('span', { class: 'works-tick', 'aria-hidden': 'true' }, on ? '✓' : ''),
         h('span', { class: 'defect-text' },
           h('span', { class: 'defect-label' }, opt.d),
-          library ? h('span', { class: 'defect-code' }, `${opt.c} · ${unit.label}${opt.note ? ` · ${opt.note}` : ''}`) : null,
+          library ? h('span', { class: 'defect-code' }, `${opt.c} · ${unit.label}${opt.note ? ` · ${opt.note}` : ''}${opt.pinned ? ' · 📌 added by you' : ''}`) : null,
           alsoOn ? h('span', { class: 'defect-also' }, `⚠ already on ${alsoOn.join(' & ')} in this room`) : null)),
         on
           ? h('label', { class: 'defect-qty' },
@@ -176,12 +186,34 @@ export default async function roomPage(root, { id, roomId }) {
             title: `Remove from ${typeLabel} list`,
             onclick: () => {
               // Already-ticked items stay ticked (they move to "Also selected").
-              setHidden(room.name, part.key, opt.k, true);
-              hidden = hiddenFor(room.name, part.key);
+              if (opt.pinned) {
+                setAdded(room.name, part.key, opt, false); // your own addition: just un-pin it
+                toast(`Removed from the ${listName} list`);
+              } else {
+                setHidden(room.name, part.key, opt.k, true);
+                toast(`Removed from ${listName} list – restore it at the bottom`);
+              }
+              refreshTemplate();
               render();
-              toast(`Removed from ${typeLabel} ${part.label.toLowerCase()} list – restore it at the bottom`);
             },
           }, '−')
+          : null,
+        pinnable
+          ? h('button', {
+            type: 'button',
+            class: 'defect-pin',
+            'aria-label': `Keep “${opt.d}” in the ${listName} list`,
+            title: `Keep in every ${listName} list`,
+            onclick: () => {
+              // A preloaded SOR that was removed earlier is simply restored.
+              const base = options.find((o) => o.c === opt.c);
+              if (base && hidden.has(base.k)) setHidden(room.name, part.key, base.k, false);
+              else setAdded(room.name, part.key, opt, true);
+              refreshTemplate();
+              render();
+              toast(`📌 Added to every ${listName} list on this phone`);
+            },
+          }, '📌')
           : null,
         lib?.l
           ? h('button', {
@@ -206,6 +238,8 @@ export default async function roomPage(root, { id, roomId }) {
     const results = h('div', { class: 'defect-list' });
     const list = h('div', { class: 'defect-list' });
 
+    const inList = (code) => visibleOptions().some((o) => o.c === code);
+
     const renderResults = () => {
       if (!library) return;
       const found = query.trim().length >= 2 ? searchLibrary(library, query, 30, part.key) : [];
@@ -213,7 +247,7 @@ export default async function roomPage(root, { id, roomId }) {
         query.trim().length >= 2
           ? h('p', { class: 'hint' }, found.length ? `${found.length === 30 ? '30+' : found.length} match${found.length === 1 ? '' : 'es'} – tap to add` : 'No matches')
           : '',
-        ...found.map((it) => row({ c: it.c, d: it.d, u: it.u })));
+        ...found.map((it) => row({ c: it.c, d: it.d, u: it.u }, { pinnable: !inList(it.c) })));
     };
 
     const render = () => {
@@ -225,7 +259,7 @@ export default async function roomPage(root, { id, roomId }) {
       const removed = removedOptions();
       list.replaceChildren(
         extras.length ? h('p', { class: 'field-label' }, 'Also selected') : '',
-        ...extras.map((o) => row(o)),
+        ...extras.map((o) => row(o, { pinnable: true })),
         h('p', { class: 'field-label' }, `${typeLabel} – ${part.label.toLowerCase()}${library ? ' SORs' : ''}`),
         ...shown.map((o) => row(o, { removable: true })),
         shown.length ? '' : h('p', { class: 'hint' }, 'All removed – use search, or restore some below.'),

@@ -33,6 +33,34 @@ export function hiddenFor(roomName, partKey) {
   return new Set(readAll()[slot(roomName, partKey)] || []);
 }
 
+// ----- SORs the surveyor has pinned (📌) into a room type's list -----
+const ADD_KEY = 'voids.sorTemplateAdd';
+
+function readAdds() {
+  try {
+    const v = JSON.parse(localStorage.getItem(ADD_KEY) || '{}');
+    return v && typeof v === 'object' ? v : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Pinned items for this room type + part: [{ c, d, u }]. */
+export function addedFor(roomName, partKey) {
+  const list = readAdds()[slot(roomName, partKey)];
+  return Array.isArray(list) ? list : [];
+}
+
+export function setAdded(roomName, partKey, item, on) {
+  const all = readAdds();
+  const k = slot(roomName, partKey);
+  const list = (all[k] || []).filter((x) => x.c !== item.c);
+  if (on) list.push({ c: item.c, d: item.d, u: item.u });
+  if (list.length) all[k] = list;
+  else delete all[k];
+  try { localStorage.setItem(ADD_KEY, JSON.stringify(all)); } catch { /* storage blocked/full */ }
+}
+
 export function setHidden(roomName, partKey, key, hidden) {
   const all = readAll();
   const s = new Set(all[slot(roomName, partKey)] || []);
