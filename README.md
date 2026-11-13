@@ -54,7 +54,7 @@ unfinished section). *Reopen section* undoes it. The job list shows a progress b
    default), Gain entry, Renew locks (pop-up: Front door pre-ticked, Back, Patio, Shed,
    Gate, Garage, Windows, Post box, Communal key / fob – pick any), Property clearance (pop-up: Full, Partial,
    Needle sweep, Environmental, Pest control, and by Operatives / Contractor), and **Key safe
-   details** (location, masked code – *Show* to reveal, GPS pin, photos).
+   details** shown under *Fit key safe* (location, code, GPS pin, photos).
 4. **Services** – **Heating type** pop-up (Gas boiler, Electric heaters, Heat pump – pick any),
    then **Fuse board**, **Mains stop tap**, and the gas, electric and water meters – each with a
    **location** description and photos (*+ Add another meter / service* for extras).
@@ -119,7 +119,8 @@ Photos are resized on the device to 1600 px JPEG.
 - **PDF report** – summary, every section, photos (re-encoded at 1024 px to keep size down).
 - **Backup file (.json)** – the whole job with photos as base64. Import it on any device.
   Importing a job that already exists offers *Replace* or *Keep both*.
-- The **key safe code is left out of both** unless you tick *Include key safe code*.
+- The **key safe code is included** in both by default – untick *Include key safe code* to leave
+  it out (e.g. for a report going to a third party).
 - On phones the file opens the share sheet (save to Files, email, etc.); on desktop it downloads.
 
 ### Back up regularly

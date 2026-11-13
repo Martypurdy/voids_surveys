@@ -682,3 +682,5 @@ body.no-scroll { overflow: hidden; }
   background: var(--surface);
 }
 .room-delete svg { width: 22px; height: 22px; }
+
+.keysafe-panel { margin-top: -4px; border-top-left-radius: 0; border-top-right-radius: 0; }

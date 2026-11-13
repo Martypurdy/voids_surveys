@@ -1,32 +1,22 @@
-// Key safe section – location, masked code, GPS pin, photos.
-// The code is masked on screen and excluded from exports unless the user opts in.
+// Key safe details – location, code (shown in plain view), GPS pin, photos.
+// Shown under "Fit key safe" on the Property screen.
 import { scheduleSave } from '../db.js';
 import { h, textField, toast } from '../ui.js';
 import { photoField } from '../photos.js';
 import { getPosition, pinUrl } from '../geo.js';
-/** Key safe section (shown on the "Keys & key safe" screen). */
+/** Key safe details section. */
 export function keySafeSection(job) {
   const ks = job.keySafe;
   const save = () => scheduleSave(job);
 
-  // Masked with CSS (-webkit-text-security) rather than type=password, so
-  // browsers don't offer to save it in the password manager.
-  const codeField = textField('Code', ks.code, (v) => {
+  const codeField = textField('Key safe code', ks.code, (v) => {
     ks.code = v;
     save();
-  }, { class: 'masked', autocapitalize: 'off', spellcheck: 'false' });
+  }, { autocapitalize: 'characters', spellcheck: 'false', placeholder: 'e.g. 1234' });
   const codeInput = codeField.querySelector('input');
+  // Stop password managers offering to save it.
   codeInput.setAttribute('data-lpignore', 'true');
   codeInput.setAttribute('data-1p-ignore', '');
-  const toggle = h('button', {
-    type: 'button',
-    'aria-pressed': 'false',
-    onclick: () => {
-      const showing = codeInput.classList.toggle('masked') === false;
-      toggle.textContent = showing ? 'Hide' : 'Show';
-      toggle.setAttribute('aria-pressed', String(showing));
-    },
-  }, 'Show');
 
   const pin = h('p', { class: 'coords' });
   const clearBtn = h('button', {
@@ -68,14 +58,13 @@ export function keySafeSection(job) {
   syncPin();
 
   return h('section', null,
-    h('h2', { class: 'section-title' }, 'Key safe'),
+    h('h2', { class: 'section-title' }, 'Key safe details'),
     h('div', null,
       textField('Key safe location', ks.location, (v) => {
         ks.location = v;
         save();
       }, { multiline: true, placeholder: 'e.g. Left of front door, behind downpipe, 1 m high', autocapitalize: 'sentences' }),
-      h('div', { class: 'input-row' }, codeField, toggle),
-      h('p', { class: 'hint' }, 'The code is hidden on screen and left out of PDF and backup exports unless you tick “Include key safe code” when exporting.'),
+      codeField,
       h('span', { class: 'field-label' }, 'GPS pin'),
       pin,
       h('div', { class: 'btn-row' }, pinBtn, clearBtn),

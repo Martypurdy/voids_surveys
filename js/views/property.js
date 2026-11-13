@@ -46,8 +46,10 @@ export default async function property(root, { id }) {
 
   // ----- Works required list -----
   const list = h('div', { class: 'works-list' });
-  const keySafePanel = h('div', { class: 'card card-body works-panel' }, keySafeSection(job));
-  let keySafeOpen = false;
+  // "Fit key safe" with the key safe details always shown right under it.
+  // The panel is never re-rendered, so typing in it is never interrupted.
+  const fitKeySafeSlot = h('div', { class: 'works-list' });
+  const keySafePanel = h('div', { class: 'card card-body works-panel keysafe-panel' }, keySafeSection(job));
 
   const item = (label, detail, on, onclick, { chevron, ...attrs } = {}) => h('button', {
     type: 'button',
@@ -62,12 +64,10 @@ export default async function property(root, { id }) {
     detail ? h('span', { class: 'works-detail' }, detail) : null),
   chevron ? h('span', { class: 'works-chevron', 'aria-hidden': 'true' }, chevron) : null);
 
-  const keySafeHasInfo = () => Boolean(job.keySafe.location.trim() || job.keySafe.code || job.keySafe.photos.length || job.keySafe.lat != null);
-
   const renderList = () => {
-    const ks = job.keySafe;
+    fitKeySafeSlot.replaceChildren(
+      item('Fit key safe', '', w.keySafe, () => { w.keySafe = !w.keySafe; save(); renderList(); }));
     list.replaceChildren(
-      item('Fit key safe', '', w.keySafe, () => { w.keySafe = !w.keySafe; save(); renderList(); }),
       item('Gain entry', '', w.gainEntry, () => { w.gainEntry = !w.gainEntry; save(); renderList(); }),
       item('Renew locks', w.cylinders?.length ? w.cylinders.join(', ') : 'Tap to choose locks',
         Boolean(w.cylinders?.length), async () => {
@@ -96,21 +96,8 @@ export default async function property(root, { id }) {
           save();
           renderList();
         }, { chevron: '›' }),
-      item('Key safe details',
-        [ks.location.trim() && 'Location', ks.code && 'Code', ks.photos.length && `${ks.photos.length} photo${ks.photos.length === 1 ? '' : 's'}`]
-          .filter(Boolean).join(' · ') || 'Location, code and photos',
-        keySafeHasInfo(), () => {
-          keySafeOpen = !keySafeOpen;
-          keySafePanel.hidden = !keySafeOpen;
-          renderList();
-          if (keySafeOpen) keySafePanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, { chevron: keySafeOpen ? '▴' : '▾', 'aria-expanded': String(keySafeOpen) }),
     );
   };
-  keySafePanel.hidden = true;
-  // Refresh the summary line when key safe details are edited.
-  keySafePanel.addEventListener('input', () => renderList());
-  keySafePanel.addEventListener('click', () => setTimeout(renderList, 400));
   renderList();
 
   root.append(
@@ -130,7 +117,8 @@ export default async function property(root, { id }) {
 
       h('h2', null, 'Works required'),
       h('p', { class: 'hint' }, 'Tap to select – selected items turn green.'),
-      list,
+      fitKeySafeSlot,
       keySafePanel,
+      list,
       completeFooter(job, 'property')));
 }

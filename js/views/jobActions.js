@@ -13,7 +13,7 @@ export async function jobActions(job) {
   await flushSave();
 
   const hasCode = Boolean(job.keySafe.code);
-  const codeBox = h('input', { type: 'checkbox' });
+  const codeBox = h('input', { type: 'checkbox', checked: true }); // included by default; untick to withhold
   const status = backupStatus(job);
   const content = h('div', null,
     h('p', { class: status.stale ? 'warn' : 'hint' },
