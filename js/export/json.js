@@ -1,6 +1,6 @@
 // .json job file: full backup / transfer, photos embedded as base64.
 import { getJob, saveJob, deleteJob, putPhotos } from '../db.js';
-import { SCHEMA, allPhotoIds, remapPhotoIds, uid, nowISO, slug, jobTitle, todayLocal, newKeySafe } from '../model.js';
+import { SCHEMA, allPhotoIds, remapPhotoIds, uid, nowISO, slug, jobTitle, todayLocal, newKeySafe, normalizeAddress } from '../model.js';
 import { loadPhotos, makeThumb } from '../photos.js';
 import { choose, toast, busy } from '../ui.js';
 
@@ -52,7 +52,7 @@ function validate(data) {
   const j = data.job;
   for (const k of ['rooms', 'externals', 'keys', 'meters']) if (!Array.isArray(j[k])) j[k] = [];
   j.keySafe = { ...newKeySafe(), ...(j.keySafe || {}) };
-  j.address = { line1: '', line2: '', town: '', postcode: '', lat: null, lng: null, ...(j.address || {}) };
+  j.address = normalizeAddress(j.address || {});
   for (const list of [...j.rooms, ...j.externals, ...j.keys, ...j.meters]) {
     if (!Array.isArray(list.photos)) list.photos = [];
   }

@@ -35,7 +35,7 @@ export function newJob({ surveyor = '' } = {}) {
     created: t,
     updated: t,
     lastExported: null,
-    address: { line1: '', line2: '', town: '', postcode: '', lat: null, lng: null },
+    address: { postcode: '', text: '', lat: null, lng: null },
     voidRef: '',
     surveyor,
     rooms: [],
@@ -104,12 +104,41 @@ export function remapPhotoIds(job, map) {
   }
 }
 
-export function addressLines(a) {
-  return [a.line1, a.line2, a.town, a.postcode].map((s) => (s || '').trim()).filter(Boolean);
+/**
+ * Address = { postcode, text, lat, lng }, where text is the full address as one
+ * free-text box (one line per row). Older jobs stored line1/line2/town – merge them.
+ */
+export function normalizeAddress(a = {}) {
+  if (typeof a.text !== 'string') {
+    a.text = [a.line1, a.line2, a.town, a.postcode].map((s) => (s || '').trim()).filter(Boolean).join('\n');
+  }
+  delete a.line1;
+  delete a.line2;
+  delete a.town;
+  a.postcode ??= '';
+  a.lat ??= null;
+  a.lng ??= null;
+  return a;
 }
 
+const squash = (s) => (s || '').replace(/\s+/g, '').toUpperCase();
+const textLines = (a) => (a.text || '').split('\n').map((s) => s.trim()).filter(Boolean);
+
+/** Address as lines, with the postcode appended if the box doesn't already contain it. */
+export function addressLines(a) {
+  const lines = textLines(a);
+  const pc = (a.postcode || '').trim();
+  if (pc && !lines.some((l) => squash(l).includes(squash(pc)))) lines.push(pc);
+  return lines;
+}
+
+/** Title: first line of the address (house number + street) and postcode. */
 export function jobTitle(job) {
-  return job.address.line1.trim() || job.voidRef.trim() || job.address.postcode.trim() || 'New survey';
+  const a = job.address;
+  const first = textLines(a)[0] || '';
+  const pc = (a.postcode || '').trim();
+  const title = [first, pc && !squash(first).includes(squash(pc)) ? pc : ''].filter(Boolean).join(', ');
+  return title || job.voidRef.trim() || 'New survey';
 }
 
 /**

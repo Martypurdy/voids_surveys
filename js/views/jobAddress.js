@@ -1,8 +1,8 @@
-// Screen 2: job details – address, postcode lookup, GPS, navigate, void ref, surveyor.
+// Screen 2: job details – postcode lookup, address, GPS, navigate, void ref, surveyor.
 import { getJob, scheduleSave } from '../db.js';
 import { jobTitle, fmtDateTime } from '../model.js';
-import { h, pageHeader, jobTabs, textField, toast, icon, ICONS } from '../ui.js';
-import { lookupPostcode, formatPostcode, getPosition, directionsUrl, pinUrl } from '../geo.js';
+import { h, pageHeader, jobTabs, textField, toast, icon, ICONS, confirmDialog } from '../ui.js';
+import { lookupPostcode, lookupStreet, formatPostcode, getPosition, directionsUrl, pinUrl } from '../geo.js';
 import { LAST_SURVEYOR } from './jobList.js';
 import { jobActions } from './jobActions.js';
 import { go } from '../router.js';
@@ -46,43 +46,76 @@ export default async function jobAddress(root, { id }) {
       a.lat != null
         ? h('span', null, `Location: ${a.lat.toFixed(5)}, ${a.lng.toFixed(5)} `,
           a.source ? `(${a.source}) · ` : '· ',
-          h('a', { href: pinUrl(a.lat, a.lng), target: '_blank', rel: 'noopener noreferrer' }, 'view map'))
-        : 'No location set');
+          h('a', { href: pinUrl(a.lat, a.lng), target: '_blank', rel: 'noopener noreferrer' }, 'View on Google Maps'))
+        : 'No map location yet – look up the postcode or use your location.');
     root.querySelector('.appbar h1')?.replaceChildren(jobTitle(job));
   };
 
-  const bind = (key, label, opts) => textField(label, a[key], (v) => {
-    a[key] = v;
+  // ----- Postcode + Look up (top of the form) -----
+  const postcodeField = textField('Postcode', a.postcode, (v) => {
+    a.postcode = v;
     save();
     updateDerived();
-  }, opts);
-
-  const postcodeField = bind('postcode', 'Postcode', { autocapitalize: 'characters', enterkeyhint: 'search' });
+  }, { autocapitalize: 'characters', enterkeyhint: 'search', placeholder: 'e.g. LS1 1UR' });
   const postcodeInput = postcodeField.querySelector('input');
-  const townInput = { el: null };
+
+  // ----- Address: one editable box -----
+  const addressField = textField('Address', a.text, (v) => {
+    a.text = v;
+    save();
+    updateDerived();
+  }, { multiline: true, autocapitalize: 'words', placeholder: 'House number and street\nTown\nPostcode' });
+  const addressBox = addressField.querySelector('textarea');
+  addressBox.rows = 4;
 
   const lookupBtn = h('button', {
     type: 'button',
+    class: 'btn-primary',
     onclick: async () => {
       lookupBtn.disabled = true;
+      lookupBtn.textContent = 'Looking up…';
       try {
         const r = await lookupPostcode(a.postcode);
         a.postcode = r.postcode;
         postcodeInput.value = r.postcode;
         a.lat = r.lat;
         a.lng = r.lng;
-        a.source = 'postcode centre';
-        if (!a.town.trim() && r.district) {
-          a.town = r.district;
-          townInput.el.value = r.district;
-        }
+        a.source = 'postcode';
         save();
         updateDerived();
-        toast('Postcode found');
+
+        const street = await lookupStreet(r.lat, r.lng); // best effort, may be null
+        const town = street?.town || r.district;
+        const lines = [
+          street?.locality && street.locality !== town ? street.locality : '',
+          town,
+          r.postcode,
+        ].filter(Boolean);
+        // First line is always "house number + street": leave it blank if no street was found.
+        const firstLine = street?.road || '';
+        const found = [firstLine, ...lines].join('\n');
+        if (firstLine) lines.unshift(firstLine);
+
+        const current = a.text.trim();
+        if (current && current !== found) {
+          const replace = await confirmDialog(`Replace the address in the box with “${lines.join(', ')}”?`, {
+            title: 'Replace address?', ok: 'Replace', danger: false,
+          });
+          if (!replace) return;
+        }
+        a.text = found;
+        addressBox.value = found;
+        save();
+        updateDerived();
+        // Put the cursor at the very start, ready for the house number.
+        addressBox.focus();
+        addressBox.setSelectionRange(0, 0);
+        toast(street?.road ? 'Address found – add the house number at the start' : 'Postcode found – add the house number and street');
       } catch (e) {
         toast(e.message);
       } finally {
         lookupBtn.disabled = false;
+        lookupBtn.textContent = 'Look up';
       }
     },
   }, 'Look up');
@@ -93,6 +126,7 @@ export default async function jobAddress(root, { id }) {
       a.postcode = f;
       postcodeInput.value = f;
       save();
+      updateDerived();
     }
   });
   postcodeInput.addEventListener('keydown', (e) => {
@@ -118,18 +152,13 @@ export default async function jobAddress(root, { id }) {
     },
   }, 'Use my location');
 
-  const townField = bind('town', 'Town / city', { autocapitalize: 'words' });
-  townInput.el = townField.querySelector('input');
-
   root.append(
     ...jobChrome(job, ''),
     h('div', { class: 'content' },
       h('h2', null, 'Address'),
-      bind('line1', 'Address line 1', { autocapitalize: 'words', autocomplete: 'off' }),
-      bind('line2', 'Address line 2', { autocapitalize: 'words' }),
-      townField,
       h('div', { class: 'input-row' }, postcodeField, lookupBtn),
-      h('p', { class: 'hint' }, 'Look up sends only the postcode to postcodes.io to find the town and map location.'),
+      h('p', { class: 'hint' }, 'Look up finds the street and town for the postcode. Check it and add the house number – you can edit the address freely.'),
+      addressField,
       coords,
       h('div', { class: 'btn-row' }, nav, gpsBtn),
 

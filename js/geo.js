@@ -57,11 +57,39 @@ export async function lookupPostcode(postcode) {
   };
 }
 
+/**
+ * Best-effort street/town for a coordinate via OpenStreetMap Nominatim (free, no key).
+ * Used after a postcode lookup – sends only the postcode's centre point.
+ * postcodes.io has no street data, and a UK postcode is usually a single street.
+ * Returns { road, locality, town } or null on any failure.
+ */
+export async function lookupStreet(lat, lng) {
+  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=17&addressdetails=1&accept-language=en-GB&lat=${lat}&lon=${lng}`;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 6000);
+  try {
+    // Nominatim's usage policy asks for an identifying Referer, so send our origin.
+    const res = await fetch(url, { signal: ctrl.signal, referrerPolicy: 'strict-origin', credentials: 'omit' });
+    if (!res.ok) return null;
+    const { address: x } = await res.json();
+    if (!x) return null;
+    return {
+      road: x.road || x.pedestrian || x.residential || '',
+      locality: x.suburb || x.neighbourhood || x.hamlet || '',
+      town: x.town || x.city || x.village || '',
+    };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Google Maps directions URL. Prefers the typed address, falls back to coordinates. */
 export function directionsUrl(address) {
   const lines = addressLines(address);
   let dest = '';
-  if (address.line1?.trim() || address.postcode?.trim()) dest = lines.join(', ');
+  if (lines.length) dest = lines.join(', ');
   else if (address.lat != null && address.lng != null) dest = `${address.lat},${address.lng}`;
   if (!dest) return '';
   return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dest)}`;

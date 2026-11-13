@@ -33,8 +33,13 @@ Open devices will show “A new version is available – Reload”.
 ## Using it
 
 1. **Jobs** – create, open, import a `.json` job file; ⋮ on a job gives PDF / backup / delete.
-2. **Address** – manual entry; *Look up* fills town and map location from api.postcodes.io;
-   *Navigate* opens Google Maps directions; *Use my location* stores the GPS position.
+2. **Address** – enter the postcode at the top and tap *Look up*: the street, area, town and
+   postcode are filled into a single address box with the cursor at the start, ready for the
+   house number. Edit the box freely. The job title becomes the first line + postcode
+   (e.g. “12 Bennett Road, LS6 3HN”). *Navigate* opens Google Maps directions; *View on Google
+   Maps* shows the pin; *Use my location* stores the GPS position.
+   Free postcode data has no house numbers, and a few postcodes (large sites, PO boxes) have no
+   street – then the first line is left blank for you to fill in.
 3. **Rooms / Externals** – add from presets (Bedroom auto-numbers) or a custom name; each has
    condition (Good / Fair / Poor / N/A), notes and photos.
 4. **Keys** – key set, quantity, received from, issued to, date, photos.
@@ -68,7 +73,8 @@ Screen and haven’t been used for a while. To reduce the risk:
 
 Survey data never leaves the device unless you export it. The only network requests are:
 
-- the postcode lookup (sends just the postcode to api.postcodes.io, when you tap *Look up*);
+- the postcode lookup, when you tap *Look up*: the postcode goes to api.postcodes.io, then the
+  postcode's centre point goes to OpenStreetMap Nominatim to find the street name;
 - Google Maps, opened in a new tab when you tap *Navigate* or *view map*.
 
 ## Project layout

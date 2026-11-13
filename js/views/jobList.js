@@ -52,7 +52,7 @@ function jobCard(job) {
     `${job.rooms.length} room${job.rooms.length === 1 ? '' : 's'}`,
     `${allPhotoIds(job).length} photo${allPhotoIds(job).length === 1 ? '' : 's'}`,
   ].join(' · ');
-  const sub = [job.address.postcode, job.voidRef && `Ref ${job.voidRef}`].filter(Boolean).join(' · ');
+  const sub = job.voidRef ? `Ref ${job.voidRef}` : '';
   return h('div', { class: 'card job-card' },
     h('a', { href: `#/job/${job.id}` },
       h('div', { class: 'job-title' }, jobTitle(job)),
