@@ -73,7 +73,9 @@ unfinished section). *Reopen section* undoes it. The job list shows a progress b
    defects list shows the **preloaded SORs** for that part with plain-English labels, codes and
    units – size-banded items (redecorate, strip paper, mould treatment) pick the band from the
    room’s ceiling area – plus a **🔍 search** over the whole SOR (codes or words; the part’s own
-   trades rank first; ⓘ shows the full description). Without a library, built-in draft lists
+   trades rank first; ⓘ shows the full description). Tap **−** to remove an SOR from that part’s
+   list for that **type of room** (Bedroom 1, 2, 3 share one list) – the phone remembers it as a
+   template; *Removed from this list* at the bottom puts items back. Without a library, built-in draft lists
    (`js/data/parts.js`) are used.
 
    The SOR is licensed (NHF) and this site is public, so **no SOR content is in this repo**.

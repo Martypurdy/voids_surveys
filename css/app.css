@@ -639,3 +639,23 @@ body.no-scroll { overflow: hidden; }
 .defect-code { font-size: .78rem; font-weight: 400; opacity: .75; }
 .defect-more { width: 40px; min-height: 56px; padding: 0; font-size: 1.1rem; color: var(--muted); }
 .sor-status { margin: 0 0 6px; font-size: 1.02rem; }
+
+/* ---------- Remove (−) / restore SORs in the per-room template ---------- */
+.defect-row, .defect-row[data-on="false"] { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; }
+.defect-row .defect-toggle { flex: 1 1 0; min-width: 0; }
+.defect-row .defect-info { flex-basis: 100%; }
+.defect-remove {
+  width: 40px;
+  min-height: 56px;
+  padding: 0;
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+}
+.removed-list { margin: 12px 0 4px; border: 1px dashed var(--border); border-radius: 10px; padding: 4px 12px 8px; }
+.removed-list summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-weight: 600; color: var(--muted); }
+.removed-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--border); }
+.removed-row .defect-text { flex: 1; }
+.defect-restore { width: 44px; min-height: 44px; padding: 0; font-size: 1.4rem; font-weight: 700; color: var(--done-line); border-color: var(--done-line); }

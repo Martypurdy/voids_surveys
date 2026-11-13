@@ -6,6 +6,7 @@ import { scheduleSave, flushSave, deletePhotos } from '../db.js';
 import { roomPart, roomAreas, roomStatus } from '../model.js';
 import { PARTS, UNITS, qtyText, defectInfo } from '../data/parts.js';
 import { getLibrary, searchLibrary, preloadFor, libraryItem } from '../sor.js';
+import { hiddenFor, setHidden, roomTypeLabel } from '../templates.js';
 import { h, textField, confirmDialog, toast } from '../ui.js';
 import { photoField } from '../photos.js';
 import { go } from '../router.js';
@@ -107,8 +108,12 @@ export default async function roomPage(root, { id, roomId }) {
     // The options shown: SOR preload (if a library is loaded) or the draft list.
     const options = library
       ? preloadFor(library, part.key, areas.ceiling)
-      : part.defects.map((d) => ({ c: d.id, d: d.label, u: d.unit }));
-    const optionCodes = new Set(options.map((o) => o.c));
+      : part.defects.map((d) => ({ k: d.id, c: d.id, d: d.label, u: d.unit }));
+    // This device's template: options removed for this type of room (Bedroom 1/2/3 share one).
+    const typeLabel = roomTypeLabel(room.name);
+    let hidden = hiddenFor(room.name, part.key);
+    const visibleOptions = () => options.filter((o) => !hidden.has(o.k));
+    const removedOptions = () => options.filter((o) => hidden.has(o.k));
 
     // Working copy: code -> { qty, d, u }. Only Save changes the room.
     const chosen = new Map(p.defects.map((d) => {
@@ -120,7 +125,7 @@ export default async function roomPage(root, { id, roomId }) {
 
     const defaultQty = (u) => (UNITS[u]?.count ? '1' : (u === 'm2' || u === 'm') && prefill ? String(prefill) : '');
 
-    const row = (opt) => {
+    const row = (opt, { removable = false } = {}) => {
       const on = chosen.has(opt.c);
       const unit = UNITS[opt.u] || UNITS.nr;
       const lib = library ? libraryItem(library, opt.c) : null;
@@ -150,6 +155,21 @@ export default async function roomPage(root, { id, roomId }) {
               oninput: (e) => { chosen.get(opt.c).qty = e.target.value; },
             }),
             h('span', null, unit.input))
+          : null,
+        removable
+          ? h('button', {
+            type: 'button',
+            class: 'defect-remove',
+            'aria-label': `Remove “${opt.d}” from the ${typeLabel} ${part.label.toLowerCase()} list`,
+            title: `Remove from ${typeLabel} list`,
+            onclick: () => {
+              // Already-ticked items stay ticked (they move to "Also selected").
+              setHidden(room.name, part.key, opt.k, true);
+              hidden = hiddenFor(room.name, part.key);
+              render();
+              toast(`Removed from ${typeLabel} ${part.label.toLowerCase()} list – restore it at the bottom`);
+            },
+          }, '−')
           : null,
         lib?.l
           ? h('button', {
@@ -185,14 +205,37 @@ export default async function roomPage(root, { id, roomId }) {
     };
 
     const render = () => {
-      // Items added from search (not in the preloaded list) appear first.
-      const extras = [...chosen].filter(([code]) => !optionCodes.has(code))
+      const shown = visibleOptions();
+      const shownCodes = new Set(shown.map((o) => o.c));
+      // Ticked items not in the list (from search, or since removed) appear first.
+      const extras = [...chosen].filter(([code]) => !shownCodes.has(code))
         .map(([code, v]) => ({ c: code, d: v.d, u: v.u }));
+      const removed = removedOptions();
       list.replaceChildren(
-        extras.length ? h('p', { class: 'field-label' }, 'Added from search') : '',
-        ...extras.map(row),
-        library ? h('p', { class: 'field-label' }, `Common ${part.label.toLowerCase()} SORs`) : '',
-        ...options.map(row));
+        extras.length ? h('p', { class: 'field-label' }, 'Also selected') : '',
+        ...extras.map((o) => row(o)),
+        h('p', { class: 'field-label' }, `${typeLabel} – ${part.label.toLowerCase()}${library ? ' SORs' : ''}`),
+        ...shown.map((o) => row(o, { removable: true })),
+        shown.length ? '' : h('p', { class: 'hint' }, 'All removed – use search, or restore some below.'),
+        removed.length
+          ? h('details', { class: 'removed-list' },
+            h('summary', null, `Removed from this ${typeLabel} list (${removed.length})`),
+            h('p', { class: 'hint' }, `Hidden for every ${typeLabel} on this device. Tap + to put one back.`),
+            ...removed.map((o) => h('div', { class: 'removed-row' },
+              h('span', { class: 'defect-text' },
+                h('span', { class: 'defect-label' }, o.d),
+                library ? h('span', { class: 'defect-code' }, o.c) : null),
+              h('button', {
+                type: 'button',
+                class: 'defect-restore',
+                'aria-label': `Restore “${o.d}”`,
+                onclick: () => {
+                  setHidden(room.name, part.key, o.k, false);
+                  hidden = hiddenFor(room.name, part.key);
+                  render();
+                },
+              }, '+'))))
+          : '');
       renderResults();
     };
     render();

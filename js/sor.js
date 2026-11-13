@@ -90,13 +90,14 @@ export function preloadFor(lib, partKey, ceilingArea) {
   return (lib.parts[partKey] || []).map((entry) => {
     if (typeof entry === 'string') {
       const it = lib._map.get(entry);
-      return it && { c: it.c, d: it.d, u: it.u };
+      return it && { k: it.c, c: it.c, d: it.d, u: it.u };
     }
     const bands = entry.band;
     let i = bands.findIndex(([max]) => max == null || (ceilingArea || 0) <= max);
     if (i < 0) i = bands.length - 1;
     const it = lib._map.get(bands[i][1]);
     return it && {
+      k: `band:${entry.d}`, // stable key whichever size band is picked
       c: it.c,
       d: `${entry.d} (${bandText(bands, i)})`,
       u: it.u,
