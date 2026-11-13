@@ -69,9 +69,19 @@ unfinished section). *Reopen section* undoes it. The job list shows a progress b
    - *Room name, notes & photos*, *Delete room*, and a button to the next room.
    The PDF lists every room's parts and defects (with codes) and ends with a **schedule of
    works** totalling each defect across the property.
-   Defect lists live in `js/data/parts.js` – draft lists for now, to be replaced by items
-   filtered from the SOR spreadsheet (codes, short labels and units only – no prices, as the
-   site is public).
+   **SOR library:** with an SOR library loaded (⚙ Settings › *Load SOR library file*), each
+   defects list shows the **preloaded SORs** for that part with plain-English labels, codes and
+   units – size-banded items (redecorate, strip paper, mould treatment) pick the band from the
+   room’s ceiling area – plus a **🔍 search** over the whole SOR (codes or words; the part’s own
+   trades rank first; ⓘ shows the full description). Without a library, built-in draft lists
+   (`js/data/parts.js`) are used.
+
+   The SOR is licensed (NHF) and this site is public, so **no SOR content is in this repo**.
+   The library file is built privately from the spreadsheet:
+   `node private/build-sor-library.js "private/SOR's .xlsx"` (needs the `xlsx` npm package)
+   → `private/sor-library.json` (load on each phone) and `private/SOR-preload-review.csv`
+   (the preloaded lists, for review). The whole `private/` folder is git-ignored. No rates are
+   copied.
 6. **Externals** – add from presets or a custom name; each has condition (Good / Fair / Poor /
    N/A), notes and photos.
 

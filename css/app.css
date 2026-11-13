@@ -628,3 +628,14 @@ body.no-scroll { overflow: hidden; }
 .preview-page { display: block; max-width: 100%; height: auto; background: #fff; box-shadow: 0 2px 10px rgb(0 0 0 / .4); }
 .preview-pageno { color: #ddd; font-size: .8rem; margin: 6px 0 14px; }
 .preview-status { color: #fff; text-align: center; margin-top: 40px; padding: 0 16px; }
+
+/* ---------- SOR search & codes ---------- */
+.sor-search-wrap { position: sticky; top: -12px; z-index: 2; margin: -12px -16px 8px; padding: 12px 16px 8px; background: var(--bg); }
+.sor-search { font-size: 1.05rem; border-width: 2px; border-color: var(--primary); }
+.defect-row { grid-template-columns: 1fr auto auto; }
+.defect-row[data-on="false"] { grid-template-columns: 1fr auto; }
+.defect-row .defect-info { grid-column: 1 / -1; font-size: .85rem; color: var(--muted); background: var(--surface-2); border-radius: 8px; padding: 8px 10px; }
+.defect-text { display: flex; flex-direction: column; min-width: 0; }
+.defect-code { font-size: .78rem; font-weight: 400; opacity: .75; }
+.defect-more { width: 40px; min-height: 56px; padding: 0; font-size: 1.1rem; color: var(--muted); }
+.sor-status { margin: 0 0 6px; font-size: 1.02rem; }

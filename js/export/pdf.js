@@ -1,6 +1,6 @@
 // PDF report (jsPDF, loaded on demand from /vendor).
 import { addressLines, jobTitle, fmtDate, fmtDateTime, slug, todayLocal, allPhotoIds, worksSummary, roomStatus, roomAreas } from '../model.js';
-import { PARTS, UNITS, defectById } from '../data/parts.js';
+import { PARTS, UNITS, defectInfo, qtyText as unitQty } from '../data/parts.js';
 import { loadPhotos, resizeImage } from '../photos.js';
 
 // Photos are re-encoded smaller for the PDF so reports stay emailable.
@@ -158,7 +158,8 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
 
   // ---------- rooms: parts & defects, plus schedule of works ----------
   const schedule = new Map(); // key -> { part, label, unit, id, total, rooms: Set }
-  const qtyText = (qty, unit) => (qty ? (unit === 'nr' ? `x${qty}` : `${qty} ${UNITS[unit]?.label || ''}`) : '');
+  // PDF fonts are Latin-1: the multiply sign and superscript 2 are both covered.
+  const qtyText = (qty, unit) => unitQty(qty, unit);
 
   const roomsSection = async (rooms) => {
     if (!rooms.length) return;
@@ -181,11 +182,11 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
         ensure(lineH(10) * 3); // keep the part heading with its first defect
         para(`${part.label}:`, { size: 10, style: 'bold' });
         for (const d of p.defects) {
-          const def = defectById(part, d.id) || { label: d.id, unit: 'nr' };
+          const def = defectInfo(part, d);
           para(`-  ${def.label}${d.qty ? `  ${qtyText(d.qty, def.unit)}` : ''}   [${d.id}]`, { size: 10, x: M + 4, width: CW - 4 });
           const key = `${part.key}|${d.id}`;
           const row = schedule.get(key) || { part: part.label, label: def.label, unit: def.unit, id: d.id, total: 0, rooms: new Set() };
-          row.total += parseFloat(String(d.qty).replace(',', '.')) || (def.unit === 'nr' ? 1 : 0);
+          row.total += parseFloat(String(d.qty).replace(',', '.')) || (UNITS[def.unit]?.count ? 1 : 0);
           row.rooms.add(room.name);
           schedule.set(key, row);
         }

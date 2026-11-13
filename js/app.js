@@ -4,6 +4,7 @@ import { flushSave } from './db.js';
 import { toast } from './ui.js';
 
 route('/', () => import('./views/jobList.js'));
+route('/settings', () => import('./views/settings.js'));
 route('/job/:id', () => import('./views/jobAddress.js'));
 route('/job/:id/rooms', () => import('./views/rooms.js'));
 route('/job/:id/rooms/:roomId', () => import('./views/room.js'));

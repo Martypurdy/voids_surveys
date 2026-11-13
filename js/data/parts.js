@@ -9,10 +9,29 @@
 // No prices/rates here: this file is published on the public website.
 
 export const UNITS = {
-  m2: { label: 'm²', input: 'm²', step: '0.1' },
-  nr: { label: 'nr', input: 'Qty', step: '1' },
-  m: { label: 'm', input: 'm', step: '0.1' },
+  m2: { label: 'm²', input: 'm²', count: false },
+  m: { label: 'm', input: 'm', count: false },
+  nr: { label: 'nr', input: 'Qty', count: true },
+  item: { label: 'item', input: 'Qty', count: true },
+  pair: { label: 'pair', input: 'Pairs', count: true },
+  m3: { label: 'm³', input: 'm³', count: false },
+  hr: { label: 'hr', input: 'Hours', count: false },
+  wk: { label: 'wk', input: 'Weeks', count: false },
+  kg: { label: 'kg', input: 'kg', count: false },
 };
+
+/** "×2", "6 m²", "14 m" … */
+export function qtyText(qty, unit) {
+  if (!qty) return '';
+  const u = UNITS[unit] || UNITS.nr;
+  return u.count ? `×${qty}` : `${qty} ${u.label}`;
+}
+
+/** Label and unit for a saved defect – stored on the defect, else from the draft list. */
+export function defectInfo(part, d) {
+  const draft = part ? defectById(part, d.id) : null;
+  return { label: d.d || draft?.label || d.id, unit: d.u || draft?.unit || 'nr' };
+}
 
 export const PARTS = [
   {

@@ -1,8 +1,11 @@
 // Screen: one room – size calculator, then each part (Ceiling, Walls, …) with an
 // OK button (green = no work) or a defects sheet (red = work needed).
+// With an SOR library loaded, the sheet shows the preloaded SORs for the part
+// (size bands picked from the room size) plus a search over the whole SOR.
 import { scheduleSave, flushSave, deletePhotos } from '../db.js';
 import { roomPart, roomAreas, roomStatus } from '../model.js';
-import { PARTS, UNITS, defectById } from '../data/parts.js';
+import { PARTS, UNITS, qtyText, defectInfo } from '../data/parts.js';
+import { getLibrary, searchLibrary, preloadFor, libraryItem } from '../sor.js';
 import { h, textField, confirmDialog, toast } from '../ui.js';
 import { photoField } from '../photos.js';
 import { go } from '../router.js';
@@ -14,6 +17,7 @@ export default async function roomPage(root, { id, roomId }) {
   const job = await loadJobOr404(id);
   const room = job.rooms.find((r) => r.id === roomId);
   if (!room) return go(`/job/${id}/rooms`);
+  const library = await getLibrary();
   const save = () => scheduleSave(job);
   const backHref = `#/job/${job.id}/rooms`;
 
@@ -43,10 +47,9 @@ export default async function roomPage(root, { id, roomId }) {
     if (p.state === 'ok') return 'OK – no work required';
     if (p.state === 'works') {
       return p.defects.map((d) => {
-        const def = defectById(part, d.id);
-        const unit = UNITS[def?.unit]?.label || '';
-        const qty = d.qty ? (unit === 'nr' ? ` ×${d.qty}` : ` ${d.qty} ${unit}`) : '';
-        return `${def?.label || d.id}${qty}`;
+        const { label, unit } = defectInfo(part, d);
+        const q = qtyText(d.qty, unit);
+        return `${label}${q ? ` ${q}` : ''}`;
       }).join(' · ');
     }
     return 'Tap for defects, or OK if no work needed';
@@ -100,42 +103,99 @@ export default async function roomPage(root, { id, roomId }) {
     const p = roomPart(room, part.key);
     const areas = roomAreas(room.size);
     const prefill = part.fill ? areas[part.fill] : 0;
-    // Work on a copy; only Save changes the room.
-    const chosen = new Map(p.defects.map((d) => [d.id, d.qty]));
-    let notes = p.notes || '';
 
-    const rows = h('div', { class: 'defect-list' });
-    const renderRows = () => {
-      rows.replaceChildren(...part.defects.map((def) => {
-        const on = chosen.has(def.id);
-        const unit = UNITS[def.unit];
-        return h('div', { class: 'defect-row', dataset: { on: String(on) } },
-          h('button', {
-            type: 'button',
-            class: 'defect-toggle',
-            'aria-pressed': String(on),
-            onclick: () => {
-              if (on) chosen.delete(def.id);
-              else chosen.set(def.id, def.unit !== 'nr' && prefill ? String(prefill) : def.unit === 'nr' ? '1' : '');
-              renderRows();
-            },
+    // The options shown: SOR preload (if a library is loaded) or the draft list.
+    const options = library
+      ? preloadFor(library, part.key, areas.ceiling)
+      : part.defects.map((d) => ({ c: d.id, d: d.label, u: d.unit }));
+    const optionCodes = new Set(options.map((o) => o.c));
+
+    // Working copy: code -> { qty, d, u }. Only Save changes the room.
+    const chosen = new Map(p.defects.map((d) => {
+      const info = defectInfo(part, d);
+      return [d.id, { qty: d.qty, d: info.label, u: info.unit }];
+    }));
+    let notes = p.notes || '';
+    let query = '';
+
+    const defaultQty = (u) => (UNITS[u]?.count ? '1' : (u === 'm2' || u === 'm') && prefill ? String(prefill) : '');
+
+    const row = (opt) => {
+      const on = chosen.has(opt.c);
+      const unit = UNITS[opt.u] || UNITS.nr;
+      const lib = library ? libraryItem(library, opt.c) : null;
+      const info = h('div', { class: 'defect-info', hidden: true }, lib?.l || '');
+      return h('div', { class: 'defect-row', dataset: { on: String(on) } },
+        h('button', {
+          type: 'button',
+          class: 'defect-toggle',
+          'aria-pressed': String(on),
+          onclick: () => {
+            if (on) chosen.delete(opt.c);
+            else chosen.set(opt.c, { qty: defaultQty(opt.u), d: opt.d, u: opt.u });
+            render();
           },
-          h('span', { class: 'works-tick', 'aria-hidden': 'true' }, on ? '✓' : ''),
-          h('span', { class: 'defect-label' }, def.label)),
-          on
-            ? h('label', { class: 'defect-qty' },
-              h('input', {
-                type: 'text',
-                inputmode: def.unit === 'nr' ? 'numeric' : 'decimal',
-                value: chosen.get(def.id) ?? '',
-                'aria-label': `${def.label} ${unit.input}`,
-                oninput: (e) => chosen.set(def.id, e.target.value),
-              }),
-              h('span', null, unit.input))
-            : null);
-      }));
+        },
+        h('span', { class: 'works-tick', 'aria-hidden': 'true' }, on ? '✓' : ''),
+        h('span', { class: 'defect-text' },
+          h('span', { class: 'defect-label' }, opt.d),
+          library ? h('span', { class: 'defect-code' }, `${opt.c} · ${unit.label}${opt.note ? ` · ${opt.note}` : ''}`) : null)),
+        on
+          ? h('label', { class: 'defect-qty' },
+            h('input', {
+              type: 'text',
+              inputmode: unit.count ? 'numeric' : 'decimal',
+              value: chosen.get(opt.c)?.qty ?? '',
+              'aria-label': `${opt.d} ${unit.input}`,
+              oninput: (e) => { chosen.get(opt.c).qty = e.target.value; },
+            }),
+            h('span', null, unit.input))
+          : null,
+        lib?.l
+          ? h('button', {
+            type: 'button',
+            class: 'defect-more',
+            'aria-label': 'Full SOR description',
+            onclick: () => { info.hidden = !info.hidden; },
+          }, 'ⓘ')
+          : null,
+        info);
     };
-    renderRows();
+
+    const searchBox = h('input', {
+      type: 'search',
+      class: 'sor-search',
+      placeholder: '🔍 Search all SOR codes or words…',
+      'aria-label': 'Search SOR',
+      autocomplete: 'off',
+      enterkeyhint: 'search',
+      oninput: (e) => { query = e.target.value; renderResults(); },
+    });
+    const results = h('div', { class: 'defect-list' });
+    const list = h('div', { class: 'defect-list' });
+
+    const renderResults = () => {
+      if (!library) return;
+      const found = query.trim().length >= 2 ? searchLibrary(library, query, 30, part.key) : [];
+      results.replaceChildren(
+        query.trim().length >= 2
+          ? h('p', { class: 'hint' }, found.length ? `${found.length === 30 ? '30+' : found.length} match${found.length === 1 ? '' : 'es'} – tap to add` : 'No matches')
+          : '',
+        ...found.map((it) => row({ c: it.c, d: it.d, u: it.u })));
+    };
+
+    const render = () => {
+      // Items added from search (not in the preloaded list) appear first.
+      const extras = [...chosen].filter(([code]) => !optionCodes.has(code))
+        .map(([code, v]) => ({ c: code, d: v.d, u: v.u }));
+      list.replaceChildren(
+        extras.length ? h('p', { class: 'field-label' }, 'Added from search') : '',
+        ...extras.map(row),
+        library ? h('p', { class: 'field-label' }, `Common ${part.label.toLowerCase()} SORs`) : '',
+        ...options.map(row));
+      renderResults();
+    };
+    render();
 
     const close = () => {
       sheet.remove();
@@ -149,10 +209,14 @@ export default async function roomPage(root, { id, roomId }) {
         h('h2', null, `${room.name} – ${part.label}`),
         h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Close', onclick: close }, '✕')),
       h('div', { class: 'sheet-body' },
+        library
+          ? h('div', { class: 'sor-search-wrap' }, searchBox)
+          : h('p', { class: 'hint' }, 'Draft list. Load your SOR library in Settings (⚙ on the surveys list) to use SOR codes and search.'),
+        results,
         h('p', { class: 'hint' }, prefill
-          ? `Tick each defect. m² / m are pre-filled from the room size (${prefill}) – change them as needed.`
+          ? `m² / m are pre-filled from the room size (${prefill}) – change them as needed.`
           : 'Tick each defect and enter the quantity.'),
-        rows,
+        list,
         textField('Notes', notes, (v) => { notes = v; }, { multiline: true, autocapitalize: 'sentences', placeholder: 'Anything the contractor should know' }),
         h('span', { class: 'field-label' }, 'Photos'),
         photoField(job, p.photos, () => save())),
@@ -161,7 +225,7 @@ export default async function roomPage(root, { id, roomId }) {
           type: 'button',
           class: 'btn-primary btn-big',
           onclick: () => {
-            p.defects = [...chosen].map(([defId, qty]) => ({ id: defId, qty: String(qty ?? '').trim() }));
+            p.defects = [...chosen].map(([code, v]) => ({ id: code, qty: String(v.qty ?? '').trim(), d: v.d, u: v.u }));
             p.notes = notes;
             if (p.defects.length) p.state = 'works';
             else if (p.state === 'works') p.state = '';
