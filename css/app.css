@@ -671,3 +671,14 @@ body.no-scroll { overflow: hidden; }
 /* Ticked rows: quantity goes on its own line under the name, so the name never gets squashed. */
 .defect-row .defect-qty { order: 5; flex: 1 1 100%; justify-content: flex-end; }
 .defect-row .defect-info { order: 6; }
+
+/* Rooms list: delete button beside each room */
+.room-row { display: grid; grid-template-columns: 1fr 52px; gap: 8px; }
+.room-delete {
+  min-height: 60px;
+  padding: 0;
+  color: var(--danger);
+  border: 2px solid color-mix(in srgb, var(--danger) 45%, var(--border));
+  background: var(--surface);
+}
+.room-delete svg { width: 22px; height: 22px; }

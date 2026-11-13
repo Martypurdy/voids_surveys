@@ -1,9 +1,9 @@
 // Screen: rooms list – add rooms from presets; each room is a button coloured by
 // progress (amber = not finished, red = needs work, green = all OK).
-import { scheduleSave } from '../db.js';
+import { scheduleSave, flushSave, deletePhotos } from '../db.js';
 import { ROOM_PRESETS, newRoom, nextNumberedName, roomStatus } from '../model.js';
 import { PARTS } from '../data/parts.js';
-import { h } from '../ui.js';
+import { h, icon, ICONS, confirmDialog, toast } from '../ui.js';
 import { go } from '../router.js';
 import { loadJobOr404, jobChrome, completeFooter } from './chrome.js';
 
@@ -38,8 +38,35 @@ export default async function rooms(root, { id }) {
 
   const empty = h('p', { class: 'empty' }, 'No rooms yet. Tap a room type above to add it.');
   const render = () => {
-    list.replaceChildren(...job.rooms.map(roomButton));
+    list.replaceChildren(...job.rooms.map((room) => h('div', { class: 'room-row' },
+      roomButton(room),
+      h('button', {
+        type: 'button',
+        class: 'room-delete',
+        'aria-label': `Delete ${room.name || 'room'}`,
+        title: 'Delete room',
+        onclick: () => deleteRoom(room),
+      }, icon(ICONS.trash)))));
     empty.hidden = job.rooms.length > 0;
+  };
+
+  const deleteRoom = async (room) => {
+    const s = roomStatus(room, PARTS);
+    const photoIds = [...room.photos, ...Object.values(room.parts || {}).flatMap((p) => p.photos || [])];
+    const what = [
+      s.defects && `${s.defects} defect${s.defects === 1 ? '' : 's'}`,
+      photoIds.length && `${photoIds.length} photo${photoIds.length === 1 ? '' : 's'}`,
+    ].filter(Boolean);
+    const ok = await confirmDialog(
+      what.length ? `This will also delete its ${what.join(' and ')}. This can’t be undone.` : 'It has nothing recorded yet.',
+      { title: `Delete “${room.name || 'room'}”?`, ok: 'Delete room' });
+    if (!ok) return;
+    job.rooms.splice(job.rooms.indexOf(room), 1);
+    await deletePhotos(photoIds);
+    scheduleSave(job, 0);
+    await flushSave();
+    render();
+    toast(`${room.name || 'Room'} deleted`);
   };
 
   const add = (name) => {

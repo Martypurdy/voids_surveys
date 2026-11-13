@@ -66,7 +66,9 @@ unfinished section). *Reopen section* undoes it. The job list shows a progress b
      work required (green). Tap the part to open its **defects list**: tick defects (red) and
      enter m², metres or quantity – m² / m are pre-filled from the room size. Notes and photos
      per part.
-   - *Room name, notes & photos*, *Delete room*, and a button to the next room.
+   - *Room name, notes & photos*, and a button to the next room.
+   - **Delete a room** with the 🗑 button beside it on the Rooms list (asks to confirm, and says
+     how many defects and photos will go with it).
    The PDF lists every room's parts and defects (with codes) and ends with a **schedule of
    works** totalling each defect across the property.
    **SOR library:** with an SOR library loaded (⚙ Settings › *Load SOR library file*), each
