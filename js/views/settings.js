@@ -60,6 +60,7 @@ export default async function settings(root) {
       fileInput,
       h('p', { class: 'hint' },
         'The SOR library file (sor-library.json) is private and stays on this device – it is never uploaded to the website. ',
-        'To get it onto a phone, send it to yourself (email, OneDrive, etc.), then tap “Load SOR library file” and pick it from Files / Downloads. ',
-        'Do this once per phone, and again when the SOR is updated.')));
+        'Tap “Load SOR library file”, then choose OneDrive in the file picker and open the “Void Surveys” folder ',
+        '(on iPhone: Browse › OneDrive; on Android: ☰ › OneDrive). ',
+        'Do this once per phone, and again whenever the library is updated.')));
 }
