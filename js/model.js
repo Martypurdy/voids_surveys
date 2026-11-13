@@ -4,7 +4,7 @@ export const SCHEMA = 1;
 
 export const CONDITIONS = ['Good', 'Fair', 'Poor', 'N/A'];
 
-export const ROOM_PRESETS = ['Hall', 'Landing', 'Living room', 'Kitchen', 'Bathroom', 'WC', 'Bedroom', 'Porch'];
+export const ROOM_PRESETS = ['Hall, stairs, landing & loft', 'Living room', 'Kitchen', 'Bathroom', 'WC', 'Bedroom', 'Porch'];
 export const EXTERNAL_PRESETS = ['Front garden', 'Rear garden', 'Boundaries', 'Garage', 'Shed'];
 
 // Services tab, in display order. The first of each is always present.
