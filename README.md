@@ -62,9 +62,12 @@ list shows a progress bar and “n of 6 sections complete”.
 6. **Rooms / Externals** – add from presets (Bedroom auto-numbers) or a custom name; each has
    condition (Good / Fair / Poor / N/A), notes and photos.
 
-**Photos:** *Add photos* asks **Take photos** (opens the phone’s own camera with its zoom and
-lens controls; after each shot tap *Take another* or *Done*, so you can snap away) or **Upload
-from phone** (pick several at once).
+**Photos:** *Add photos* asks **Take photos** or **Upload from phone** (pick several at once).
+**Take photos** opens the app’s own full-screen camera: tap the shutter as many times as you
+like – there’s no review step after each shot – then tap **Done**. Zoom buttons (.5× / 1× / 2×)
+and a torch appear where the phone’s browser allows (0.5× needs a phone and browser that expose
+the ultra-wide lens; otherwise 2× is a digital crop). If camera access is refused, it offers the
+phone’s own camera app instead. The first time, the browser asks for camera permission.
 Photos are resized on the device to 1600 px JPEG.
 
 ## Exports & backups

@@ -430,3 +430,91 @@ section > .section-title { margin-top: 28px; padding-top: 16px; border-top: 1px 
 .btn-big { min-height: 56px; font-size: 1.05rem; font-weight: 700; }
 .session-preview { display: block; width: 100%; max-height: 40vh; object-fit: contain; border-radius: 10px; background: var(--surface-2); }
 .photo-actions .add-photos svg { width: 22px; height: 22px; }
+
+/* ---------- In-app camera ---------- */
+body.no-scroll { overflow: hidden; }
+.camera {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+  touch-action: none;
+}
+.cam-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform-origin: center;
+  transition: transform .15s;
+}
+.cam-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+.cam-flash.go { animation: cam-flash .25s ease-out; }
+@keyframes cam-flash { from { opacity: .7; } to { opacity: 0; } }
+.cam-top {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
+  background: linear-gradient(rgb(0 0 0 / .55), transparent);
+}
+.cam-count { font-weight: 700; font-size: 1.05rem; text-shadow: 0 1px 3px #000; }
+.cam-torch { min-height: 40px; background: rgb(0 0 0 / .45); color: #fff; border-color: rgb(255 255 255 / .4); }
+.cam-torch[aria-pressed="true"] { background: #ffd23f; color: #000; }
+.cam-bottom {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  padding: 12px 16px calc(18px + env(safe-area-inset-bottom));
+  background: linear-gradient(transparent, rgb(0 0 0 / .65));
+}
+.cam-zoom { display: flex; justify-content: center; gap: 10px; margin-bottom: 16px; }
+.cam-zoom button {
+  min-width: 48px;
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 0;
+  background: rgb(0 0 0 / .5);
+  color: #fff;
+  font-weight: 700;
+}
+.cam-zoom button[aria-pressed="true"] { background: rgb(0 0 0 / .7); color: #ffd23f; }
+.cam-controls { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
+.cam-last {
+  justify-self: start;
+  width: 52px;
+  height: 52px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 2px solid #fff;
+  background: rgb(255 255 255 / .15);
+}
+.cam-last:not([src]) { visibility: hidden; }
+.cam-shutter {
+  width: 78px;
+  height: 78px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 50%;
+  border: 5px solid #fff;
+  background: rgb(255 255 255 / .9);
+  box-shadow: inset 0 0 0 3px #000;
+}
+.cam-shutter:active { transform: scale(.92); background: #fff; }
+.cam-done {
+  justify-self: end;
+  min-height: 48px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--done-line);
+  color: #fff;
+  font-weight: 800;
+  font-size: 1.05rem;
+}
+.cam-message { position: absolute; top: 40%; left: 16px; right: 16px; text-align: center; }

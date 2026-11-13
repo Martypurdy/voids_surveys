@@ -2,6 +2,7 @@
 import { putPhoto, getPhoto, getPhotos, deletePhotos, scheduleSave, flushSave } from './db.js';
 import { uid, nowISO } from './model.js';
 import { h, icon, ICONS, objectUrl, confirmDialog, choose, toast } from './ui.js';
+import { openCamera, cameraSupported } from './camera.js';
 
 export const FULL_MAX = 1600;
 export const FULL_QUALITY = 0.82;
@@ -62,9 +63,9 @@ export async function makeThumb(blob) {
  * Photo field: one "Add photos" button that asks "Take photos" or "Upload from
  * phone", plus a thumbnail grid.
  *
- * "Take photos" opens the phone's own camera app (with its zoom/lens controls).
- * A web page can only receive one shot per camera launch, so after each shot a
- * "Take another / Done" prompt keeps the session going.
+ * "Take photos" opens the in-app camera (camera.js): snap repeatedly with no
+ * per-photo review; shots are saved in the background. Falls back to the
+ * phone's camera app if the in-app camera can't start.
  *
  * @param {object} job   the job (saved after every change)
  * @param {string[]} list  the photos array to manage – mutated in place
@@ -101,48 +102,57 @@ export function photoField(job, list, onChange = () => {}) {
 
   // Upload: no capture attribute, multiple allowed (iOS shows Photo Library / Take Photo / Files).
   const pickInput = h('input', { type: 'file', accept: 'image/*', multiple: true, hidden: true, onchange: (e) => handleFiles(e.target) });
-  // Camera: opens the phone's rear camera directly.
-  const camInput = h('input', {
-    type: 'file',
-    accept: 'image/*',
-    capture: 'environment',
-    hidden: true,
-    onchange: async (e) => {
-      const added = await handleFiles(e.target);
-      if (added) cameraSession(added);
-    },
-  });
+  // Fallback only (no in-app camera / permission refused): the phone's own camera app.
+  const camInput = h('input', { type: 'file', accept: 'image/*', capture: 'environment', hidden: true, onchange: (e) => handleFiles(e.target) });
 
-  // ----- "Snap away" session: Take another / Done after each shot -----
-  let sessionCount = 0;
-  const cameraSession = async (added) => {
-    sessionCount += added;
-    const preview = h('img', { class: 'session-preview', alt: 'Last photo taken' });
-    const lastId = list[list.length - 1];
-    getPhoto(lastId).then((rec) => { if (rec) preview.src = objectUrl(rec.thumb || rec.blob); });
-    await choose({
-      title: `📷 ${sessionCount} photo${sessionCount === 1 ? '' : 's'} taken`,
-      content: preview,
-      buttons: [
-        // Runs inside the tap, so the browser allows opening the camera again.
-        { label: '📷 Take another', value: 'more', class: 'btn-primary btn-big', onClick: () => camInput.click() },
-        { label: '✓ Done', value: 'done', class: 'btn-big' },
-      ],
+  // ----- In-app camera: snap many in a row, no review step -----
+  // Shots are saved one after another in the background while you keep shooting.
+  let queue = Promise.resolve();
+  let pending = 0;
+  const saveShot = (blob) => {
+    pending++;
+    status.textContent = `Saving ${pending} photo${pending === 1 ? '' : 's'}…`;
+    queue = queue.then(async () => {
+      try {
+        const id = await storePhotoFile(blob, job.id);
+        list.push(id);
+        grid.append(thumbButton(id));
+        scheduleSave(job, 0);
+        await flushSave();
+      } catch (e) {
+        console.error(e);
+        toast('A photo couldn’t be saved');
+      } finally {
+        pending--;
+        status.textContent = pending ? `Saving ${pending} photo${pending === 1 ? '' : 's'}…` : '';
+        onChange();
+      }
     });
+  };
+
+  const takePhotos = async () => {
+    if (!cameraSupported()) return camInput.click();
+    const { error } = await openCamera({ onCapture: saveShot });
+    if (error) {
+      console.warn(error);
+      // A fresh tap is needed before the browser will open the phone's camera app.
+      await choose({
+        title: 'Camera not available',
+        message: error.name === 'NotAllowedError'
+          ? 'Camera permission was refused. Allow camera access for this site in your browser settings, or use the phone’s camera app instead.'
+          : 'The camera couldn’t be started. You can use the phone’s camera app instead.',
+        buttons: [
+          { label: '📷 Use phone camera app', value: 'native', class: 'btn-primary btn-big', onClick: () => camInput.click() },
+          { label: 'Cancel', value: null },
+        ],
+      });
+    }
   };
 
   const addPhotos = () => choose({
     title: 'Add photos',
     buttons: [
-      {
-        label: '📷 Take photos',
-        value: 'camera',
-        class: 'btn-primary btn-big',
-        onClick: () => {
-          sessionCount = 0;
-          camInput.click();
-        },
-      },
+      { label: '📷 Take photos', value: 'camera', class: 'btn-primary btn-big', onClick: () => { takePhotos(); } },
       { label: '🖼 Upload from phone', value: 'upload', class: 'btn-big', onClick: () => pickInput.click() },
       { label: 'Cancel', value: null },
     ],
