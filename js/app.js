@@ -1,6 +1,7 @@
 // Entry point: routes, autosave flushing, service worker.
 import { route, start } from './router.js';
 import { flushSave } from './db.js';
+import { toast } from './ui.js';
 
 route('/', () => import('./views/jobList.js'));
 route('/job/:id', () => import('./views/jobAddress.js'));
@@ -17,3 +18,40 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') flushSave();
 });
 window.addEventListener('pagehide', () => flushSave());
+
+registerServiceWorker();
+
+async function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  try {
+    const reg = await navigator.serviceWorker.register('sw.js');
+    const offerUpdate = (worker) => {
+      toast('A new version is available', {
+        action: 'Reload',
+        timeout: 0,
+        onAction: async () => {
+          await flushSave();
+          worker.postMessage('skipWaiting');
+        },
+      });
+    };
+    if (reg.waiting && navigator.serviceWorker.controller) offerUpdate(reg.waiting);
+    reg.addEventListener('updatefound', () => {
+      const worker = reg.installing;
+      worker?.addEventListener('statechange', () => {
+        // Only prompt for updates, not on the very first install.
+        if (worker.state === 'installed' && navigator.serviceWorker.controller) offerUpdate(worker);
+      });
+    });
+    // clients.claim() also fires controllerchange on first install – don't reload then.
+    const hadController = Boolean(navigator.serviceWorker.controller);
+    let reloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloading || !hadController) return;
+      reloading = true;
+      location.reload();
+    });
+  } catch (e) {
+    console.warn('Service worker registration failed', e);
+  }
+}
