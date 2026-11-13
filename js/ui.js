@@ -104,6 +104,22 @@ export function conditionPicker(value, onChange) {
   return wrap;
 }
 
+/** Big tap-to-select button (green when on), used for works such as "Fit key safe". */
+export function worksButton(label, detail, on, onclick, { chevron, ...attrs } = {}) {
+  return h('button', {
+    type: 'button',
+    class: 'works-item',
+    'aria-pressed': String(on),
+    onclick,
+    ...attrs,
+  },
+  h('span', { class: 'works-tick', 'aria-hidden': 'true' }, on ? '✓' : ''),
+  h('span', { class: 'works-text' },
+    h('span', { class: 'works-label' }, label),
+    detail ? h('span', { class: 'works-detail' }, detail) : null),
+  chevron ? h('span', { class: 'works-chevron', 'aria-hidden': 'true' }, chevron) : null);
+}
+
 export function badge(condition) {
   return condition ? h('span', { class: 'badge', dataset: { v: condition } }, condition) : null;
 }

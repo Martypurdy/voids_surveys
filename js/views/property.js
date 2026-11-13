@@ -1,13 +1,12 @@
-// Screen: property type – type/style/size, property photo (shown at the top of
-// the PDF), and the "works required" list with its pop-ups and key safe details.
+// Screen: property – type/style/size, property photo (shown at the top of the PDF)
+// and clearance. Key safe, locks and gain entry live on the Security tab.
 import { scheduleSave } from '../db.js';
 import {
   PROPERTY_TYPES, PROPERTY_STYLES,
-  CYLINDER_OPTIONS, CYLINDER_DEFAULT, CLEARANCE_OPTIONS, CLEARANCE_BY,
+  CLEARANCE_OPTIONS, CLEARANCE_BY,
 } from '../model.js';
-import { h, textField, selectField, multiSelect } from '../ui.js';
+import { h, textField, selectField, multiSelect, worksButton } from '../ui.js';
 import { photoField } from '../photos.js';
-import { keySafeSection } from './keySafe.js';
 import { loadJobOr404, jobChrome, completeFooter } from './chrome.js';
 
 const HAS_STYLE = new Set(['House', 'Bungalow']);
@@ -44,45 +43,13 @@ export default async function property(root, { id }) {
   renderTypes();
   syncVisibility();
 
-  // ----- Works required list -----
+  // ----- Clearance -----
   const list = h('div', { class: 'works-list' });
-  // "Fit key safe" with the key safe details always shown right under it.
-  // The panel is never re-rendered, so typing in it is never interrupted.
-  const fitKeySafeSlot = h('div', { class: 'works-list' });
-  const keySafePanel = h('div', { class: 'card card-body works-panel keysafe-panel' }, keySafeSection(job));
-
-  const item = (label, detail, on, onclick, { chevron, ...attrs } = {}) => h('button', {
-    type: 'button',
-    class: 'works-item',
-    'aria-pressed': String(on),
-    onclick,
-    ...attrs,
-  },
-  h('span', { class: 'works-tick', 'aria-hidden': 'true' }, on ? '✓' : ''),
-  h('span', { class: 'works-text' },
-    h('span', { class: 'works-label' }, label),
-    detail ? h('span', { class: 'works-detail' }, detail) : null),
-  chevron ? h('span', { class: 'works-chevron', 'aria-hidden': 'true' }, chevron) : null);
-
   const renderList = () => {
-    fitKeySafeSlot.replaceChildren(
-      item('Fit key safe', '', w.keySafe, () => { w.keySafe = !w.keySafe; save(); renderList(); }));
+    const detail = [w.clearance.join(', '), w.clearanceBy.length ? `by ${w.clearanceBy.join(' / ')}` : '']
+      .filter(Boolean).join(' – ');
     list.replaceChildren(
-      item('Gain entry', '', w.gainEntry, () => { w.gainEntry = !w.gainEntry; save(); renderList(); }),
-      item('Renew locks', w.cylinders?.length ? w.cylinders.join(', ') : 'Tap to choose locks',
-        Boolean(w.cylinders?.length), async () => {
-          const r = await multiSelect({
-            title: 'Renew locks',
-            message: 'Select every lock that needs renewing.',
-            groups: [{ options: CYLINDER_OPTIONS, selected: w.cylinders ?? CYLINDER_DEFAULT }],
-          });
-          if (!r) return;
-          [w.cylinders] = r;
-          save();
-          renderList();
-        }, { chevron: '›' }),
-      item('Property clearance',
-        [w.clearance.join(', '), w.clearanceBy.length ? `by ${w.clearanceBy.join(' / ')}` : ''].filter(Boolean).join(' – ') || 'Tap to choose',
+      worksButton('Property clearance', detail || 'Tap to choose',
         Boolean(w.clearance.length || w.clearanceBy.length), async () => {
           const r = await multiSelect({
             title: 'Property clearance',
@@ -95,8 +62,7 @@ export default async function property(root, { id }) {
           [w.clearance, w.clearanceBy] = r;
           save();
           renderList();
-        }, { chevron: '›' }),
-    );
+        }, { chevron: '›' }));
   };
   renderList();
 
@@ -115,10 +81,7 @@ export default async function property(root, { id }) {
       h('p', { class: 'hint' }, 'The first photo appears at the top of the PDF report.'),
       photoField(job, p.photos),
 
-      h('h2', null, 'Works required'),
-      h('p', { class: 'hint' }, 'Tap to select – selected items turn green.'),
-      fitKeySafeSlot,
-      keySafePanel,
+      h('h2', null, 'Clearance'),
       list,
       completeFooter(job, 'property')));
 }

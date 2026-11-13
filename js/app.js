@@ -6,12 +6,14 @@ import { toast } from './ui.js';
 route('/', () => import('./views/jobList.js'));
 route('/settings', () => import('./views/settings.js'));
 route('/job/:id', () => import('./views/jobAddress.js'));
-route('/job/:id/rooms', () => import('./views/rooms.js'));
-route('/job/:id/rooms/:roomId', () => import('./views/room.js'));
-route('/job/:id/externals', () => import('./views/items.js'), { kind: 'externals' });
-route('/job/:id/keys', () => import('./views/property.js')); // old tab -> key safe now lives on Property
 route('/job/:id/property', () => import('./views/property.js'));
-route('/job/:id/keysafe', () => import('./views/property.js'));
+route('/job/:id/security', () => import('./views/security.js'));
+route('/job/:id/keys', () => import('./views/security.js')); // old links
+route('/job/:id/keysafe', () => import('./views/security.js'));
+route('/job/:id/rooms', () => import('./views/rooms.js'), { kind: 'rooms' });
+route('/job/:id/rooms/:roomId', () => import('./views/room.js'), { kind: 'rooms' });
+route('/job/:id/externals', () => import('./views/rooms.js'), { kind: 'externals' });
+route('/job/:id/externals/:roomId', () => import('./views/room.js'), { kind: 'externals' });
 route('/job/:id/meters', () => import('./views/meters.js'));
 
 start(document.getElementById('app'));

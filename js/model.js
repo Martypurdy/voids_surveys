@@ -4,8 +4,10 @@ export const SCHEMA = 1;
 
 export const CONDITIONS = ['Good', 'Fair', 'Poor', 'N/A'];
 
-export const ROOM_PRESETS = ['Hall, stairs, landing & loft', 'Living room', 'Kitchen', 'Bathroom', 'WC', 'Bedroom', 'Porch'];
-export const EXTERNAL_PRESETS = ['Front garden', 'Rear garden', 'Boundaries', 'Garage', 'Shed'];
+import { AREA_PRESETS, defaultFeatures } from './data/features.js';
+
+export const ROOM_PRESETS = AREA_PRESETS.rooms;
+export const EXTERNAL_PRESETS = AREA_PRESETS.externals;
 
 // Services tab, in display order. The first of each is always present.
 export const UTILITIES = ['Fuse board', 'Mains stop tap', 'Gas', 'Electric', 'Water'];
@@ -22,6 +24,7 @@ export const BACKUP_WARN_DAYS = 7;
 export const SECTIONS = [
   ['address', 'Address', ''],
   ['property', 'Property', 'property'],
+  ['security', 'Security', 'security'],
   ['meters', 'Services', 'meters'],
   ['rooms', 'Rooms', 'rooms'],
   ['externals', 'Externals', 'externals'],
@@ -52,12 +55,15 @@ export function newWorks() {
 }
 
 /** Selected works as [label, detail] pairs, for summaries and the PDF. */
-export function worksSummary(w) {
+/** which: 'security' (key safe, gain entry, locks) | 'property' (clearance) | 'all'. */
+export function worksSummary(w, which = 'all') {
   const out = [];
-  if (w.keySafe) out.push(['Fit key safe', '']);
-  if (w.gainEntry) out.push(['Gain entry', '']);
-  if (w.cylinders?.length) out.push(['Renew locks', w.cylinders.join(', ')]);
-  if (w.clearance.length || w.clearanceBy.length) {
+  const sec = which !== 'property';
+  const prop = which !== 'security';
+  if (sec && w.keySafe) out.push(['Fit key safe', '']);
+  if (sec && w.gainEntry) out.push(['Gain entry', '']);
+  if (sec && w.cylinders?.length) out.push(['Renew locks', w.cylinders.join(', ')]);
+  if (prop && (w.clearance.length || w.clearanceBy.length)) {
     out.push(['Property clearance', [w.clearance.join(', '), w.clearanceBy.length ? `by ${w.clearanceBy.join(' / ')}` : '']
       .filter(Boolean).join(' – ')]);
   }
@@ -80,10 +86,14 @@ export function upgradeJob(job) {
   for (const u of ['Mains stop tap', 'Fuse board']) {
     if (!job.meters.some((m) => m.utility === u)) job.meters.unshift(newMeter(u));
   }
-  for (const r of job.rooms) {
+  // Rooms and outside areas share one shape (older outside items only had a condition).
+  for (const r of [...job.rooms, ...job.externals]) {
     r.parts ??= {};
     r.size ??= { length: '', width: '', height: '' };
+    if (!Array.isArray(r.photos)) r.photos = [];
   }
+  job.security ??= newRoom('Security', 'security');
+  job.security.parts ??= {};
   return job;
 }
 
@@ -120,6 +130,7 @@ export function newJob({ surveyor = '' } = {}) {
     externals: [],
     keys: [],
     keySafe: newKeySafe(),
+    security: newRoom('Security', 'security'),
     meters: UTILITIES.map((u) => newMeter(u)),
   };
 }
@@ -130,9 +141,12 @@ export function newItem(name) {
 
 // ----- Rooms: parts, defects, size -----
 
-/** A new room: parts start unchecked (amber). */
-export function newRoom(name) {
-  return { ...newItem(name), parts: {}, size: { length: '', width: '', height: '' } };
+/**
+ * A new room or outside area (kind 'rooms' | 'externals' | 'security'): starts with its
+ * type's features, all unchecked (amber).
+ */
+export function newRoom(name, kind = 'rooms') {
+  return { ...newItem(name), parts: {}, size: { length: '', width: '', height: '' }, features: defaultFeatures(name, kind), featureLabels: {} };
 }
 
 /** part = { state: '' | 'ok' | 'works', defects: [{ id, qty }], notes, photos } */
@@ -213,9 +227,9 @@ export function nextNumberedName(items, base) {
 export function photoLists(job) {
   return [
     job.property?.photos || [],
-    ...job.rooms.map((x) => x.photos),
-    ...job.rooms.flatMap((x) => Object.values(x.parts || {}).map((p) => p.photos || [])),
-    ...job.externals.map((x) => x.photos),
+    // Rooms, outside areas and Security: the area's own photos plus each feature's.
+    ...[...job.rooms, ...job.externals, ...(job.security ? [job.security] : [])]
+      .flatMap((x) => [x.photos || [], ...Object.values(x.parts || {}).map((p) => p.photos || [])]),
     ...job.keys.map((x) => x.photos),
     job.keySafe.photos,
     ...job.meters.map((x) => x.photos),

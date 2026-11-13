@@ -32,11 +32,16 @@ Open devices will show “A new version is available – Reload”.
 
 ## Using it
 
-Each job has five sections, shown as tabs in this order: **Address, Property, Services, Rooms,
-Externals**. A tab turns **amber** when you open it and **green ✓** when you tap the
+Each job has six sections, shown as tabs in this order: **Address, Property, Security, Services,
+Rooms, Externals**. A tab turns **amber** when you open it and **green ✓** when you tap the
 *Mark … complete* button at the bottom of that screen (which then moves you to the next
 unfinished section). *Reopen section* undoes it. The job list shows a progress bar and
-“n of 5 sections complete”.
+“n of 6 sections complete”.
+
+Rooms, outside areas and Security all work the same way: each has **features**, each feature
+has **OK** (green, no work) or a **defects list** (red) with quantities, notes and photos.
+**+ Add feature** adds one from suggestions or your own name (e.g. Patio, Pond, Conservatory);
+**✎ Edit features** removes them.
 
 1. **Jobs** – create, open, import a `.json` job file; ⋮ on a job gives PDF / backup / delete.
 2. **Address** – enter the postcode at the top and tap *Look up*: the street, area, town and
@@ -50,15 +55,17 @@ unfinished section). *Reopen section* undoes it. The job list shows a progress b
    off the list. The last surveyor picked is filled in automatically on new surveys.
 3. **Property** – House / Flat / Bungalow / Maisonette / Bedsit / Other, style (houses and
    bungalows), floor level (flats), bedrooms, storeys; **property photo** (the first one is shown
-   at the top of the PDF); **Works required** – tap to select (green): Fit key safe (on by
-   default), Gain entry, Renew locks (pop-up: Front door pre-ticked, Back, Patio, Shed,
-   Gate, Garage, Windows, Post box, Communal key / fob – pick any), Property clearance (pop-up: Full, Partial,
-   Needle sweep, Environmental, Pest control, and by Operatives / Contractor), and **Key safe
-   details** shown under *Fit key safe* (location, code, GPS pin, photos).
-4. **Services** – **Heating type** pop-up (Gas boiler, Electric heaters, Heat pump – pick any),
+   at the top of the PDF); **Property clearance** (pop-up: Full, Partial, Needle sweep,
+   Environmental, Pest control, and by Operatives / Contractor).
+4. **Security** – **Fit key safe** (on by default) with the key safe details always shown under it
+   (location, code, GPS pin, photos), **Gain entry**, **Renew locks** (pop-up: Front door
+   pre-ticked, Back, Patio, Shed, Gate, Garage, Windows, Post box, Communal key / fob – pick any),
+   then **Doors & windows** as features: Front door, Rear door, Patio / side door, Windows –
+   security (+ Garage door, Communal entrance door…).
+5. **Services** – **Heating type** pop-up (Gas boiler, Electric heaters, Heat pump – pick any),
    then **Fuse board**, **Mains stop tap**, and the gas, electric and water meters – each with a
    **location** description and photos (*+ Add another meter / service* for extras).
-5. **Rooms** – add rooms from presets (Bedroom auto-numbers) or a custom name. Each room is a
+6. **Rooms** – add rooms from presets (Bedroom auto-numbers) or a custom name. Each room is a
    button: **amber** = not finished, **red** = work needed, **green** = all OK. Tap a room:
    - **Room size** – length × width × height; the app works out emulsion (ceiling and wall m²),
      flooring m² and skirting length.
@@ -90,8 +97,10 @@ unfinished section). *Reopen section* undoes it. The job list shows a progress b
    → `private/sor-library.json` (load on each phone) and `private/SOR-preload-review.csv`
    (the preloaded lists, for review). The whole `private/` folder is git-ignored. No rates are
    copied.
-6. **Externals** – add from presets or a custom name; each has condition (Good / Fair / Poor /
-   N/A), notes and photos.
+7. **Externals** – outside areas, same flow as rooms: **Building exterior** (Roof, Chimney,
+   Gutters, Downpipes, Fascias & soffits, Walls & pointing, Drainage), **Front / Rear garden**
+   (Paths, Lawn, Bushes & hedges, Trees – add Patio, Fence, Gate, Garden wall, Steps…),
+   **Fencing & gates**, **Shed**, **Garage**, or a custom area.
 
 Surveys made with older versions keep any key register or meter readings they recorded; these
 still appear in the PDF.

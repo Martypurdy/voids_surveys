@@ -1,6 +1,7 @@
 // PDF report (jsPDF, loaded on demand from /vendor).
 import { addressLines, jobTitle, fmtDate, fmtDateTime, slug, todayLocal, allPhotoIds, worksSummary, roomStatus, roomAreas, serviceTitle } from '../model.js';
-import { PARTS, UNITS, defectInfo, isSorCode, qtyText as unitQty } from '../data/parts.js';
+import { UNITS, defectInfo, isSorCode, qtyText as unitQty } from '../data/parts.js';
+import { FEATURES, featuresOf } from '../data/features.js';
 import { loadPhotos, resizeImage } from '../photos.js';
 
 // Photos are re-encoded smaller for the PDF so reports stay emailable.
@@ -161,38 +162,47 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
   // PDF fonts are Latin-1: the multiply sign and superscript 2 are both covered.
   const qtyText = (qty, unit) => unitQty(qty, unit);
 
-  const roomsSection = async (rooms) => {
-    if (!rooms.length) return;
-    heading('Rooms');
-    for (const room of rooms) {
-      const s = roomStatus(room, PARTS);
-      const legacy = s.state === 'todo' && room.condition; // surveyed with an older version
-      const badge = legacy ? room.condition : s.state === 'ok' ? 'No work' : s.works ? 'Work needed' : s.checked < s.total ? 'Not finished' : '';
-      ensure(30);
-      subheading(room.name || 'Untitled room', badge);
-      const a = roomAreas(room.size);
-      if (a.ceiling) para(`Size ${room.size.length} x ${room.size.width} x ${room.size.height} m  -  ceiling/floor ${a.ceiling} m², walls ${a.walls} m², skirting ${a.perimeter} m`, { size: 9, rgb: [90, 98, 106] });
-      for (const part of PARTS) {
-        const p = room.parts?.[part.key];
-        if (!p?.state) continue;
-        if (p.state === 'ok') {
-          para(`${part.label}: OK - no work required`, { size: 10 });
-          continue;
-        }
-        ensure(lineH(10) * 3); // keep the part heading with its first defect
-        para(`${part.label}:`, { size: 10, style: 'bold' });
-        for (const d of p.defects) {
-          const def = defectInfo(part, d);
-          para(`-  ${def.label}${d.qty ? `  ${qtyText(d.qty, def.unit)}` : ''}${isSorCode(d.id) ? `   [${d.id}]` : ''}`, { size: 10, x: M + 4, width: CW - 4 });
-          const key = `${part.key}|${d.id}`;
-          const row = schedule.get(key) || { part: part.label, label: def.label, unit: def.unit, id: d.id, total: 0, rooms: new Set() };
-          row.total += parseFloat(String(d.qty).replace(',', '.')) || (UNITS[def.unit]?.count ? 1 : 0);
-          row.rooms.add(room.name);
-          schedule.set(key, row);
-        }
-        if (p.notes) para(`Notes: ${p.notes}`, { size: 9.5, x: M + 4, width: CW - 4, rgb: [70, 78, 86] });
-        await photoGrid(p.photos);
+  /** Each checked feature of a room / area / Security: OK, or its defects (added to the schedule). */
+  const featureBlocks = async (room, kind) => {
+    for (const part of featuresOf(room, kind)) {
+      const p = room.parts?.[part.key];
+      if (!p?.state) continue;
+      if (p.state === 'ok') {
+        para(`${part.label}: OK - no work required`, { size: 10 });
+        continue;
       }
+      ensure(lineH(10) * 3); // keep the feature heading with its first defect
+      para(`${part.label}:`, { size: 10, style: 'bold' });
+      for (const d of p.defects) {
+        const def = defectInfo(FEATURES[part.key] ? part : null, d);
+        para(`-  ${def.label}${d.qty ? `  ${qtyText(d.qty, def.unit)}` : ''}${isSorCode(d.id) ? `   [${d.id}]` : ''}`, { size: 10, x: M + 4, width: CW - 4 });
+        const key = `${part.label}|${d.id}`;
+        const row = schedule.get(key) || { part: part.label, label: def.label, unit: def.unit, id: d.id, total: 0, rooms: new Set() };
+        row.total += parseFloat(String(d.qty).replace(',', '.')) || (UNITS[def.unit]?.count ? 1 : 0);
+        row.rooms.add(room.name);
+        schedule.set(key, row);
+      }
+      if (p.notes) para(`Notes: ${p.notes}`, { size: 9.5, x: M + 4, width: CW - 4, rgb: [70, 78, 86] });
+      await photoGrid(p.photos);
+    }
+  };
+
+  const areaBadge = (room, kind) => {
+    const s = roomStatus(room, featuresOf(room, kind));
+    if (s.state === 'todo' && room.condition) return room.condition; // older survey
+    return s.state === 'ok' ? 'No work' : s.works ? 'Work needed' : s.checked < s.total ? 'Not finished' : '';
+  };
+
+  /** Rooms or outside areas. */
+  const roomsSection = async (title, areas, kind) => {
+    if (!areas.length) return;
+    heading(title);
+    for (const room of areas) {
+      ensure(30);
+      subheading(room.name || 'Untitled', areaBadge(room, kind));
+      const a = roomAreas(room.size);
+      if (kind === 'rooms' && a.ceiling) para(`Size ${room.size.length} x ${room.size.width} x ${room.size.height} m  -  ceiling/floor ${a.ceiling} m², walls ${a.walls} m², skirting ${a.perimeter} m`, { size: 9, rgb: [90, 98, 106] });
+      await featureBlocks(room, kind);
       para(room.notes, { size: 10 });
       await photoGrid(room.photos);
       y += 4;
@@ -202,14 +212,13 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
   const scheduleSection = () => {
     if (!schedule.size) return;
     heading('Schedule of works');
-    para('All defects recorded in the rooms, totalled.', { size: 9, rgb: [90, 98, 106] });
+    para('All defects recorded in this survey, totalled by feature.', { size: 9, rgb: [90, 98, 106] });
     y += 1;
-    for (const part of PARTS) {
-      const rows = [...schedule.values()].filter((r) => r.part === part.label);
-      if (!rows.length) continue;
+    const groups = [...new Set([...schedule.values()].map((r) => r.part))];
+    for (const label of groups) {
       ensure(14);
-      para(part.label, { size: 10.5, style: 'bold' });
-      for (const r of rows) {
+      para(label, { size: 10.5, style: 'bold' });
+      for (const r of [...schedule.values()].filter((x) => x.part === label)) {
         const total = Math.round(r.total * 10) / 10;
         para(`-  ${r.label}:  ${qtyText(total, r.unit)}${isSorCode(r.id) ? `   [${r.id}]` : ''}   (${[...r.rooms].join(', ')})`, { size: 10, x: M + 4, width: CW - 4 });
       }
@@ -247,30 +256,24 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
     ['Location', job.address.lat != null ? `${job.address.lat}, ${job.address.lng}` : ''],
   ]);
 
-  // Summary of condition ratings.
-  if (job.rooms.length) {
-    const st = job.rooms.map((r) => roomStatus(r, PARTS));
+  // Summary: rooms and outside areas needing work.
+  const summarise = (label, areas, kind) => {
+    if (!areas.length) return;
+    const st = areas.map((r) => roomStatus(r, featuresOf(r, kind)));
     const n = (f) => st.filter(f).length;
     y += 2;
-    kv([['Rooms', `${job.rooms.length} surveyed - ${n((s) => s.works)} need work, ${n((s) => s.state === 'ok')} all OK` +
+    kv([[label, `${areas.length} surveyed - ${n((s) => s.works)} need work, ${n((s) => s.state === 'ok')} all OK` +
       (n((s) => s.checked < s.total) ? `, ${n((s) => s.checked < s.total)} not finished` : '')]]);
-    const need = job.rooms.filter((r, i) => st[i].works).map((r) => r.name);
+    const need = areas.filter((r, i) => st[i].works).map((r) => r.name);
     if (need.length) kv([['Work needed in', need.join(', ')]]);
-  }
-  const all = [...job.externals];
-  if (all.length) {
-    const count = (c) => all.filter((i) => i.condition === c).length;
-    y += 2;
-    kv([['Condition summary', ['Good', 'Fair', 'Poor', 'N/A'].map((c) => `${c}: ${count(c)}`).join('   ') +
-      (all.some((i) => !i.condition) ? `   Not rated: ${all.filter((i) => !i.condition).length}` : '')]]);
-    const poor = all.filter((i) => i.condition === 'Poor').map((i) => i.name);
-    if (poor.length) kv([['Rated poor', poor.join(', ')]]);
-  }
+  };
+  summarise('Rooms', job.rooms, 'rooms');
+  summarise('Outside areas', job.externals, 'externals');
 
   // ---------- sections ----------
-  // Same order as the app's tabs: property, keys & key safe, meters, rooms, externals.
+  // Same order as the app's tabs: property, security, services, rooms, externals.
   const prop = job.property;
-  const works = worksSummary(job.works);
+  const works = worksSummary(job.works, 'property');
   if (prop.type || prop.style || prop.bedrooms || prop.storeys || prop.floor || prop.notes || works.length || otherPropertyPhotos.length) {
     heading('Property');
     kv([
@@ -303,15 +306,33 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
     }
   }
 
+  // ----- Security: key safe & access works, then doors and windows -----
   const ks = job.keySafe;
-  if (ks.location || ks.code || ks.lat != null || ks.photos.length) {
-    heading('Key safe');
-    kv([
-      ['Location', ks.location],
-      ['Code', ks.code ? (includeCode ? ks.code : 'Withheld from this report') : 'Not recorded'],
-      ['GPS', ks.lat != null ? `${ks.lat}, ${ks.lng}${ks.accuracy != null ? ` (±${ks.accuracy} m)` : ''}` : ''],
-    ]);
-    await photoGrid(ks.photos);
+  const secWorks = worksSummary(job.works, 'security');
+  const hasKeySafe = ks.location || ks.code || ks.lat != null || ks.photos.length;
+  const secChecked = job.security && featuresOf(job.security, 'security').some((f) => job.security.parts?.[f.key]?.state);
+  if (secWorks.length || hasKeySafe || secChecked) {
+    heading('Security');
+    for (const [label, detail] of secWorks) {
+      para(`-  ${label}${detail ? `: ${detail}` : ''}`, { size: 10.5 });
+      y += 0.8;
+    }
+    if (hasKeySafe) {
+      y += 2;
+      subheading('Key safe');
+      kv([
+        ['Location', ks.location],
+        ['Code', ks.code ? (includeCode ? ks.code : 'Withheld from this report') : 'Not recorded'],
+        ['GPS', ks.lat != null ? `${ks.lat}, ${ks.lng}${ks.accuracy != null ? ` (±${ks.accuracy} m)` : ''}` : ''],
+      ]);
+      await photoGrid(ks.photos);
+    }
+    if (secChecked) {
+      y += 2;
+      subheading('Doors & windows', areaBadge(job.security, 'security'));
+      await featureBlocks(job.security, 'security');
+    }
+    y += 2;
   }
 
   const meters = job.meters.filter((m) => m.location || m.photos.length || m.serial || m.reading || m.type || m.supply);
@@ -336,8 +357,8 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
     }
   }
 
-  await roomsSection(job.rooms);
-  await itemSection('Externals', job.externals);
+  await roomsSection('Rooms', job.rooms, 'rooms');
+  await roomsSection('Externals', job.externals, 'externals');
   scheduleSection();
 
   // ---------- footers ----------

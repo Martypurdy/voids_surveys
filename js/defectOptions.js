@@ -9,7 +9,9 @@ import { hiddenFor, addedFor, roomType } from './templates.js';
 
 /** Built-in options before the user's own template is applied. */
 export function baseOptions({ library, roomName, part, ceilingArea = 0 }) {
-  if (library) return preloadFor(library, part.key, ceilingArea);
+  // SOR preloads exist for the six room features; everything else (Electrics, Roof,
+  // Fence…) keeps its built-in list – SOR search still works on them.
+  if (library?.parts?.[part.key]) return preloadFor(library, part.key, ceilingArea);
   const extra = ROOM_DEFAULTS[roomType(roomName)]?.[part.key] || {};
   const skip = new Set(extra.skip || []);
   return [...(extra.add || []), ...part.defects.filter((d) => !skip.has(d.id))]
