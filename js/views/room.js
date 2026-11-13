@@ -3,10 +3,11 @@
 // With an SOR library loaded, the sheet shows the preloaded SORs for the part
 // (size bands picked from the room size) plus a search over the whole SOR.
 import { scheduleSave, flushSave, deletePhotos } from '../db.js';
-import { roomPart, roomAreas, roomStatus } from '../model.js';
+import { roomPart, roomAreas, roomStatus, uid } from '../model.js';
 import { PARTS, UNITS, qtyText, defectInfo } from '../data/parts.js';
-import { getLibrary, searchLibrary, preloadFor, libraryItem } from '../sor.js';
-import { hiddenFor, setHidden, addedFor, setAdded, roomTypeLabel } from '../templates.js';
+import { getLibrary, searchLibrary, libraryItem } from '../sor.js';
+import { setHidden, setAdded, roomTypeLabel } from '../templates.js';
+import { templateOptions } from '../defectOptions.js';
 import { h, textField, confirmDialog, toast } from '../ui.js';
 import { photoField } from '../photos.js';
 import { go } from '../router.js';
@@ -40,7 +41,7 @@ export default async function roomPage(root, { id, roomId }) {
   }, { inputmode: 'decimal', placeholder: 'm' });
   renderAreas();
 
-  // ---------- Parts ----------
+  // ---------- Features ----------
   const partsList = h('div', { class: 'parts-list' });
   const statusLine = h('p', { class: 'hint' });
 
@@ -95,8 +96,8 @@ export default async function roomPage(root, { id, roomId }) {
     statusLine.textContent = s.state === 'ok'
       ? '✓ Every part OK – no work required in this room.'
       : s.checked === s.total
-        ? `✓ All parts checked – ${s.defects} defect${s.defects === 1 ? '' : 's'} recorded.`
-        : `${s.checked} of ${s.total} parts checked.`;
+        ? `✓ All features checked – ${s.defects} defect${s.defects === 1 ? '' : 's'} recorded.`
+        : `${s.checked} of ${s.total} features checked.`;
   };
 
   // ---------- Defects sheet ----------
@@ -105,24 +106,19 @@ export default async function roomPage(root, { id, roomId }) {
     const areas = roomAreas(room.size);
     const prefill = part.fill ? areas[part.fill] : 0;
 
-    // The options shown: SOR preload (if a library is loaded) or the draft list.
-    const options = library
-      ? preloadFor(library, part.key, areas.ceiling)
-      : part.defects.map((d) => ({ k: d.id, c: d.id, d: d.label, u: d.unit }));
-    // This device's template for this type of room (Bedroom 1/2/3 share one):
-    // SORs removed with − and SORs pinned with 📌.
+    // The list for this type of room (Bedroom 1/2/3 share one) on this device:
+    // built-in list, minus items removed with −, plus items pinned 📌 or written by the user.
     const typeLabel = roomTypeLabel(room.name);
     const listName = `${typeLabel} ${part.label.toLowerCase()}`;
-    let hidden = hiddenFor(room.name, part.key);
-    let pinned = addedFor(room.name, part.key);
-    const baseCodes = new Set(options.map((o) => o.c));
-    const pinnedOptions = () => pinned.filter((x) => !baseCodes.has(x.c))
-      .map((x) => ({ k: `pin:${x.c}`, c: x.c, d: x.d, u: x.u, pinned: true }));
-    const visibleOptions = () => [...options.filter((o) => !hidden.has(o.k)), ...pinnedOptions()];
-    const removedOptions = () => options.filter((o) => hidden.has(o.k));
+    const tplArgs = { library, roomName: room.name, part, ceilingArea: areas.ceiling };
+    let tpl = templateOptions(tplArgs);
+    const options = tpl.base;
+    let hidden = tpl.hidden;
+    const visibleOptions = () => tpl.visible;
+    const removedOptions = () => tpl.removed;
     const refreshTemplate = () => {
-      hidden = hiddenFor(room.name, part.key);
-      pinned = addedFor(room.name, part.key);
+      tpl = templateOptions(tplArgs);
+      hidden = tpl.hidden;
     };
 
     // Working copy: code -> { qty, d, u }. Only Save changes the room.
@@ -165,7 +161,9 @@ export default async function roomPage(root, { id, roomId }) {
         h('span', { class: 'works-tick', 'aria-hidden': 'true' }, on ? '✓' : ''),
         h('span', { class: 'defect-text' },
           h('span', { class: 'defect-label' }, opt.d),
-          library ? h('span', { class: 'defect-code' }, `${opt.c} · ${unit.label}${opt.note ? ` · ${opt.note}` : ''}${opt.pinned ? ' · 📌 added by you' : ''}`) : null,
+          opt.custom
+            ? h('span', { class: 'defect-code' }, `✎ your own · ${unit.label}`)
+            : library ? h('span', { class: 'defect-code' }, `${opt.c} · ${unit.label}${opt.note ? ` · ${opt.note}` : ''}${opt.pinned ? ' · 📌 added by you' : ''}`) : null,
           alsoOn ? h('span', { class: 'defect-also' }, `⚠ already on ${alsoOn.join(' & ')} in this room`) : null)),
         on
           ? h('label', { class: 'defect-qty' },
@@ -250,6 +248,27 @@ export default async function roomPage(root, { id, roomId }) {
         ...found.map((it) => row({ c: it.c, d: it.d, u: it.u }, { pinnable: !inList(it.c) })));
     };
 
+    // ----- Add your own defect (saved to this room type's list on this device) -----
+    const ownLabel = h('input', { type: 'text', placeholder: 'Describe the defect…', autocapitalize: 'sentences', 'aria-label': 'Your own defect' });
+    const ownUnit = h('select', { 'aria-label': 'Measured by' },
+      h('option', { value: 'nr' }, 'Qty'), h('option', { value: 'm2' }, 'm²'), h('option', { value: 'm' }, 'm'));
+    const addOwnDefect = () => {
+      const label = ownLabel.value.trim();
+      if (!label) return ownLabel.focus();
+      const item = { c: `my-${uid().slice(0, 8)}`, d: label, u: ownUnit.value, custom: true };
+      setAdded(room.name, part.key, item, true);
+      refreshTemplate();
+      chosen.set(item.c, { qty: defaultQty(item.u), d: item.d, u: item.u });
+      ownLabel.value = '';
+      render();
+      toast(`Added to every ${listName} list on this phone`);
+    };
+    ownLabel.addEventListener('keydown', (e) => { if (e.key === 'Enter') addOwnDefect(); });
+    const addOwn = h('div', { class: 'add-own' },
+      h('span', { class: 'field-label' }, '+ Add your own defect'),
+      h('div', { class: 'add-own-row' }, ownLabel, ownUnit,
+        h('button', { type: 'button', class: 'btn-primary', onclick: addOwnDefect }, 'Add')));
+
     const render = () => {
       const shown = visibleOptions();
       const shownCodes = new Set(shown.map((o) => o.c));
@@ -262,6 +281,7 @@ export default async function roomPage(root, { id, roomId }) {
         ...extras.map((o) => row(o, { pinnable: true })),
         h('p', { class: 'field-label' }, `${typeLabel} – ${part.label.toLowerCase()}${library ? ' SORs' : ''}`),
         ...shown.map((o) => row(o, { removable: true })),
+        addOwn,
         shown.length ? '' : h('p', { class: 'hint' }, 'All removed – use search, or restore some below.'),
         removed.length
           ? h('details', { class: 'removed-list' },
@@ -277,7 +297,7 @@ export default async function roomPage(root, { id, roomId }) {
                 'aria-label': `Restore “${o.d}”`,
                 onclick: () => {
                   setHidden(room.name, part.key, o.k, false);
-                  hidden = hiddenFor(room.name, part.key);
+                  refreshTemplate();
                   render();
                 },
               }, '+'))))
@@ -342,7 +362,7 @@ export default async function roomPage(root, { id, roomId }) {
       h('div', { class: 'grid-3' }, sizeField('length', 'Length (m)'), sizeField('width', 'Width (m)'), sizeField('height', 'Height (m)')),
       areasLine,
 
-      h('h2', null, 'Parts'),
+      h('h2', null, 'Features'),
       statusLine,
       partsList,
 

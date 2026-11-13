@@ -62,10 +62,12 @@ unfinished section). *Reopen section* undoes it. The job list shows a progress b
    button: **amber** = not finished, **red** = work needed, **green** = all OK. Tap a room:
    - **Room size** – length × width × height; the app works out emulsion (ceiling and wall m²),
      flooring m² and skirting length.
-   - **Parts** – Ceiling, Walls, Floor, Woodwork, Door, Window. Each starts amber. **OK** = no
+   - **Features** – Ceiling, Walls, Floor, Woodwork, Door, Window. Each starts amber. **OK** = no
      work required (green). Tap the part to open its **defects list**: tick defects (red) and
      enter m², metres or quantity – m² / m are pre-filled from the room size. Notes and photos
      per part.
+   - **+ Add your own defect** at the bottom of any defects list: type a description and choose
+     Qty, m² or m – it is saved to that room type’s list on this phone.
    - *Room name, notes & photos*, and a button to the next room.
    - **Delete a room** with the 🗑 button beside it on the Rooms list (asks to confirm, and says
      how many defects and photos will go with it).
@@ -113,6 +115,11 @@ are always shown:
 - A torch button appears where supported. The first time, the browser asks for camera
   permission; if it’s refused, the phone’s own camera app is offered instead.
 Photos are resized on the device to 1600 px JPEG.
+
+**Settings › Defect lists:** pick a room type and feature to manage its defect list on this
+phone – remove or restore standard defects, add your own, and edit your own defects’ wording
+and unit. Room-type defaults for the built-in lists live in `ROOM_DEFAULTS` in
+`js/data/parts.js`.
 
 ## Exports & backups
 

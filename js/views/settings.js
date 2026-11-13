@@ -4,6 +4,7 @@ import { PARTS } from '../data/parts.js';
 import { h, pageHeader, confirmDialog, toast, busy } from '../ui.js';
 import { fmtDateTime } from '../model.js';
 import { refresh } from '../router.js';
+import { defectListEditor } from './defectLists.js';
 
 export default async function settings(root) {
   const lib = await getLibrary();
@@ -62,5 +63,9 @@ export default async function settings(root) {
         'The SOR library file (sor-library.json) is private and stays on this device – it is never uploaded to the website. ',
         'Tap “Load SOR library file”, then choose OneDrive in the file picker and open the “Void Surveys” folder ',
         '(on iPhone: Browse › OneDrive; on Android: ☰ › OneDrive). ',
-        'Do this once per phone, and again whenever the library is updated.')));
+        'Do this once per phone, and again whenever the library is updated.'),
+
+      h('h2', null, 'Defect lists'),
+      h('p', { class: 'hint' }, 'Set up the defects offered for each room type and feature on this phone. Remove standard ones with −, add your own (choose Qty, m² or m), and edit the wording or unit of your own. Bedroom 1, 2, 3 … share the Bedroom list. Defects already recorded on surveys are not changed.'),
+      defectListEditor(lib)));
 }

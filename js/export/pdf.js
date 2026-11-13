@@ -1,6 +1,6 @@
 // PDF report (jsPDF, loaded on demand from /vendor).
 import { addressLines, jobTitle, fmtDate, fmtDateTime, slug, todayLocal, allPhotoIds, worksSummary, roomStatus, roomAreas, serviceTitle } from '../model.js';
-import { PARTS, UNITS, defectInfo, qtyText as unitQty } from '../data/parts.js';
+import { PARTS, UNITS, defectInfo, isSorCode, qtyText as unitQty } from '../data/parts.js';
 import { loadPhotos, resizeImage } from '../photos.js';
 
 // Photos are re-encoded smaller for the PDF so reports stay emailable.
@@ -183,7 +183,7 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
         para(`${part.label}:`, { size: 10, style: 'bold' });
         for (const d of p.defects) {
           const def = defectInfo(part, d);
-          para(`-  ${def.label}${d.qty ? `  ${qtyText(d.qty, def.unit)}` : ''}   [${d.id}]`, { size: 10, x: M + 4, width: CW - 4 });
+          para(`-  ${def.label}${d.qty ? `  ${qtyText(d.qty, def.unit)}` : ''}${isSorCode(d.id) ? `   [${d.id}]` : ''}`, { size: 10, x: M + 4, width: CW - 4 });
           const key = `${part.key}|${d.id}`;
           const row = schedule.get(key) || { part: part.label, label: def.label, unit: def.unit, id: d.id, total: 0, rooms: new Set() };
           row.total += parseFloat(String(d.qty).replace(',', '.')) || (UNITS[def.unit]?.count ? 1 : 0);
@@ -211,7 +211,7 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
       para(part.label, { size: 10.5, style: 'bold' });
       for (const r of rows) {
         const total = Math.round(r.total * 10) / 10;
-        para(`-  ${r.label}:  ${qtyText(total, r.unit)}   [${r.id}]   (${[...r.rooms].join(', ')})`, { size: 10, x: M + 4, width: CW - 4 });
+        para(`-  ${r.label}:  ${qtyText(total, r.unit)}${isSorCode(r.id) ? `   [${r.id}]` : ''}   (${[...r.rooms].join(', ')})`, { size: 10, x: M + 4, width: CW - 4 });
       }
       y += 1.5;
     }

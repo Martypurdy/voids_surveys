@@ -684,3 +684,14 @@ body.no-scroll { overflow: hidden; }
 .room-delete svg { width: 22px; height: 22px; }
 
 .keysafe-panel { margin-top: -4px; border-top-left-radius: 0; border-top-right-radius: 0; }
+
+/* ---------- Your own defects & Settings › Defect lists ---------- */
+.add-own { margin: 14px 0 6px; padding: 10px 12px; border: 2px dashed var(--border); border-radius: 12px; }
+.add-own-row { display: grid; grid-template-columns: 1fr 78px auto; gap: 8px; }
+.add-own-row select { padding: 8px 6px; }
+.tpl-list { display: flex; flex-direction: column; gap: 6px; }
+.tpl-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.tpl-row .defect-text { flex: 1; min-width: 0; }
+.tpl-row .tpl-edit { flex: 1; min-width: 0; }
+.tpl-row select { width: 78px; padding: 8px 6px; }
+.tpl-row .defect-remove { min-height: 44px; }

@@ -51,14 +51,35 @@ export function addedFor(roomName, partKey) {
   return Array.isArray(list) ? list : [];
 }
 
+function writeAdds(all) {
+  try { localStorage.setItem(ADD_KEY, JSON.stringify(all)); } catch { /* storage blocked/full */ }
+}
+
+/** Pin (on=true) or unpin an item. Your own defects are { c: 'my-…', d, u, custom: true }. */
 export function setAdded(roomName, partKey, item, on) {
   const all = readAdds();
   const k = slot(roomName, partKey);
   const list = (all[k] || []).filter((x) => x.c !== item.c);
-  if (on) list.push({ c: item.c, d: item.d, u: item.u });
+  if (on) list.push({ c: item.c, d: item.d, u: item.u, ...(item.custom ? { custom: true } : {}) });
   if (list.length) all[k] = list;
   else delete all[k];
-  try { localStorage.setItem(ADD_KEY, JSON.stringify(all)); } catch { /* storage blocked/full */ }
+  writeAdds(all);
+}
+
+/** Change the wording or unit of one of your own defects. */
+export function updateAdded(roomName, partKey, code, patch) {
+  const all = readAdds();
+  const list = all[slot(roomName, partKey)] || [];
+  const it = list.find((x) => x.c === code);
+  if (!it) return;
+  Object.assign(it, patch);
+  writeAdds(all);
+}
+
+/** Room types that have a saved template on this device (lower-case keys). */
+export function templateRoomTypes() {
+  const keys = [...Object.keys(readAll()), ...Object.keys(readAdds())];
+  return [...new Set(keys.map((k) => k.split('|')[0]))];
 }
 
 export function setHidden(roomName, partKey, key, hidden) {

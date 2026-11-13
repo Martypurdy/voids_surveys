@@ -122,5 +122,18 @@ export const PARTS = [
   },
 ];
 
+/**
+ * Room-type defaults on top of the lists above (used when no SOR library is loaded).
+ * Keyed by room type in lower case ("bedroom" covers Bedroom 1, 2, 3 …):
+ *   { kitchen: { walls: { add: [{ id, label, unit }], skip: ['WAL-07'] } } }
+ * add  – extra defects shown first for that room type
+ * skip – standard defects that don't apply to that room type
+ * To be filled in room by room.
+ */
+export const ROOM_DEFAULTS = {};
+
+/** User-written defects have ids starting "my-"; draft ids look like "WAL-01". */
+export const isSorCode = (id) => /^\d+$/.test(String(id));
+
 export const partByKey = (key) => PARTS.find((p) => p.key === key);
 export const defectById = (part, id) => part.defects.find((d) => d.id === id);
