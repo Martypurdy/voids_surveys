@@ -72,6 +72,10 @@ export function upgradeJob(job) {
   if (!Array.isArray(job.property.photos)) job.property.photos = [];
   job.works = { ...newWorks(), ...(job.works || {}) };
   if (!Array.isArray(job.heating)) job.heating = [];
+  for (const r of job.rooms) {
+    r.parts ??= {};
+    r.size ??= { length: '', width: '', height: '' };
+  }
   return job;
 }
 
@@ -116,6 +120,53 @@ export function newItem(name) {
   return { id: uid(), name, condition: '', notes: '', photos: [] };
 }
 
+// ----- Rooms: parts, defects, size -----
+
+/** A new room: parts start unchecked (amber). */
+export function newRoom(name) {
+  return { ...newItem(name), parts: {}, size: { length: '', width: '', height: '' } };
+}
+
+/** part = { state: '' | 'ok' | 'works', defects: [{ id, qty }], notes, photos } */
+export function roomPart(room, key) {
+  room.parts[key] ??= { state: '', defects: [], notes: '', photos: [] };
+  return room.parts[key];
+}
+
+const num = (v) => {
+  const n = parseFloat(String(v).replace(',', '.'));
+  return Number.isFinite(n) && n > 0 ? n : 0;
+};
+const r1 = (n) => Math.round(n * 10) / 10;
+
+/** Areas from length × width × height (metres). Missing figures give 0. */
+export function roomAreas(size = {}) {
+  const l = num(size.length);
+  const w = num(size.width);
+  const ht = num(size.height);
+  return {
+    ceiling: r1(l * w),
+    floor: r1(l * w),
+    walls: r1(2 * (l + w) * ht),
+    perimeter: r1(2 * (l + w)),
+  };
+}
+
+/** Room progress: { checked, total, defects, state: 'todo' | 'started' | 'attention' | 'ok' } */
+export function roomStatus(room, parts) {
+  const total = parts.length;
+  let checked = 0;
+  let defects = 0;
+  let works = 0;
+  for (const p of parts) {
+    const s = room.parts?.[p.key];
+    if (s?.state === 'ok') checked++;
+    if (s?.state === 'works') { checked++; works++; defects += s.defects.length; }
+  }
+  const state = checked === 0 ? 'todo' : checked < total ? 'started' : works ? 'attention' : 'ok';
+  return { checked, total, defects, works, state };
+}
+
 export function newKey() {
   return { id: uid(), keySet: '', quantity: 1, receivedFrom: '', issuedTo: '', date: todayLocal(), photos: [] };
 }
@@ -155,6 +206,7 @@ export function photoLists(job) {
   return [
     job.property?.photos || [],
     ...job.rooms.map((x) => x.photos),
+    ...job.rooms.flatMap((x) => Object.values(x.parts || {}).map((p) => p.photos || [])),
     ...job.externals.map((x) => x.photos),
     ...job.keys.map((x) => x.photos),
     job.keySafe.photos,

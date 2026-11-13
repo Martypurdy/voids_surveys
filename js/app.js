@@ -5,7 +5,8 @@ import { toast } from './ui.js';
 
 route('/', () => import('./views/jobList.js'));
 route('/job/:id', () => import('./views/jobAddress.js'));
-route('/job/:id/rooms', () => import('./views/items.js'), { kind: 'rooms' });
+route('/job/:id/rooms', () => import('./views/rooms.js'));
+route('/job/:id/rooms/:roomId', () => import('./views/room.js'));
 route('/job/:id/externals', () => import('./views/items.js'), { kind: 'externals' });
 route('/job/:id/keys', () => import('./views/property.js')); // old tab -> key safe now lives on Property
 route('/job/:id/property', () => import('./views/property.js'));

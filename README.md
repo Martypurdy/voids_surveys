@@ -58,8 +58,22 @@ unfinished section). *Reopen section* undoes it. The job list shows a progress b
 4. **Meters** – **Heating type** pop-up (Gas boiler, Electric heaters, Heat pump – pick any),
    then gas, electric and water meters, each with **meter location** and photos
    (*+ Add another meter* for extras).
-5. **Rooms / Externals** – add from presets (Bedroom auto-numbers) or a custom name; each has
-   condition (Good / Fair / Poor / N/A), notes and photos.
+5. **Rooms** – add rooms from presets (Bedroom auto-numbers) or a custom name. Each room is a
+   button: **amber** = not finished, **red** = work needed, **green** = all OK. Tap a room:
+   - **Room size** – length × width × height; the app works out emulsion (ceiling and wall m²),
+     flooring m² and skirting length.
+   - **Parts** – Ceiling, Walls, Floor, Woodwork, Door, Window. Each starts amber. **OK** = no
+     work required (green). Tap the part to open its **defects list**: tick defects (red) and
+     enter m², metres or quantity – m² / m are pre-filled from the room size. Notes and photos
+     per part.
+   - *Room name, notes & photos*, *Delete room*, and a button to the next room.
+   The PDF lists every room's parts and defects (with codes) and ends with a **schedule of
+   works** totalling each defect across the property.
+   Defect lists live in `js/data/parts.js` – draft lists for now, to be replaced by items
+   filtered from the SOR spreadsheet (codes, short labels and units only – no prices, as the
+   site is public).
+6. **Externals** – add from presets or a custom name; each has condition (Good / Fair / Poor /
+   N/A), notes and photos.
 
 Surveys made with older versions keep any key register or meter readings they recorded; these
 still appear in the PDF.

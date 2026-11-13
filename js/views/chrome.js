@@ -35,15 +35,15 @@ function tabs(job, active) {
 }
 
 /** Header + tabs for a job screen; marks `section` as started on first visit. */
-export function jobChrome(job, section) {
+export function jobChrome(job, section, { back = '#/', title } = {}) {
   if (!sectionState(job, section)) {
     job.progress[section] = 'started';
     scheduleSave(job);
   }
   const nav = tabs(job, section);
   return [
-    pageHeader(jobTitle(job), {
-      back: '#/',
+    pageHeader(title || jobTitle(job), {
+      back,
       actions: h('button', {
         type: 'button',
         class: 'icon-btn',

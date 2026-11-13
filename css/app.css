@@ -534,3 +534,74 @@ body.no-scroll { overflow: hidden; }
 .cam-msg-buttons button { min-height: 48px; background: rgb(255 255 255 / .12); color: #fff; border-color: rgb(255 255 255 / .35); font-weight: 700; }
 .cam-msg-buttons .btn-primary { background: var(--done-line); border-color: var(--done-line); color: #fff; }
 .cam-zoom button:disabled { opacity: .45; }
+
+/* ---------- Rooms: room buttons, parts, defects sheet ---------- */
+:root { --attn-bg: #fde3e1; --attn-ink: #8c1d16; --attn-line: #c62828; }
+@media (prefers-color-scheme: dark) { :root { --attn-bg: #3d1513; --attn-ink: #ffb3ab; --attn-line: #ff6f61; } }
+
+.works-item[data-state="todo"], .works-item[data-state="started"] { background: var(--started-bg); border-color: var(--started-line); color: var(--started-ink); }
+.works-item[data-state="attention"] { background: var(--attn-bg); border-color: var(--attn-line); color: var(--attn-ink); }
+.works-item[data-state="attention"] .works-tick { background: var(--attn-line); border-color: var(--attn-line); color: #fff; }
+.works-item[data-state="ok"] { background: var(--done-bg); border-color: var(--done-line); color: var(--done-ink); }
+.works-item[data-state="ok"] .works-tick { background: var(--done-line); border-color: var(--done-line); color: #fff; }
+.works-item[data-state="todo"] .works-tick, .works-item[data-state="started"] .works-tick { border-color: var(--started-line); }
+
+.parts-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.part-row { display: grid; grid-template-columns: 1fr 76px; gap: 8px; }
+.ok-btn {
+  min-height: 60px;
+  padding: 0;
+  border: 2px solid var(--done-line);
+  color: var(--done-ink);
+  background: var(--surface);
+  font-weight: 800;
+  font-size: 1.05rem;
+}
+.ok-btn[aria-pressed="true"] { background: var(--done-line); color: #fff; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 8px; }
+.room-areas { line-height: 1.6; }
+.room-more { margin-top: 8px; }
+
+.sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+.sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: calc(8px + env(safe-area-inset-top)) 8px 8px 16px;
+  background: var(--primary);
+  color: var(--primary-ink);
+}
+.sheet-head h2 { flex: 1; margin: 0; font-size: 1.1rem; }
+.sheet-head .icon-btn { color: inherit; }
+.sheet-body { flex: 1; overflow-y: auto; padding: 12px 16px; -webkit-overflow-scrolling: touch; }
+.sheet-foot {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 8px;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+.defect-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.defect-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: stretch; }
+.defect-row[data-on="false"] { grid-template-columns: 1fr; }
+.defect-toggle {
+  justify-content: flex-start;
+  gap: 12px;
+  min-height: 56px;
+  text-align: left;
+  border-width: 2px;
+}
+.defect-toggle[aria-pressed="true"] { background: var(--attn-bg); border-color: var(--attn-line); color: var(--attn-ink); font-weight: 700; }
+.defect-toggle[aria-pressed="true"] .works-tick { background: var(--attn-line); border-color: var(--attn-line); color: #fff; }
+.defect-qty { display: flex; align-items: center; gap: 6px; font-weight: 700; }
+.defect-qty input { width: 80px; text-align: right; font-weight: 700; }
+.defect-qty span { min-width: 30px; }
+.lightbox { z-index: 50; }
