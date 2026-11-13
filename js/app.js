@@ -3,6 +3,7 @@ import { route, start } from './router.js';
 import { flushSave } from './db.js';
 
 route('/', () => import('./views/jobList.js'));
+route('/job/:id', () => import('./views/jobAddress.js'));
 
 start(document.getElementById('app'));
 
