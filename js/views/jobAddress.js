@@ -1,5 +1,5 @@
 // Screen 2: job details – address, postcode lookup, GPS, navigate, void ref, surveyor.
-import { getJob, scheduleSave, flushSave } from '../db.js';
+import { getJob, scheduleSave } from '../db.js';
 import { jobTitle, fmtDateTime } from '../model.js';
 import { h, pageHeader, jobTabs, textField, toast, icon, ICONS } from '../ui.js';
 import { lookupPostcode, formatPostcode, getPosition, directionsUrl, pinUrl } from '../geo.js';
@@ -23,8 +23,7 @@ export function jobChrome(job, active) {
         class: 'icon-btn',
         'aria-label': 'Export / job actions',
         onclick: async () => {
-          await flushSave();
-          if (await jobActions(job)) go('/');
+          if ((await jobActions(job)) === 'deleted') go('/');
         },
       }, icon(ICONS.share)),
     }),
