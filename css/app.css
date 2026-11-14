@@ -782,3 +782,9 @@ body.no-scroll { overflow: hidden; }
 
 .addon-pill { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #7b3fc4; color: #fff; font-size: .68rem; font-weight: 800; letter-spacing: .03em; vertical-align: middle; }
 .intro-banner .addon-pill { align-self: flex-start; margin: 0 0 4px; }
+.intro-step-text { margin-top: 2px; }
+.intro-step-text .intro-list { margin: 6px 0; }
+.table-wrap { overflow-x: auto; margin: 4px 0 10px; }
+.intro-table { border-collapse: collapse; font-size: .82rem; min-width: 480px; }
+.intro-table th, .intro-table td { border: 1px solid var(--border); padding: 5px 7px; text-align: left; vertical-align: top; }
+.intro-table th { background: var(--surface-2); }
