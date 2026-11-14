@@ -751,3 +751,31 @@ body.no-scroll { overflow: hidden; }
 .mat-row .defect-remove { min-height: 48px; }
 .mat-row[data-on="false"] .defect-qty { opacity: .45; }
 .mat-add { margin-top: 4px; }
+
+/* Settings: introductions */
+.intro-banner { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; margin: 4px 0 8px; border-radius: var(--radius); background: var(--started-bg); color: var(--started-ink); border: 1px solid var(--started-line); }
+.intro-card p { margin: 0 0 8px; }
+.intro-card h3, .intro-option h3 { margin: 10px 0 4px; font-size: 1.02rem; }
+.intro-option { margin-bottom: 10px; }
+.intro-option h3 { margin-top: 0; }
+.intro-option .hint { margin: 0 0 6px; }
+.intro-list { margin: 4px 0 8px; padding-left: 20px; line-height: 1.5; }
+.intro-list li { margin-bottom: 4px; }
+.intro-steps { list-style: none; padding: 0; margin: 0 0 16px; display: flex; flex-direction: column; gap: 10px; }
+.intro-step { display: grid; grid-template-columns: 32px 1fr; gap: 10px; align-items: start; line-height: 1.45; }
+.intro-num { width: 32px; height: 32px; border-radius: 50%; background: var(--primary); color: var(--primary-ink); display: grid; place-items: center; font-weight: 800; }
+
+/* Sign-in demo */
+.demo .sheet-body { max-width: 520px; width: 100%; margin: 0 auto; }
+.demo-flag { align-self: flex-start; margin-top: 2px; padding: 1px 8px; border-radius: 999px; background: #fff; color: #7b3fc4; font-size: .75rem; font-weight: 800; letter-spacing: .04em; }
+.demo-body h2 { margin: 8px 0; }
+.demo-body .btn-block { margin-top: 10px; }
+.demo-logo { width: 64px; height: 64px; margin: 8px auto 4px; border-radius: 16px; background: var(--surface-2); display: grid; place-items: center; font-size: 2rem; }
+.demo-ok { background: var(--done-line); color: #fff; font-weight: 800; }
+.demo-body > h2 { text-align: center; }
+.demo-perms { list-style: none; padding: 0; margin: 8px 0 12px; display: flex; flex-direction: column; gap: 8px; }
+.demo-perms li { padding: 10px 12px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); }
+.demo-status p { margin: 0 0 6px; }
+.demo-dots { display: flex; justify-content: center; gap: 6px; margin: 4px 0 8px; }
+.demo-dots span { width: 8px; height: 8px; border-radius: 50%; background: var(--border); }
+.demo-dots span.on { background: var(--primary); width: 22px; border-radius: 4px; }

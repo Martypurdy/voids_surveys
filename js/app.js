@@ -5,6 +5,7 @@ import { toast } from './ui.js';
 
 route('/', () => import('./views/jobList.js'));
 route('/settings', () => import('./views/settings.js'));
+route('/settings/:tab', () => import('./views/settings.js'));
 route('/job/:id', () => import('./views/jobAddress.js'));
 route('/job/:id/property', () => import('./views/property.js'));
 route('/job/:id/security', () => import('./views/security.js'));
