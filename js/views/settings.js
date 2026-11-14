@@ -4,7 +4,7 @@
 //   SOR library     load / remove the private SOR library on this device
 import { getLibrary, saveLibrary, removeLibrary, validateLibrary } from '../sor.js';
 import { PARTS } from '../data/parts.js';
-import { h, pageHeader, confirmDialog, toast, busy } from '../ui.js';
+import { h, pageHeader, confirmDialog, toast, busy, scrollTabs } from '../ui.js';
 import { fmtDateTime } from '../model.js';
 import { refresh } from '../router.js';
 import { defectListEditor } from './defectLists.js';
@@ -37,7 +37,7 @@ export default async function settings(root, { tab } = {}) {
     }, label, addOn ? h('span', { class: 'addon-pill' }, 'Add-on') : null)));
 
   const body = tab === 'defects' ? defectsTab(lib) : tab === 'sor' ? sorTab(lib) : tab === 'rollout' ? rolloutTab() : tab === 'branding' ? brandingTab() : syncTab();
-  root.append(pageHeader('Settings', { back: '#/' }), appearance(), nav, h('div', { class: 'content' }, body));
+  root.append(pageHeader('Settings', { back: '#/' }), appearance(), scrollTabs(nav), h('div', { class: 'content' }, body));
 }
 
 /** Light / Dark / Auto switch, always at the top of Settings. */

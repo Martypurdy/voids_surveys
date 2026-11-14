@@ -50,6 +50,33 @@ export const ICONS = {
 
 // ---------- Page chrome ----------
 
+/**
+ * Wrap a row of tabs so arrows show when there are more tabs off screen:
+ * › on the right (and ‹ on the left once scrolled). Tapping an arrow scrolls along.
+ */
+export function scrollTabs(nav) {
+  const arrow = (dir) => h('button', {
+    type: 'button',
+    class: `tabs-arrow tabs-arrow-${dir}`,
+    'aria-label': dir === 'right' ? 'More sections' : 'Previous sections',
+    hidden: true,
+    onclick: () => nav.scrollBy({ left: (dir === 'right' ? 1 : -1) * nav.clientWidth * 0.7, behavior: 'smooth' }),
+  }, h('span', { 'aria-hidden': 'true' }, dir === 'right' ? '›' : '‹'));
+  const left = arrow('left');
+  const right = arrow('right');
+  const update = () => {
+    const max = nav.scrollWidth - nav.clientWidth;
+    left.hidden = nav.scrollLeft <= 4;
+    right.hidden = nav.scrollLeft >= max - 4;
+  };
+  nav.addEventListener('scroll', update, { passive: true });
+  window.addEventListener('resize', update);
+  new MutationObserver(update).observe(nav, { childList: true });
+  requestAnimationFrame(() => requestAnimationFrame(update));
+  setTimeout(update, 400); // after the active tab has scrolled into view
+  return h('div', { class: 'tabs-wrap' }, nav, left, right);
+}
+
 export function pageHeader(title, { back, actions = [] } = {}) {
   return h('header', { class: 'appbar' },
     back ? h('a', { class: 'btn icon-btn', href: back, 'aria-label': 'Back' }, icon(ICONS.back)) : h('span', { style: 'width:8px' }),

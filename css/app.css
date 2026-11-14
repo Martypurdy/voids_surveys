@@ -112,10 +112,52 @@ h2 { font-size: 1.05rem; margin: 20px 0 8px; }
 .appbar .icon-btn { color: inherit; }
 
 /* ---------- Job tabs ---------- */
-.tabs {
+.tabs-wrap {
   position: sticky;
   top: calc(56px + env(safe-area-inset-top));
   z-index: 9;
+}
+/* Arrows at the ends when more tabs are off screen */
+.tabs-arrow {
+  position: absolute;
+  top: 0;
+  bottom: 1px;
+  width: 52px;
+  display: flex;
+  align-items: center;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: #fff;
+}
+.tabs-arrow[hidden] { display: none; }
+.tabs-arrow span {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .3);
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 27px;
+  text-align: center;
+}
+.tabs-arrow-right {
+  right: 0;
+  justify-content: flex-end;
+  padding-right: 6px;
+  background: linear-gradient(to right, transparent, var(--surface) 55%);
+}
+.tabs-arrow-right span { animation: tabs-nudge 1.6s ease-in-out 3; }
+.tabs-arrow-left {
+  left: 0;
+  justify-content: flex-start;
+  padding-left: 6px;
+  background: linear-gradient(to left, transparent, var(--surface) 55%);
+}
+@keyframes tabs-nudge { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(4px); } }
+@media (prefers-reduced-motion: reduce) { .tabs-arrow-right span { animation: none; } }
+.tabs {
   display: flex;
   overflow-x: auto;
   scrollbar-width: none;

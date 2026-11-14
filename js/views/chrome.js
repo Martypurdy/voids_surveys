@@ -3,7 +3,7 @@
 // the footer button marks it complete (green) and moves to the next section.
 import { getJob, scheduleSave, flushSave } from '../db.js';
 import { SECTIONS, jobTitle, sectionState } from '../model.js';
-import { h, icon, ICONS, pageHeader, toast } from '../ui.js';
+import { h, icon, ICONS, pageHeader, toast, scrollTabs } from '../ui.js';
 import { jobActions } from './jobActions.js';
 import { go } from '../router.js';
 
@@ -53,7 +53,7 @@ export function jobChrome(job, section, { back = '#/', title } = {}) {
         },
       }, icon(ICONS.share)),
     }),
-    nav,
+    scrollTabs(nav),
   ];
 }
 

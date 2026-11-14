@@ -12,6 +12,7 @@ import { FEATURES, featuresOf } from './data/features.js';
 import { roomType } from './templates.js';
 
 const BATH = /bath|en-?\s?suite|shower/;
+const HAS_BATH = /bath|en-?\s?suite/; // shower rooms have no bath
 const TOILET = /wc|toilet|cloak/;
 
 /** Standard items for a room type: [name, qty]. */
@@ -19,7 +20,8 @@ export function standardItems(roomName) {
   const t = roomType(roomName);
   const out = [];
   if (BATH.test(t) || TOILET.test(t)) out.push(['Toilet seat', 1]);
-  if (BATH.test(t)) out.push(['Shower head & hose', 1], ['Shower curtain', 1], ['Sink plug', 1]);
+  if (BATH.test(t)) out.push(['Shower head & hose', 1], ['Shower curtain', 1],
+    HAS_BATH.test(t) ? ['Plugs (sink & bath)', 2] : ['Sink plug', 1]);
   if (/kitchen/.test(t)) out.push(['Sink plug', 1]);
   return out;
 }
