@@ -106,7 +106,7 @@ export function surveyorField(job, save) {
       if (!name) return;
       addSurveyor(name);
       pick(getSurveyors().find((n) => n.toLowerCase() === name.toLowerCase()) || name);
-      toast(`${name} added – they'll be filled in on new surveys`);
+      toast(`${name} added – they’ll be filled in on new surveys`);
     },
   }, '+ Add');
 

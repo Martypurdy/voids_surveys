@@ -77,7 +77,7 @@ export async function importJobFile(file) {
   const existing = await getJob(job.id);
   if (existing) {
     const choice = await choose({
-      title: 'Job already on this device',
+      title: 'Survey already on this device',
       message: `“${jobTitle(existing)}” already exists here. Replace it with the imported copy, or keep both?`,
       buttons: [
         { label: 'Keep both (import as copy)', value: 'copy', class: 'btn-primary' },

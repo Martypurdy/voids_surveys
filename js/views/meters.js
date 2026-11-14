@@ -7,7 +7,7 @@ import { loadJobOr404, jobChrome, completeFooter } from './chrome.js';
 
 const DEFAULT_UTILITIES = new Set(UTILITIES);
 const LOCATION_HINTS = {
-  'Fuse board': 'e.g. Under stairs cupboard, above front door',
+  'Fuse board': 'e.g. Under-stairs cupboard, above front door',
   'Mains stop tap': 'e.g. Under kitchen sink, in front garden',
   Gas: 'e.g. External box at front of property',
   Electric: 'e.g. Under stairs cupboard',

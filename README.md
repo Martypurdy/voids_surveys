@@ -47,7 +47,7 @@ has **OK** (green, no work) or a **defects list** (red) with quantities, notes a
 2. **Address** – enter the postcode at the top and tap *Look up*: the street, area, town and
    postcode are filled into a single address box with the cursor at the start, ready for the
    house number. Edit the box freely. The job title becomes the first line + postcode
-   (e.g. “12 Bennett Road, LS6 3HN”). *Navigate* opens Google Maps directions; *View on Google
+   (e.g. “2 Sample Road, BS00 0AB”). *Navigate* opens Google Maps directions; *View on Google
    Maps* shows the pin; *Use my location* stores the GPS position.
    Free postcode data has no house numbers, and a few postcodes (large sites, PO boxes) have no
    street – then the first line is left blank for you to fill in.
@@ -123,11 +123,11 @@ are always shown:
   - phones whose browser offers zoom below 1× use that;
   - on iPhone it switches straight to the *Ultra Wide* lens;
   - otherwise (many Android phones don’t say which lens is which) the first tap runs a
-    one-time **wide lens setup**: each rear lens is shown with *“Is this picture WIDER than
+    one-time **wide-lens set-up**: each rear lens is shown with *“Is this picture WIDER than
     normal?”* – tap **Yes** on the wide one and it’s remembered on that phone. Zoom (telephoto)
     lenses are never offered, and lenses that fail or show no picture are skipped;
   - if there’s no wide lens available to the browser, it offers *Use phone camera for .5×*
-    and *Try lens setup again*.
+    and *Try lens set-up again*.
 
   Zoom buttons are greyed out while a lens is switching, so repeated taps can’t jam it.
 - **2×** uses real zoom where available, otherwise a digital crop (lower resolution).

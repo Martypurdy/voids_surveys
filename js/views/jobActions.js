@@ -29,7 +29,7 @@ export async function jobActions(job) {
       { label: '👁 Preview report', value: 'preview', class: 'btn-primary' },
       { label: 'Export PDF report', value: 'pdf', class: 'btn-primary' },
       { label: 'Backup file (.json)', value: 'json', class: 'btn-primary' },
-      { label: 'Delete job', value: 'delete', class: 'btn-danger' },
+      { label: 'Delete survey', value: 'delete', class: 'btn-danger' },
       { label: 'Cancel', value: null },
     ],
   });
@@ -88,10 +88,10 @@ export async function jobActions(job) {
   }
 
   if (action === 'delete') {
-    const ok = await confirmDialog(`Delete “${jobTitle(job)}” and all its photos from this device? This can't be undone.`);
+    const ok = await confirmDialog(`Delete “${jobTitle(job)}” and all its photos from this device? This can’t be undone.`);
     if (!ok) return null;
     await deleteJob(job.id);
-    toast('Job deleted');
+    toast('Survey deleted');
     return 'deleted';
   }
   return null;

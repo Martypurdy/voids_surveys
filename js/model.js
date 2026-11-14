@@ -21,7 +21,7 @@ export const HEATING_TYPES = ['Gas boiler', 'Electric heaters', 'Heat pump'];
 export const BACKUP_WARN_DAYS = 7;
 
 /** Items commonly left for (gifted to) the incoming tenant. */
-export const GIFT_ITEMS = ['Carpets', 'Laminate flooring', 'Sheet vinyl', 'Wallpaper', 'Curtains', 'Curtain poles', 'Blinds', 'Lamp shades', 'Cabinets', 'Sheds'];
+export const GIFT_ITEMS = ['Carpets', 'Laminate flooring', 'Sheet vinyl', 'Wallpaper', 'Curtains', 'Curtain poles', 'Blinds', 'Lampshades', 'Cabinets', 'Sheds'];
 
 /** gifted = { selected: { [item]: [room / area names] }, extra: [your own item names] } */
 export const newGifted = () => ({ selected: {}, extra: [] });
@@ -49,7 +49,9 @@ export function newProperty() {
 // ----- Works required (Property type screen) -----
 export const CYLINDER_OPTIONS = ['Front door', 'Back door', 'Patio door', 'French doors', 'Shed', 'Gate', 'Garage', 'Windows', 'Post box', 'Communal key', 'Communal fob'];
 export const CYLINDER_DEFAULT = ['Front door'];
-export const CLEARANCE_OPTIONS = ['Full clearance', 'Partial clearance', 'Needle sweep', 'Environmental', 'Pest control'];
+export const CLEARANCE_OPTIONS = ['Full clearance', 'Partial clearance', 'Needle sweep', 'Pre-clean', 'Pest control'];
+/** Small text shown under an option. */
+export const CLEARANCE_HINTS = { 'Pre-clean': 'Environmental clean' };
 export const CLEARANCE_BY = ['Operatives', 'Contractor'];
 
 export function newWorks() {
@@ -72,7 +74,7 @@ export function worksSummary(w, which = 'all') {
   if (sec && w.gainEntry) out.push(['Gain entry', '']);
   if (sec && w.cylinders?.length) out.push(['Renew locks', w.cylinders.join(', ')]);
   if (prop && (w.clearance.length || w.clearanceBy.length)) {
-    out.push(['Property clearance', [w.clearance.join(', '), w.clearanceBy.length ? `by ${w.clearanceBy.join(' / ')}` : '']
+    out.push(['Clearance / clean', [w.clearance.map((c) => (c === 'Pre-clean' ? 'Pre-clean (environmental clean)' : c)).join(', '), w.clearanceBy.length ? `by ${w.clearanceBy.join(' / ')}` : '']
       .filter(Boolean).join(' – ')]);
   }
   return out;
@@ -94,6 +96,8 @@ export function upgradeJob(job) {
   if (Array.isArray(cyl) && cyl.includes('Communal key / fob')) {
     job.works.cylinders = [...new Set(cyl.flatMap((c) => (c === 'Communal key / fob' ? ['Communal key', 'Communal fob'] : [c])))];
   }
+  // 'Environmental' was renamed 'Pre-clean'.
+  job.works.clearance = (job.works.clearance || []).map((c) => (c === 'Environmental' ? 'Pre-clean' : c));
   if (!Array.isArray(job.heating)) job.heating = [];
   // Older surveys: add Fuse board and Mains stop tap at the top of Services.
   for (const u of ['Mains stop tap', 'Fuse board']) {
@@ -107,6 +111,11 @@ export function upgradeJob(job) {
   }
   job.security ??= newRoom('Security', 'security');
   job.gifted = { ...newGifted(), ...(job.gifted || {}) };
+  // 'Lamp shades' is now spelt 'Lampshades'.
+  if (job.gifted.selected['Lamp shades']) {
+    job.gifted.selected.Lampshades = job.gifted.selected['Lamp shades'];
+    delete job.gifted.selected['Lamp shades'];
+  }
   job.security.parts ??= {};
   return job;
 }

@@ -209,7 +209,8 @@ export async function multiSelect({ title, message, groups }) {
         else state[gi].add(opt);
         render();
       },
-    }, state[gi].has(opt) ? `✓ ${opt}` : opt)));
+    }, state[gi].has(opt) ? `✓ ${opt}` : opt,
+    g.hints?.[opt] ? h('small', { class: 'choice-hint' }, g.hints[opt]) : null)));
     render();
     grid.render = render;
     return grid;

@@ -9,7 +9,7 @@ import { go } from '../router.js';
 
 export async function loadJobOr404(id) {
   const job = await getJob(id);
-  if (!job) throw new Error('Job not found on this device');
+  if (!job) throw new Error('Survey not found on this device');
   return job;
 }
 
@@ -47,7 +47,7 @@ export function jobChrome(job, section, { back = '#/', title } = {}) {
       actions: h('button', {
         type: 'button',
         class: 'icon-btn',
-        'aria-label': 'Export / job actions',
+        'aria-label': 'Export / survey actions',
         onclick: async () => {
           if ((await jobActions(job)) === 'deleted') go('/');
         },

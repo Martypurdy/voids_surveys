@@ -95,7 +95,7 @@ export function photoField(job, list, onChange = () => {}) {
       }
     }
     status.textContent = '';
-    if (failed) toast(`${failed} photo${failed > 1 ? 's' : ''} couldn't be read`);
+    if (failed) toast(`${failed} photo${failed > 1 ? 's' : ''} couldn’t be read`);
     onChange();
     return files.length - failed;
   };

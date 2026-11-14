@@ -1,9 +1,9 @@
 // Screen: property – type/style/size, property photo (shown at the top of the PDF)
-// and clearance. Key safe, locks and gain entry live on the Security tab.
+// and clearance / clean. Key safe, locks and gain entry live on the Security tab.
 import { scheduleSave } from '../db.js';
 import {
   PROPERTY_TYPES, PROPERTY_STYLES,
-  CLEARANCE_OPTIONS, CLEARANCE_BY,
+  CLEARANCE_OPTIONS, CLEARANCE_HINTS, CLEARANCE_BY,
 } from '../model.js';
 import { h, textField, selectField, multiSelect, worksButton } from '../ui.js';
 import { photoField } from '../photos.js';
@@ -49,12 +49,12 @@ export default async function property(root, { id }) {
     const detail = [w.clearance.join(', '), w.clearanceBy.length ? `by ${w.clearanceBy.join(' / ')}` : '']
       .filter(Boolean).join(' – ');
     list.replaceChildren(
-      worksButton('Property clearance', detail || 'Tap to choose',
+      worksButton('Clearance / clean', detail || 'Tap to choose',
         Boolean(w.clearance.length || w.clearanceBy.length), async () => {
           const r = await multiSelect({
-            title: 'Property clearance',
+            title: 'Clearance / clean',
             groups: [
-              { label: 'Clearance needed', options: CLEARANCE_OPTIONS, selected: w.clearance },
+              { label: 'Clearance / clean needed', options: CLEARANCE_OPTIONS, hints: CLEARANCE_HINTS, selected: w.clearance },
               { label: 'Carried out by', options: CLEARANCE_BY, selected: w.clearanceBy },
             ],
           });
@@ -81,7 +81,7 @@ export default async function property(root, { id }) {
       h('p', { class: 'hint' }, 'The first photo appears at the top of the PDF report.'),
       photoField(job, p.photos),
 
-      h('h2', null, 'Clearance'),
+      h('h2', null, 'Clearance / clean'),
       list,
       completeFooter(job, 'property')));
 }

@@ -935,3 +935,5 @@ body.no-scroll { overflow: hidden; }
 .theme-switch button[aria-pressed="true"] { background: var(--primary); color: var(--primary-ink); }
 .theme-hint { display: block; font-size: .78rem; color: var(--muted); }
 .hero-logo svg { width: 38px; height: 38px; }
+.choice-hint { display: block; font-size: .74rem; font-weight: 500; opacity: .8; margin-top: 1px; }
+.choice-grid button:has(.choice-hint) { flex-direction: column; line-height: 1.2; }

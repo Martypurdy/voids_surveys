@@ -231,7 +231,7 @@ export function openCamera({ onCapture, onNative }) {
           continue; // no picture / can't open – skip it
         }
         const reply = await ask(
-          `Wide lens setup (${i + 1} of ${candidates.length}): is this picture WIDER than normal – showing more of the room?`,
+          `Wide-lens set-up (${i + 1} of ${candidates.length}): is this picture WIDER than normal – showing more of the room?`,
           [['yes', 'Yes – use this for .5×', 'btn-primary'], ['no', 'No – try next lens'], ['stop', 'Cancel']]);
         if (reply === 'yes') {
           remember(WIDE_KEY, candidates[i].deviceId);
@@ -260,7 +260,7 @@ export function openCamera({ onCapture, onNative }) {
             hideMessage();
             setLevel(0.5);
           },
-        }, 'Try lens setup again'),
+        }, 'Try lens set-up again'),
         h('button', { type: 'button', onclick: hideMessage }, 'Close'),
       ].filter(Boolean));
     }
