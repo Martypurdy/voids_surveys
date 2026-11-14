@@ -334,6 +334,8 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
   onProgress('Building report…');
   font(20, 'bold', BRAND);
   doc.text('Void Property Survey', M, y + 7);
+  font(9, 'bold', [120, 128, 136]);
+  doc.text('PropertyPad', W - M, y + 6, { align: 'right' });
   y += 13;
 
   // Property photo (first one taken on the Property type screen) at the top.

@@ -25,7 +25,7 @@ export default async function jobList(root) {
   });
 
   root.append(
-    pageHeader('Void surveys', {
+    pageHeader('PropertyPad', {
       actions: [h('button', { type: 'button', class: 'btn btn-small', style: 'color:inherit;background:transparent;border-color:currentColor', onclick: () => importInput.click() }, 'Import'), importInput, h('a', { class: 'btn icon-btn', href: '#/settings', 'aria-label': 'Settings', style: 'color:inherit' }, icon(ICONS.settings))],
     }),
     h('div', { class: 'content' },

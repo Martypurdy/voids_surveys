@@ -46,7 +46,7 @@ export async function markExported(job) {
 
 function validate(data) {
   if (!data || data.app !== APP || !data.job || !Array.isArray(data.photos)) {
-    throw new Error('Not a void survey job file');
+    throw new Error('Not a PropertyPad survey file');
   }
   if (data.schema > SCHEMA) throw new Error('This file was made by a newer version of the app');
   const j = data.job;

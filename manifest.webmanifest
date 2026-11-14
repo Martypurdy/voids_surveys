@@ -1,7 +1,7 @@
 {
-  "name": "Void Surveys",
-  "short_name": "Voids",
-  "description": "Offline void property condition surveys. All data stays on this device.",
+  "name": "PropertyPad",
+  "short_name": "PropertyPad",
+  "description": "Offline property surveys and site forms. All data stays on this device.",
   "id": "./",
   "start_url": "./",
   "scope": "./",

@@ -3,9 +3,9 @@
 import { h, trackOverlay } from '../ui.js';
 
 const LOCATIONS = [
-  { key: 'me', emoji: '👤', title: 'Just me', where: 'My OneDrive › Void Surveys', text: 'Your own surveys and lists on all your devices.' },
+  { key: 'me', emoji: '👤', title: 'Just me', where: 'My OneDrive › PropertyPad', text: 'Your own surveys and lists on all your devices.' },
   { key: 'team', emoji: '👥', title: 'My team', where: 'SharePoint › Voids Team › Surveys', text: 'Shared surveys and lists for the voids team.' },
-  { key: 'company', emoji: '🏢', title: 'Company', where: 'SharePoint › Property Services › Void Surveys', text: 'Company standard lists, SOR library and all surveys.' },
+  { key: 'company', emoji: '🏢', title: 'Company', where: 'SharePoint › Property Services › PropertyPad', text: 'Company standard lists, SOR library and all surveys.' },
 ];
 
 export function openSyncDemo() {
@@ -29,7 +29,7 @@ export function openSyncDemo() {
       input.addEventListener('input', () => { email = input.value; });
       return [
         h('div', { class: 'demo-logo', 'aria-hidden': 'true' }, '🏠'),
-        h('h2', null, 'Sign in to Void Surveys'),
+        h('h2', null, 'Sign in to PropertyPad'),
         h('p', { class: 'hint' }, 'Use your normal work account. Your company’s own sign-in page opens here – the app never sees your password.'),
         h('label', { class: 'field' }, h('span', { class: 'field-label' }, 'Work email'), input),
         h('button', { type: 'button', class: 'btn-primary btn-block btn-big', onclick: () => go(1) }, 'Sign in with work account'),
@@ -39,7 +39,7 @@ export function openSyncDemo() {
     // 2. Permissions
     () => [
       h('div', { class: 'demo-logo', 'aria-hidden': 'true' }, '🔒'),
-      h('h2', null, 'Allow Void Surveys to:'),
+      h('h2', null, 'Allow PropertyPad to:'),
       h('ul', { class: 'demo-perms' },
         h('li', null, '✓ See your name and work email'),
         h('li', null, '✓ Read and save files in the folder you choose'),

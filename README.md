@@ -1,6 +1,6 @@
-# Void Surveys
+# PropertyPad
 
-A mobile-first, offline web app (PWA) for void property condition surveys in social housing.
+A mobile-first, offline web app (PWA) for property surveys and site forms – starting with void property condition surveys in social housing.
 
 - **No backend, no accounts.** Everything is stored on the device in IndexedDB.
 - **Works offline** after the first visit (service worker).
