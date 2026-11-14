@@ -15,6 +15,7 @@ const TABS = [
   ['defects', 'Defect lists', false],
   ['sor', 'SOR library', true],
   ['sync', 'Sync & sharing', true],
+  ['branding', 'Company branding', true],
   ['rollout', 'Company roll-out', true],
 ];
 const LAST_TAB = 'voids.settingsTab';
@@ -34,7 +35,7 @@ export default async function settings(root, { tab } = {}) {
       'aria-current': k === tab ? 'page' : null,
     }, label, addOn ? h('span', { class: 'addon-pill' }, 'Add-on') : null)));
 
-  const body = tab === 'defects' ? defectsTab(lib) : tab === 'sor' ? sorTab(lib) : tab === 'rollout' ? rolloutTab() : syncTab();
+  const body = tab === 'defects' ? defectsTab(lib) : tab === 'sor' ? sorTab(lib) : tab === 'rollout' ? rolloutTab() : tab === 'branding' ? brandingTab() : syncTab();
   root.append(pageHeader('Settings', { back: '#/' }), nav, h('div', { class: 'content' }, body));
 }
 
@@ -111,6 +112,87 @@ function syncTab() {
 
     h('button', { type: 'button', class: 'btn-primary btn-block btn-big', onclick: openSyncDemo }, 'See how sign-in would look (demo)'),
     h('p', { class: 'footnote' }, 'The demo is a mock-up only – nothing is sent or saved.'),
+  ];
+}
+
+// ---------- Company branding ----------
+function brandingTab() {
+  const field = (label, value) => h('li', null, h('strong', null, label), value ? ` – ${value}` : '');
+  const preview = h('figure', { class: 'brand-preview', 'aria-label': 'Example of a branded report page' },
+    h('div', { class: 'bp-page' },
+      h('div', { class: 'bp-head' },
+        h('div', { class: 'bp-logo' }, 'YOUR', h('br'), 'LOGO'),
+        h('div', { class: 'bp-company' },
+          h('strong', null, 'Your Company Name'),
+          h('span', null, 'Your slogan goes here'),
+          h('span', { class: 'bp-small' }, 'Property Services · 1 Example Street, Town, AB1 2CD'))),
+      h('div', { class: 'bp-bar' }),
+      h('div', { class: 'bp-title' }, 'Void Property Survey'),
+      h('div', { class: 'bp-lines' },
+        h('span', { style: 'width:70%' }), h('span', { style: 'width:55%' }), h('span', { style: 'width:62%' })),
+      h('div', { class: 'bp-surveyor' },
+        h('span', null, h('strong', null, 'Surveyed by: '), 'A. Surveyor, Voids Surveyor'),
+        h('span', null, '07700 900000 · a.surveyor@yourcompany.co.uk'),
+        h('span', { class: 'bp-sign' }, 'A. Surveyor')),
+      h('div', { class: 'bp-lines' },
+        h('span', { style: 'width:80%' }), h('span', { style: 'width:45%' })),
+      h('div', { class: 'bp-foot' },
+        h('span', null, 'Your Company Name · 0100 000 0000 · yourcompany.co.uk'),
+        h('span', null, 'Form VS-01 v1.0 · Page 1 of 4'))),
+    h('figcaption', { class: 'hint' }, 'Example layout – your logo, colours and details replace the placeholders.'));
+
+  return [
+    proposal('Company branding on every form',
+      'Load the company’s logo, colours and contact details once, and every report and form produced by the app carries them.'),
+
+    h('h2', null, 'Why it matters'),
+    h('div', { class: 'card card-body intro-card' },
+      h('p', null, 'Reports from the app go to contractors, managers, tenants and other organisations. With the company’s own branding they look like official company documents, show who to contact, and match the rest of the company’s paperwork.')),
+
+    h('h2', null, 'How a branded report could look'),
+    preview,
+
+    h('h2', null, 'What can be added'),
+    h('div', { class: 'card card-body intro-card' },
+      h('h3', null, '🏢 Company'),
+      h('ul', { class: 'intro-list' },
+        field('Logo', 'PNG or SVG, shown at the top of every report'),
+        field('Company name and slogan'),
+        field('Brand colours', 'used for headings, lines and the app’s header'),
+        field('Department or team', 'e.g. Property Services – Voids')),
+      h('h3', null, '📄 Report header & footer'),
+      h('ul', { class: 'intro-list' },
+        field('Header', 'logo, company name, slogan and office address'),
+        field('Footer', 'phone, email, website and page numbers'),
+        field('Legal details', 'company or registered charity number, registered office'),
+        field('Document control', 'form reference and version, e.g. “Form VS-01 v1.0”'),
+        field('Notes', 'confidentiality notice or standard terms on the last page')),
+      h('h3', null, '👤 The person completing the form'),
+      h('ul', { class: 'intro-list' },
+        field('Name and job title'),
+        field('Work mobile and email'),
+        field('Qualifications or membership', 'optional, e.g. MRICS'),
+        field('Signature', 'signed once on screen and added to each report')),
+      h('p', { class: 'hint' }, 'Company details are set once by an administrator. Each person adds their own name, job title and signature.')),
+
+    h('h2', null, 'Where it would show'),
+    h('ul', { class: 'intro-benefits' },
+      h('li', { class: 'intro-benefit' }, h('span', { class: 'intro-benefit-icon', 'aria-hidden': 'true' }, '📄'),
+        h('span', null, h('strong', null, 'Every PDF report and form'), h('br'), 'Header on the cover, footer on every page, signature block with the surveyor’s details.')),
+      h('li', { class: 'intro-benefit' }, h('span', { class: 'intro-benefit-icon', 'aria-hidden': 'true' }, '📱'),
+        h('span', null, h('strong', null, 'The app itself'), h('br'), 'Company logo and colours on the home screen, so staff know it’s the company’s tool.')),
+      h('li', { class: 'intro-benefit' }, h('span', { class: 'intro-benefit-icon', 'aria-hidden': 'true' }, '✉️'),
+        h('span', null, h('strong', null, 'Shared files'), h('br'), 'Company name in PDF file names when reports are emailed or saved.')),
+      h('li', { class: 'intro-benefit' }, h('span', { class: 'intro-benefit-icon', 'aria-hidden': 'true' }, '🧩'),
+        h('span', null, h('strong', null, 'Future forms'), h('br'), 'Handover, repair and inspection forms pick up the same branding automatically.'))),
+
+    h('h2', null, 'How it would be set up'),
+    h('ol', { class: 'intro-steps' },
+      guideStep(1, 'Gather the brand pack', 'Logo file, brand colours, slogan, address, phone, website and any legal wording – usually from the communications team.'),
+      guideStep(2, 'Load it in Settings', 'An administrator adds the logo and fills in the company details once. A live preview shows the report before saving.'),
+      guideStep(3, 'Lock company details', 'Company details are locked so they stay consistent; staff can only edit their own name, job title and signature.'),
+      guideStep(4, 'Share with everyone', 'With the Sync & sharing add-on the branding reaches every user automatically. Without it, a branding file can be loaded on each device.'),
+      guideStep(5, 'Update any time', 'A new logo or phone number is changed once and appears on all new reports. Reports already sent keep the branding they were made with.')),
   ];
 }
 
