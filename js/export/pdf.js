@@ -27,7 +27,7 @@ function loadJsPDF() {
 }
 
 export function pdfFilename(job) {
-  return `Void survey - ${slug(jobTitle(job))} - ${todayLocal()}.pdf`;
+  return `Empty home inspection - ${slug(jobTitle(job))} - ${todayLocal()}.pdf`;
 }
 
 // The built-in PDF fonts only cover Latin-1, so normalise common "smart" characters.
@@ -342,7 +342,7 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
   // ---------- cover ----------
   onProgress('Building report…');
   font(20, 'bold', BRAND);
-  doc.text('Void Property Survey', M, y + 7);
+  doc.text('Empty Home Inspection', M, y + 7);
   font(9, 'bold', [120, 128, 136]);
   doc.text('PropertyPad', W - M, y + 6, { align: 'right' });
   y += 13;

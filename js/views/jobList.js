@@ -154,7 +154,7 @@ function jobCard(job) {
       h('div', { class: 'job-head' },
         h('div', { class: 'job-title' }, jobTitle(job)),
         h('span', { class: 'job-pill' }, state === 'done' ? '✓ Complete' : state === 'progress' ? 'In progress' : 'New')),
-      h('div', { class: 'job-sub' }, ['Void survey', job.surveyor].filter(Boolean).join(' · ')),
+      h('div', { class: 'job-sub' }, ['Empty home inspection', job.surveyor].filter(Boolean).join(' · ')),
       h('div', { class: 'job-progress' },
         h('div', { class: 'progress', 'aria-hidden': 'true' }, SECTIONS.map(([k]) => h('span', { dataset: { state: sectionState(job, k) || 'todo' } }))),
         h('span', { class: 'job-pct' }, `${pct}%`)),

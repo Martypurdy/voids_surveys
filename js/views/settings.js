@@ -146,7 +146,7 @@ function brandingTab() {
           h('span', null, 'Your slogan goes here'),
           h('span', { class: 'bp-small' }, 'Property Services · 1 Example Street, Town, AB1 2CD'))),
       h('div', { class: 'bp-bar' }),
-      h('div', { class: 'bp-title' }, 'Void Property Survey'),
+      h('div', { class: 'bp-title' }, 'Empty Home Inspection'),
       h('div', { class: 'bp-lines' },
         h('span', { style: 'width:70%' }), h('span', { style: 'width:55%' }), h('span', { style: 'width:62%' })),
       h('div', { class: 'bp-surveyor' },
