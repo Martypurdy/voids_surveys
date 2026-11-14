@@ -32,6 +32,24 @@ export function formatPostcode(s) {
   return c.length > 3 ? `${c.slice(0, -3)} ${c.slice(-3)}` : c;
 }
 
+// ----- Demo addresses (for testing and demonstrations) -----
+// "BS000" plus any two letters (e.g. BS000AB, shown as "BS00 0AB") gives a made-up
+// address, with the map pin on Buckingham Palace. Works offline; nothing is sent.
+const DEMO = /^BS000([A-Z]{2})$/i;
+const DEMO_STREETS = ['Demo Street', 'Sample Road', 'Example Avenue', 'Test Lane', 'Specimen Close', 'Trial Way', 'Mock Crescent', 'Practice Place'];
+export const DEMO_PIN = { lat: 51.501364, lng: -0.14189, label: 'Buckingham Palace (demo)' };
+
+/** Demo address for a BS000xx postcode, or null for any other postcode. */
+export function demoAddress(postcode) {
+  const m = DEMO.exec((postcode || '').replace(/\s+/g, ''));
+  if (!m) return null;
+  const [a, b] = m[1].toUpperCase().split('').map((c) => c.charCodeAt(0) - 65);
+  const pc = formatPostcode(`BS000${m[1]}`);
+  const number = ((a * 26 + b) % 120) + 1;
+  const street = DEMO_STREETS[(a + b) % DEMO_STREETS.length];
+  return { postcode: pc, text: [`${number} ${street}`, 'Sampleton', 'Demoshire', pc].join('\n'), lat: DEMO_PIN.lat, lng: DEMO_PIN.lng };
+}
+
 /**
  * Look up a postcode on api.postcodes.io (free, no key).
  * Sends only the postcode. Returns { postcode, lat, lng, district }.
@@ -87,6 +105,8 @@ export async function lookupStreet(lat, lng) {
 
 /** Google Maps directions URL. Prefers the typed address, falls back to coordinates. */
 export function directionsUrl(address) {
+  // Demo addresses don't exist – navigate to the demo pin instead.
+  if (address.demo && address.lat != null) return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${address.lat},${address.lng}`)}`;
   const lines = addressLines(address);
   let dest = '';
   if (lines.length) dest = lines.join(', ');

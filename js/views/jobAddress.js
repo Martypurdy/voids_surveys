@@ -2,7 +2,7 @@
 import { scheduleSave } from '../db.js';
 import { jobTitle, fmtDateTime } from '../model.js';
 import { h, textField, toast, confirmDialog } from '../ui.js';
-import { lookupPostcode, lookupStreet, formatPostcode, getPosition, directionsUrl, pinUrl } from '../geo.js';
+import { lookupPostcode, lookupStreet, formatPostcode, getPosition, directionsUrl, pinUrl, demoAddress, DEMO_PIN } from '../geo.js';
 import { surveyorField } from '../surveyors.js';
 import { loadJobOr404, jobChrome, completeFooter } from './chrome.js';
 
@@ -29,6 +29,7 @@ export default async function jobAddress(root, { id }) {
   // ----- Postcode + Look up (top of the form) -----
   const postcodeField = textField('Postcode', a.postcode, (v) => {
     a.postcode = v;
+    if (a.demo && !demoAddress(v)) delete a.demo; // a real postcode – navigate by address again
     save();
     updateDerived();
   }, { autocapitalize: 'characters', enterkeyhint: 'search', placeholder: 'e.g. LS1 1UR' });
@@ -47,10 +48,25 @@ export default async function jobAddress(root, { id }) {
     type: 'button',
     class: 'btn-primary',
     onclick: async () => {
+      // Demo postcode (BS000 + two letters): made-up address, pin on Buckingham Palace.
+      const demo = demoAddress(a.postcode);
+      if (demo) {
+        if (a.text.trim() && a.text.trim() !== demo.text && !(await confirmDialog(
+          `Replace the address in the box with the demo address “${demo.text.split('\n').join(', ')}”?`,
+          { title: 'Replace address?', ok: 'Replace', danger: false }))) return;
+        Object.assign(a, { postcode: demo.postcode, text: demo.text, lat: demo.lat, lng: demo.lng, source: DEMO_PIN.label, demo: true });
+        postcodeInput.value = demo.postcode;
+        addressBox.value = demo.text;
+        save();
+        updateDerived();
+        toast('Demo address loaded');
+        return;
+      }
       lookupBtn.disabled = true;
       lookupBtn.textContent = 'Looking up…';
       try {
         const r = await lookupPostcode(a.postcode);
+        delete a.demo;
         a.postcode = r.postcode;
         postcodeInput.value = r.postcode;
         a.lat = r.lat;
