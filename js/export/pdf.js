@@ -4,6 +4,7 @@ import { UNITS, defectInfo, isSorCode, qtyText as unitQty } from '../data/parts.
 import { FEATURES, featuresOf } from '../data/features.js';
 import { loadPhotos, resizeImage } from '../photos.js';
 import { getLibrary } from '../sor.js';
+import { materialGroups, materialTotals, matQty } from '../materials.js';
 
 // Photos are re-encoded smaller for the PDF so reports stay emailable.
 const PDF_PHOTO_MAX = 1024;
@@ -196,19 +197,48 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
     return s.state === 'ok' ? 'No work' : s.works ? 'Work needed' : s.checked < s.total ? 'Not finished' : '';
   };
 
+  /** Room / area title: shaded bar with a bigger, bolder name, and its status badge. */
+  const roomTitle = (text, condition) => {
+    ensure(30);
+    const hgt = 9;
+    doc.setFillColor(228, 236, 244);
+    doc.rect(M, y, CW, hgt, 'F');
+    doc.setFillColor(...BRAND);
+    doc.rect(M, y, 1.6, hgt, 'F');
+    font(13.5, 'bold', BRAND);
+    doc.text(clean(text), M + 4, y + 6.3);
+    if (condition) {
+      font(8.5, 'bold', [255, 255, 255]);
+      const tw = doc.getTextWidth(condition) + 5;
+      doc.setFillColor(...(COND_RGB[condition] || COND_RGB['N/A']));
+      doc.roundedRect(W - M - tw - 2, y + 1.75, tw, 5.5, 1.5, 1.5, 'F');
+      doc.text(condition, W - M - tw + 0.5, y + 5.65);
+    }
+    y += hgt + 3;
+  };
+  /** Line dividing one room / area from the next. */
+  const divider = () => {
+    y += 2;
+    ensure(4);
+    doc.setDrawColor(150, 160, 170);
+    doc.setLineWidth(0.4);
+    doc.line(M, y, W - M, y);
+    y += 5;
+  };
+
   /** Rooms or outside areas. */
   const roomsSection = async (title, areas, kind) => {
     if (!areas.length) return;
     heading(title);
-    for (const room of areas) {
-      ensure(30);
-      subheading(room.name || 'Untitled', areaBadge(room, kind));
+    for (const [i, room] of areas.entries()) {
+      if (i) divider();
+      roomTitle(room.name || 'Untitled', areaBadge(room, kind));
       const a = roomAreas(room.size);
       if (kind === 'rooms' && a.ceiling) para(`Size ${room.size.length} x ${room.size.width} x ${room.size.height} m  -  ceiling/floor ${a.ceiling} m², walls ${a.walls} m², skirting ${a.perimeter} m`, { size: 9, rgb: [90, 98, 106] });
       await featureBlocks(room, kind);
       para(room.notes, { size: 10 });
       await photoGrid(room.photos);
-      y += 4;
+      y += 2;
     }
   };
 
@@ -269,6 +299,34 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
         para(`-  ${r.label}${q ? `:  ${q}` : ''}${showCodes && isSorCode(r.id) ? `   [${r.id}]` : ''}   (${[...r.rooms].join(', ')})`, { size: 10, x: M + 4, width: CW - 4 });
       }
       y += 1.5;
+    }
+  };
+
+  /** Materials list (under the schedule of works): by room, then totals to order. */
+  const materialsSection = () => {
+    const groups = materialGroups(job)
+      .map((g) => ({ ...g, items: g.items.filter((it) => it.on) }))
+      .filter((g) => g.items.length);
+    if (!groups.length) return;
+    heading('Materials list');
+    para('Rough list of materials, grouped by room. Standard items are changed in every void.', { size: 9, rgb: [90, 98, 106] });
+    y += 1;
+    for (const g of groups) {
+      ensure(14);
+      para(g.name, { size: 10.5, style: 'bold' });
+      for (const it of g.items) {
+        const q = matQty(it.q, it.unit);
+        para(`-  ${it.name}${q ? `  ${q}` : ''}`, { size: 10, x: M + 4, width: CW - 4 });
+      }
+      y += 1.5;
+    }
+    const totals = materialTotals(groups);
+    ensure(20);
+    y += 1;
+    subheading('Totals to order');
+    for (const t of totals) {
+      const q = matQty(t.q, t.unit);
+      para(`-  ${t.name}${q ? `  ${q}` : ''}`, { size: 10, x: M + 4, width: CW - 4 });
     }
   };
 
@@ -419,6 +477,7 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
     kv(gifts.map(([item, rooms]) => [item, rooms.join(', ')]), { labelW: 48 });
   }
   scheduleSection();
+  materialsSection();
 
   // ---------- footers ----------
   const pages = doc.getNumberOfPages();

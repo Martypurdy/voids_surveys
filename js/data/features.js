@@ -185,7 +185,7 @@ export const FEATURES = Object.fromEntries([...PARTS, ...MORE].map((f) => [f.key
 
 // ----- Types: presets and starting features -----
 export const AREA_PRESETS = {
-  rooms: ['Hall, stairs, landing & loft', 'Living room', 'Kitchen', 'Bathroom', 'WC', 'Bedroom', 'Porch'],
+  rooms: ['Hall, stairs, landing & loft', 'Living room', 'Kitchen', 'Bathroom', 'Ensuite', 'Downstairs bathroom', 'WC', 'Bedroom', 'Porch'],
   externals: ['Building exterior', 'Front garden', 'Rear garden', 'Fencing & gates', 'Shed', 'Garage'],
 };
 
@@ -204,7 +204,7 @@ export function defaultFeatures(name, kind) {
     return [];
   }
   if (/kitchen/.test(t)) return [...ROOM_BASE, 'kitchen'];
-  if (/bath|wc|toilet|shower|cloak/.test(t)) return [...ROOM_BASE, 'sanitary'];
+  if (/bath|en-?\s?suite|wc|toilet|shower|cloak/.test(t)) return [...ROOM_BASE, 'sanitary'];
   if (/hall|stair|landing|loft/.test(t)) return [...ROOM_BASE, 'stairs', 'loft'];
   if (/porch/.test(t)) return ['ceiling', 'walls', 'floor', 'door', 'window', 'electrics'];
   return ROOM_BASE;

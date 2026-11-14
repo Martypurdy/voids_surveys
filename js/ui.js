@@ -17,6 +17,9 @@ export function h(tag, props, ...children) {
     else if (k === 'value' || k === 'checked' || k === 'open') el[k] = v;
     else el.setAttribute(k, v === true ? '' : v);
   }
+  // Typing boxes show purple until filled in, then green (CSS uses :placeholder-shown,
+  // which needs a placeholder – a blank one is enough).
+  if ((tag === 'input' || tag === 'textarea') && !el.hasAttribute('placeholder')) el.setAttribute('placeholder', ' ');
   return el;
 }
 

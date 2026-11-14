@@ -164,6 +164,16 @@ input, select, textarea {
   color: var(--text);
 }
 textarea { min-height: 88px; resize: vertical; }
+/* Typing boxes: thin purple border until something is entered, then green. */
+:root { --input-todo: #7b3fc4; --input-done: #1e7d3a; }
+@media (prefers-color-scheme: dark) { :root { --input-todo: #b48cf2; --input-done: #5cc97c; } }
+input:is([type="text"], [type="search"], [type="number"], [type="tel"], [type="email"], :not([type])), textarea {
+  border: 2px solid var(--input-todo);
+}
+input:is([type="text"], [type="search"], [type="number"], [type="tel"], [type="email"], :not([type])):not(:placeholder-shown),
+textarea:not(:placeholder-shown) {
+  border-color: var(--input-done);
+}
 input:focus, select:focus, textarea:focus, button:focus-visible, .btn:focus-visible, summary:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--primary) 45%, transparent);
   outline-offset: 1px;
@@ -578,7 +588,10 @@ body.no-scroll { overflow: hidden; }
   background: var(--primary);
   color: var(--primary-ink);
 }
-.sheet-head h2 { flex: 1; margin: 0; font-size: 1.1rem; }
+.sheet-head h2 { flex: 1; min-width: 0; margin: 0; display: flex; flex-direction: column; line-height: 1.2; }
+.sheet-room { font-size: 1.3rem; font-weight: 800; }
+.sheet-room::before { content: "📍 "; }
+.sheet-part { font-size: .95rem; font-weight: 600; opacity: .9; }
 .sheet-head .icon-btn { color: inherit; }
 .sheet-body { flex: 1; overflow-y: auto; padding: 12px 16px; -webkit-overflow-scrolling: touch; }
 .sheet-foot {
@@ -729,3 +742,12 @@ body.no-scroll { overflow: hidden; }
 .alert-box strong { letter-spacing: .03em; }
 .alert-box.alert-amber { border-color: var(--started-line); background: var(--started-bg); color: var(--started-ink); }
 .alert-box + .alert-box { margin-top: 8px; }
+
+/* Materials list */
+.mat-group { margin-bottom: 14px; }
+.mat-title { margin: 0 0 10px; font-size: 1.15rem; }
+.mat-row { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; }
+.mat-row .defect-qty input { width: 64px; }
+.mat-row .defect-remove { min-height: 48px; }
+.mat-row[data-on="false"] .defect-qty { opacity: .45; }
+.mat-add { margin-top: 4px; }

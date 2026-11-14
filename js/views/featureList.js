@@ -8,7 +8,7 @@ import { roomPart, roomAreas, roomStatus, uid } from '../model.js';
 import { UNITS, qtyText, defectInfo } from '../data/parts.js';
 import { FEATURES, SUGGESTIONS, featuresOf, customFeatureKey } from '../data/features.js';
 import { searchLibrary, libraryItem } from '../sor.js';
-import { setHidden, setAdded, roomTypeLabel } from '../templates.js';
+import { setHidden, setAdded, updateAdded, setWording, roomTypeLabel } from '../templates.js';
 import { templateOptions } from '../defectOptions.js';
 import { h, textField, confirmDialog, toast, choose, trackOverlay } from '../ui.js';
 import { photoField } from '../photos.js';
@@ -233,23 +233,34 @@ export function featureList({ job, room, kind, library, onChange = () => {} }) {
       }
     }
 
-    // Press and hold a defect (about a second) to edit its wording for this survey only.
+    // Press and hold a defect (about a second) to change its wording. The new wording
+    // is kept in this room type's list on this device, so it's used on every survey after.
     const editWording = async (opt) => {
-      const current = chosen.get(opt.c)?.d || opt.d;
+      const listed = tpl.visible.find((o) => o.c === opt.c) || options.find((o) => o.c === opt.c);
+      const current = chosen.get(opt.c)?.d || listed?.d || opt.d;
+      const std = listed?.std; // standard wording, if it has been changed
       const box = h('textarea', { value: current, rows: 3, autocapitalize: 'sentences', 'aria-label': 'Defect wording' });
       setTimeout(() => { box.focus(); box.setSelectionRange(box.value.length, box.value.length); }, 50);
       const ok = await choose({
         title: 'Edit wording',
-        message: 'For this survey only – the standard list is not changed.',
         content: box,
         buttons: [
           { label: 'Save', value: true, class: 'btn-primary' },
-          ...(current !== opt.d ? [{ label: 'Reset to standard wording', value: 'reset' }] : []),
+          ...(std ? [{ label: 'Back to standard wording', value: 'reset' }] : []),
           { label: 'Cancel', value: false },
         ],
       });
       if (!ok) return;
-      const text = ok === 'reset' ? opt.d : box.value.trim() || opt.d;
+      const text = ok === 'reset' ? std : box.value.trim() || current;
+      if (listed && !listed.pinned && !listed.custom) {
+        const standard = std || listed.d;
+        setWording(room.name, part.key, opt.c, text === standard ? null : text);
+      } else if (listed) {
+        updateAdded(room.name, part.key, opt.c, { d: text });
+      } else {
+        setAdded(room.name, part.key, { c: opt.c, d: text, u: opt.u }, true); // a search result joins the list
+      }
+      refreshTemplate();
       const entry = chosen.get(opt.c) || { qty: defaultQty(opt.u), u: opt.u };
       chosen.set(opt.c, { ...entry, d: text }); // editing also ticks it
       renderSheet();
@@ -282,7 +293,6 @@ export function featureList({ job, room, kind, library, onChange = () => {} }) {
             ? h('span', { class: 'defect-code' }, `✎ your own · ${unit.label}`)
             : library && lib ? h('span', { class: 'defect-code' }, `${opt.c} · ${unit.label}${opt.note ? ` · ${opt.note}` : ''}${opt.pinned ? ' · 📌 added by you' : ''}`)
               : h('span', { class: 'defect-code' }, unit.label),
-          label !== opt.d ? h('span', { class: 'defect-also' }, '✎ wording edited for this survey') : null,
           alsoOn ? h('span', { class: 'defect-also' }, `⚠ already on ${alsoOn.join(' & ')} here`) : null));
       onLongPress(toggle, () => editWording(opt));
       return h('div', { class: 'defect-row', dataset: { on: String(on) } },
@@ -438,7 +448,9 @@ export function featureList({ job, room, kind, library, onChange = () => {} }) {
 
     const sheet = h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': `${part.label} defects` },
       h('header', { class: 'sheet-head' },
-        h('h2', null, `${room.name} – ${part.label}`),
+        h('h2', null,
+          h('span', { class: 'sheet-room' }, kind === 'security' ? 'Security' : room.name || 'Room'),
+          h('span', { class: 'sheet-part' }, `${part.label} defects`)),
         h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Save and close', onclick: saveAndClose }, '✕')),
       h('div', { class: 'sheet-body' },
         library ? h('div', { class: 'sor-search-wrap' }, searchBox) : null,
@@ -446,7 +458,7 @@ export function featureList({ job, room, kind, library, onChange = () => {} }) {
         h('p', { class: 'hint' }, prefill
           ? `m² / m are pre-filled from the room size (${prefill}) – change them as needed. `
           : 'Tick each defect and enter the quantity. ',
-        'Press and hold a defect to edit its wording.'),
+        'Press and hold a defect to change its wording – it’s remembered for next time.'),
         listEl,
         textField('Notes', notes, (v) => { notes = v; }, { multiline: true, autocapitalize: 'sentences', placeholder: 'Anything the contractor should know' }),
         h('span', { class: 'field-label' }, 'Photos'),

@@ -5,7 +5,7 @@
 // Shared by the room screen's defects sheet and Settings › Defect lists.
 import { ROOM_DEFAULTS } from './data/parts.js';
 import { preloadFor } from './sor.js';
-import { hiddenFor, addedFor, roomType } from './templates.js';
+import { hiddenFor, addedFor, wordingFor, roomType } from './templates.js';
 
 /** Built-in options before the user's own template is applied. */
 export function baseOptions({ library, roomName, part, ceilingArea = 0 }) {
@@ -20,7 +20,9 @@ export function baseOptions({ library, roomName, part, ceilingArea = 0 }) {
 
 /** { base, visible, removed, hidden } for this room type + feature on this device. */
 export function templateOptions(args) {
-  const base = baseOptions(args);
+  // Wording changed by the surveyor (press and hold) replaces the standard wording.
+  const words = wordingFor(args.roomName, args.part.key);
+  const base = baseOptions(args).map((o) => (words[o.c] ? { ...o, std: o.d, d: words[o.c] } : o));
   const hidden = hiddenFor(args.roomName, args.part.key);
   const baseCodes = new Set(base.map((o) => o.c));
   const added = addedFor(args.roomName, args.part.key)

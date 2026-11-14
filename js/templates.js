@@ -90,3 +90,31 @@ export function setHidden(roomName, partKey, key, hidden) {
   else delete all[slot(roomName, partKey)];
   writeAll(all);
 }
+
+// ----- Wording the surveyor has changed (press and hold a defect) -----
+// Saved per room type + feature on this device and used on every survey after.
+const WORD_KEY = 'voids.sorWording';
+
+function readWording() {
+  try {
+    const v = JSON.parse(localStorage.getItem(WORD_KEY) || '{}');
+    return v && typeof v === 'object' ? v : {};
+  } catch {
+    return {};
+  }
+}
+
+/** { [code]: wording } for this room type + feature. */
+export function wordingFor(roomName, partKey) {
+  return readWording()[slot(roomName, partKey)] || {};
+}
+
+/** Save new wording for a standard defect (text = null resets it). */
+export function setWording(roomName, partKey, code, text) {
+  const all = readWording();
+  const k = slot(roomName, partKey);
+  const m = all[k] || {};
+  if (text) m[code] = text; else delete m[code];
+  if (Object.keys(m).length) all[k] = m; else delete all[k];
+  try { localStorage.setItem(WORD_KEY, JSON.stringify(all)); } catch { /* storage blocked/full */ }
+}
