@@ -233,9 +233,14 @@ export function newMeter(utility = 'Electric') {
     location: '',
     balanceType: 'Credit', // Credit | Debt – only used for prepayment meters
     balance: '',
+    doorDamaged: '', // gas / electric meter box door: '' | 'yes' | 'no'
+    notes: '',
     photos: [],
   };
 }
+
+/** Gas and electric meters ask whether the meter box door is damaged. */
+export const hasMeterDoor = (utility) => utility === 'Gas' || utility === 'Electric';
 
 /** Next name for a numbered preset, e.g. "Bedroom 3". */
 export function nextNumberedName(items, base) {

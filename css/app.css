@@ -937,3 +937,8 @@ body.no-scroll { overflow: hidden; }
 .hero-logo svg { width: 38px; height: 38px; }
 .choice-hint { display: block; font-size: .74rem; font-weight: 500; opacity: .8; margin-top: 1px; }
 .choice-grid button:has(.choice-hint) { flex-direction: column; line-height: 1.2; }
+
+/* Services: meter box door Yes / No */
+.yes-no { grid-template-columns: 1fr 1fr; }
+.yes-no button[aria-pressed="true"][data-v="yes"] { background: var(--poor); }
+.yes-no button[aria-pressed="true"][data-v="no"] { background: var(--good); }

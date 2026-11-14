@@ -1,5 +1,5 @@
 // PDF report (jsPDF, loaded on demand from /vendor).
-import { addressLines, jobTitle, fmtDate, fmtDateTime, slug, todayLocal, allPhotoIds, worksSummary, roomStatus, roomAreas, serviceTitle } from '../model.js';
+import { addressLines, jobTitle, fmtDate, fmtDateTime, slug, todayLocal, allPhotoIds, worksSummary, roomStatus, roomAreas, serviceTitle, hasMeterDoor } from '../model.js';
 import { UNITS, defectInfo, isSorCode, qtyText as unitQty } from '../data/parts.js';
 import { FEATURES, featuresOf } from '../data/features.js';
 import { loadPhotos, resizeImage } from '../photos.js';
@@ -276,7 +276,10 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
 
   const scheduleSection = () => {
     const secWorksList = worksSummary(job.works, 'security');
-    if (!schedule.size && !alerts.length && !secWorksList.length) return;
+    // Damaged gas / electric meter box doors.
+    const serviceWorks = job.meters.filter((m) => hasMeterDoor(m.utility) && m.doorDamaged === 'yes')
+      .map((m) => `${serviceTitle(m.utility)} box door damaged${m.notes ? ` - ${m.notes}` : ''}${m.location ? `   (${m.location})` : ''}`);
+    if (!schedule.size && !alerts.length && !secWorksList.length && !serviceWorks.length) return;
     heading('Schedule of works');
     alerts.forEach(alertBox);
     para('All works recorded in this survey, totalled by feature.', { size: 9, rgb: [90, 98, 106] });
@@ -287,6 +290,12 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
       for (const [label, detail] of secWorksList) {
         para(`-  ${label}${detail ? `: ${detail}` : ''}`, { size: 10, x: M + 4, width: CW - 4 });
       }
+      y += 1.5;
+    }
+    if (serviceWorks.length) {
+      ensure(14);
+      para('Services', { size: 10.5, style: 'bold' });
+      for (const t of serviceWorks) para(`-  ${t}`, { size: 10, x: M + 4, width: CW - 4 });
       y += 1.5;
     }
     const groups = [...new Set([...schedule.values()].map((r) => r.part))];
@@ -445,7 +454,7 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
     y += 2;
   }
 
-  const meters = job.meters.filter((m) => m.location || m.photos.length || m.serial || m.reading || m.type || m.supply);
+  const meters = job.meters.filter((m) => m.location || m.photos.length || m.serial || m.reading || m.type || m.supply || m.doorDamaged || m.notes);
   if (meters.length || job.heating.length) {
     heading('Services');
     kv([['Heating type', job.heating.join(', ')]]);
@@ -461,6 +470,8 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
         ['Serial number', m.serial],
         ['Reading', m.reading],
         ['Date read', m.reading ? fmtDate(m.date) : ''],
+        ['Meter box door', hasMeterDoor(m.utility) && m.doorDamaged ? (m.doorDamaged === 'yes' ? 'Damaged' : 'Not damaged') : ''],
+        ['Notes', m.notes],
       ]);
       await photoGrid(m.photos);
       y += 3;

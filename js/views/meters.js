@@ -1,6 +1,6 @@
 // Screen: services – heating, fuse board, stop tap & meters – heating type (pop-up), then each meter's location and photos.
 import { scheduleSave, flushSave, deletePhotos } from '../db.js';
-import { newMeter, UTILITIES, HEATING_TYPES, serviceTitle } from '../model.js';
+import { newMeter, UTILITIES, HEATING_TYPES, serviceTitle, hasMeterDoor } from '../model.js';
 import { h, textField, selectField, confirmDialog, multiSelect } from '../ui.js';
 import { photoField } from '../photos.js';
 import { loadJobOr404, jobChrome, completeFooter } from './chrome.js';
@@ -10,7 +10,7 @@ const LOCATION_HINTS = {
   'Fuse board': 'e.g. Under-stairs cupboard, above front door',
   'Mains stop tap': 'e.g. Under kitchen sink, in front garden',
   Gas: 'e.g. External box at front of property',
-  Electric: 'e.g. Under stairs cupboard',
+  Electric: 'e.g. Under-stairs cupboard',
   Water: 'e.g. Pavement outside, under kitchen sink',
 }; // the first gas/electric/water meters can't be deleted
 
@@ -50,9 +50,35 @@ export default async function meters(root, { id }) {
   const meterCard = (m, open = false) => {
     const title = h('span', { class: 'summary-title' });
     const meta = h('span', { class: 'summary-meta' });
+
+    // Gas / electric: is the meter box door damaged? (Yes / No), then a notes box.
+    const doorBtns = h('div', { class: 'segmented yes-no', role: 'group', 'aria-label': 'Meter box door damaged?' });
+    const renderDoor = () => doorBtns.replaceChildren(...[['yes', 'Yes'], ['no', 'No']].map(([v, label]) => h('button', {
+      type: 'button',
+      dataset: { v },
+      'aria-pressed': String(m.doorDamaged === v),
+      onclick: () => {
+        m.doorDamaged = m.doorDamaged === v ? '' : v;
+        renderDoor();
+        sync();
+        save();
+      },
+    }, label)));
+    renderDoor();
+    const doorBlock = h('div', { class: 'meter-door' },
+      h('span', { class: 'field-label' }, 'Is the meter box door damaged?'),
+      doorBtns,
+      textField('Notes', m.notes ?? '', (v) => { m.notes = v; save(); },
+        { multiline: true, autocapitalize: 'sentences', placeholder: 'e.g. Door hanging off, lock broken, key missing' }));
+
     const sync = () => {
       title.textContent = serviceTitle(m.utility);
-      meta.textContent = [m.location.trim() ? 'Located' : '', m.photos.length ? `📷 ${m.photos.length}` : ''].filter(Boolean).join(' · ');
+      doorBlock.hidden = !hasMeterDoor(m.utility);
+      meta.textContent = [
+        m.location.trim() ? 'Located' : '',
+        hasMeterDoor(m.utility) && m.doorDamaged === 'yes' ? '⚠ Door damaged' : '',
+        m.photos.length ? `📷 ${m.photos.length}` : '',
+      ].filter(Boolean).join(' · ');
     };
     sync();
     const removable = !(DEFAULT_UTILITIES.has(m.utility) && firstOfType(m));
@@ -67,7 +93,8 @@ export default async function meters(root, { id }) {
           m.location = v;
           sync();
           save();
-        }, { placeholder: LOCATION_HINTS[m.utility] || 'e.g. Under stairs cupboard', autocapitalize: 'sentences' }),
+        }, { placeholder: LOCATION_HINTS[m.utility] || 'e.g. Under-stairs cupboard', autocapitalize: 'sentences' }),
+        doorBlock,
         h('span', { class: 'field-label' }, 'Photos'),
         photoField(job, m.photos, sync),
         removable
