@@ -11,6 +11,7 @@
 //   5. No wide lens available: offer the phone's own camera app.
 // 2x – hardware zoom on the main camera, otherwise a digital crop.
 // Zoom taps are ignored while a lens switch is in progress.
+import { torchOff } from './torch.js';
 import { h, trackOverlay } from './ui.js';
 
 export const cameraSupported = () => Boolean(navigator.mediaDevices?.getUserMedia);
@@ -31,6 +32,7 @@ const recall = (k) => { try { return localStorage.getItem(k); } catch { return n
  * @returns {Promise<{ count: number, error?: Error }>} when closed
  */
 export function openCamera({ onCapture, onNative, onGallery }) {
+  torchOff();
   return new Promise((resolve) => {
     let stream = null;
     let track = null;

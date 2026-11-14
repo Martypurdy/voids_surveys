@@ -895,7 +895,7 @@ body.no-scroll { overflow: hidden; }
   clip-path: polygon(50% 8%, 100% 48%, 100% 100%, 0 100%, 0 48%);
   pointer-events: none;
 }
-.hero-top { display: flex; align-items: center; gap: 10px; position: relative; z-index: 1; }
+.hero-top { display: flex; align-items: center; gap: 8px; position: relative; z-index: 1; }
 .hero-logo { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; background: #fff; color: #1f5f8b; flex: none; box-shadow: 0 2px 8px rgb(0 0 0 / .18); }
 .hero-logo svg { width: 28px; height: 28px; }
 .hero-brand { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.15; }
@@ -1073,3 +1073,6 @@ body.no-scroll { overflow: hidden; }
 
 /* In-app camera: Gallery (upload from the phone) next to Torch */
 .cam-top-btns { display: flex; gap: 8px; }
+
+/* Torch on / off in the top bar: yellow while on */
+.torch-btn[aria-pressed="true"] { background: #ffd23f; color: #3a2a00; border-color: #ffd23f; box-shadow: 0 0 12px rgb(255 210 63 / .8); }

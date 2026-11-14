@@ -1,4 +1,5 @@
 // Small DOM helpers: element builder, form fields, dialogs, toasts.
+import { torchSupported, torchIsOn, toggleTorch, onTorchChange } from './torch.js';
 import { CONDITIONS } from './model.js';
 
 /**
@@ -39,6 +40,8 @@ export function icon(d) {
 }
 
 export const ICONS = {
+  import: '<path d="M4 14v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/><path d="M8 10l4 4 4-4"/><path d="M12 2v12"/>',
+  torch: '<path d="M7 2h10v4l-2.5 4v11a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1V10L7 6z"/><path d="M7 6h10"/><path d="M12 13v3"/>',
   home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/>',
   back: '<path d="M15 18l-6-6 6-6"/>',
   camera: '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
@@ -77,11 +80,37 @@ export function scrollTabs(nav) {
   return h('div', { class: 'tabs-wrap' }, nav, left, right);
 }
 
+/** Torch (flashlight) on / off button for the top bar. Lit up yellow while on. */
+export function torchButton(cls = 'btn icon-btn torch-btn') {
+  if (!torchSupported()) return null;
+  const btn = h('button', { type: 'button', class: cls, title: 'Torch on / off' }, icon(ICONS.torch));
+  const render = () => {
+    const on = torchIsOn();
+    btn.setAttribute('aria-pressed', String(on));
+    btn.setAttribute('aria-label', on ? 'Turn torch off' : 'Turn torch on');
+  };
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    try {
+      await toggleTorch();
+    } catch (e) {
+      toast(e.name === 'NotAllowedError' ? 'Allow camera access for this site to use the torch' : e.message || 'Torch not available');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+  // Keep every torch button in step (one per screen); stop listening once it's gone.
+  const off = onTorchChange(() => { if (!btn.isConnected) off(); else render(); });
+  render();
+  return btn;
+}
+
 export function pageHeader(title, { back, actions = [] } = {}) {
   return h('header', { class: 'appbar' },
     back ? h('a', { class: 'btn icon-btn', href: back, 'aria-label': 'Back' }, icon(ICONS.back)) : h('span', { style: 'width:8px' }),
     h('h1', null, title),
     // Home: straight back to the front screen from anywhere (saves first – see router).
+    torchButton(),
     h('a', { class: 'btn icon-btn home-btn', href: '#/', 'aria-label': 'Home', title: 'Home' }, icon(ICONS.home)),
     actions);
 }

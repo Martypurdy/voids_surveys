@@ -2,7 +2,7 @@
 // surveys on this device (search / filter once there are a few).
 import { listJobs, saveJob, requestPersist, storageInfo } from '../db.js';
 import { newJob, jobTitle, backupStatus, fmtDate, allPhotoIds, sectionsOf, completedCount, sectionState, formOf, isRtl } from '../model.js';
-import { h, icon, ICONS } from '../ui.js';
+import { h, icon, ICONS, torchButton } from '../ui.js';
 import { go, refresh } from '../router.js';
 import { jobActions } from './jobActions.js';
 import { getLastSurveyor } from '../surveyors.js';
@@ -65,8 +65,9 @@ export default async function jobList(root) {
       h('div', { class: 'hero-brand' },
         h('h1', null, 'PropertyPad'),
         h('span', null, 'Surveys & site forms')),
-      h('button', { type: 'button', class: 'hero-btn', onclick: () => importInput.click(), 'aria-label': 'Import a survey file' }, 'Import'),
+      h('button', { type: 'button', class: 'hero-btn hero-icon', onclick: () => importInput.click(), 'aria-label': 'Import a survey file', title: 'Import a survey file' }, icon(ICONS.import)),
       importInput,
+      torchButton('hero-btn hero-icon torch-btn'),
       h('a', { class: 'hero-btn hero-icon', href: '#/settings', 'aria-label': 'Settings' }, icon(ICONS.settings))),
     h('p', { class: 'hero-hello' }, greeting(), h('span', null,
       new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }))),
