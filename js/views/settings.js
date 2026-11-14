@@ -274,6 +274,7 @@ function defectsTab(lib) {
         h('li', null, h('strong', null, 'Add your own: '), 'type a defect and choose Qty, m² or m. It stays on every survey until you remove it.'),
         h('li', null, h('strong', null, 'Remove: '), 'tap − to hide a standard defect you never use. Hidden ones can be put back at the bottom.'),
         h('li', null, h('strong', null, 'Change wording: '), 'in a survey, press and hold a defect (or right-click it on a computer). The new wording is remembered for next time.'),
+        h('li', null, h('strong', null, 'Your order: '), 'drag ⠿ to put the defects you use most at the top – here, or with ↕ Reorder on the defects screen.'),
         h('li', null, h('strong', null, 'Safe: '), 'changes here never alter defects already recorded on surveys.')),
       h('p', { class: 'hint' }, 'Lists are saved on this device. You can also change them while surveying, from the defects screen.')),
     defectListEditor(lib),

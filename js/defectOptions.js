@@ -5,7 +5,7 @@
 // Shared by the room screen's defects sheet and Settings › Defect lists.
 import { ROOM_DEFAULTS } from './data/parts.js';
 import { preloadFor } from './sor.js';
-import { hiddenFor, addedFor, wordingFor, roomType } from './templates.js';
+import { hiddenFor, addedFor, wordingFor, orderFor, roomType } from './templates.js';
 
 /** Built-in options before the user's own template is applied. */
 export function baseOptions({ library, roomName, part, ceilingArea = 0 }) {
@@ -16,6 +16,14 @@ export function baseOptions({ library, roomName, part, ceilingArea = 0 }) {
   const skip = new Set(extra.skip || []);
   return [...(extra.add || []), ...part.defects.filter((d) => !skip.has(d.id))]
     .map((d) => ({ k: d.id, c: d.id, d: d.label, u: d.unit }));
+}
+
+/** Items in the surveyor's saved order first; anything not yet ordered (e.g. newly added) keeps its place after them. */
+function applyOrder(items, order) {
+  if (!order.length) return items;
+  const rank = new Map(order.map((c, i) => [c, i]));
+  const ranked = items.filter((o) => rank.has(o.c)).sort((a, b) => rank.get(a.c) - rank.get(b.c));
+  return [...ranked, ...items.filter((o) => !rank.has(o.c))];
 }
 
 /** { base, visible, removed, hidden } for this room type + feature on this device. */
@@ -31,7 +39,7 @@ export function templateOptions(args) {
   return {
     base,
     hidden,
-    visible: [...base.filter((o) => !hidden.has(o.k)), ...added],
+    visible: applyOrder([...base.filter((o) => !hidden.has(o.k)), ...added], orderFor(args.roomName, args.part.key)),
     removed: base.filter((o) => hidden.has(o.k)),
   };
 }

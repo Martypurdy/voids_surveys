@@ -78,7 +78,7 @@ export function updateAdded(roomName, partKey, code, patch) {
 
 /** Room types that have a saved template on this device (lower-case keys). */
 export function templateRoomTypes() {
-  const keys = [...Object.keys(readAll()), ...Object.keys(readAdds())];
+  const keys = [...Object.keys(readAll()), ...Object.keys(readAdds()), ...Object.keys(readWording()), ...Object.keys(readOrders())];
   return [...new Set(keys.map((k) => k.split('|')[0]))];
 }
 
@@ -117,4 +117,30 @@ export function setWording(roomName, partKey, code, text) {
   if (text) m[code] = text; else delete m[code];
   if (Object.keys(m).length) all[k] = m; else delete all[k];
   try { localStorage.setItem(WORD_KEY, JSON.stringify(all)); } catch { /* storage blocked/full */ }
+}
+
+// ----- Custom order (drag and drop) -----
+// Saved per room type + feature on this device: the list's codes, most used first.
+const ORDER_KEY = 'voids.sorOrder';
+
+function readOrders() {
+  try {
+    const v = JSON.parse(localStorage.getItem(ORDER_KEY) || '{}');
+    return v && typeof v === 'object' ? v : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Codes in the order the surveyor chose (may be empty). */
+export function orderFor(roomName, partKey) {
+  const list = readOrders()[slot(roomName, partKey)];
+  return Array.isArray(list) ? list : [];
+}
+
+export function setOrder(roomName, partKey, codes) {
+  const all = readOrders();
+  if (codes.length) all[slot(roomName, partKey)] = codes;
+  else delete all[slot(roomName, partKey)];
+  try { localStorage.setItem(ORDER_KEY, JSON.stringify(all)); } catch { /* storage blocked/full */ }
 }

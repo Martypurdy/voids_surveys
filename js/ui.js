@@ -299,3 +299,67 @@ export function busy(message) {
     close: () => el.remove(),
   };
 }
+
+// ---------- Drag-and-drop ordering (mouse and touch) ----------
+
+/**
+ * Let the surveyor drag rows of `list` into a new order by their handle.
+ * Rows are direct children with data-key; only the handle starts a drag, so taps,
+ * typing and scrolling elsewhere work as normal. Calls onReorder(keys) after a drop.
+ */
+export function makeSortable(list, { handle = '.drag-handle', onReorder }) {
+  const rows = () => [...list.children].filter((el) => el.dataset.key != null);
+  list.addEventListener('pointerdown', (e) => {
+    const grip = e.target.closest(handle);
+    if (!grip || !list.contains(grip)) return;
+    const row = grip.closest('[data-key]');
+    if (!row || row.parentElement !== list) return;
+    e.preventDefault();
+    // Listen on the window: moving the row in the page would drop pointer capture on the grip.
+    const id = e.pointerId;
+    const before = rows().map((r) => r.dataset.key).join('|');
+    const scroller = list.closest('.sheet-body') || document.scrollingElement;
+    row.classList.add('dragging');
+    navigator.vibrate?.(15);
+
+    const move = (ev) => {
+      if (ev.pointerId !== id) return;
+      ev.preventDefault();
+      const y = ev.clientY;
+      const others = rows().filter((r) => r !== row);
+      const target = others.find((r) => {
+        const b = r.getBoundingClientRect();
+        return y < b.top + b.height / 2;
+      });
+      if (target) {
+        if (row.nextElementSibling !== target) list.insertBefore(row, target);
+      } else if (others.length) {
+        const last = others[others.length - 1];
+        if (last.nextElementSibling !== row) last.after(row);
+      }
+      // Scroll when dragging near the top or bottom edge.
+      const area = scroller === document.scrollingElement
+        ? { top: 0, bottom: window.innerHeight }
+        : scroller.getBoundingClientRect();
+      if (y < area.top + 60) scroller.scrollBy(0, -12);
+      else if (y > area.bottom - 60) scroller.scrollBy(0, 12);
+    };
+    const end = (ev) => {
+      if (ev.pointerId !== id) return;
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', end);
+      row.classList.remove('dragging');
+      const keys = rows().map((r) => r.dataset.key);
+      if (keys.join('|') !== before) onReorder(keys);
+    };
+    window.addEventListener('pointermove', move, { passive: false });
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+  });
+}
+
+/** The ⠿ grip shown at the start of a draggable row. */
+export const dragHandle = (label = 'Drag to reorder') => h('span', {
+  class: 'drag-handle', role: 'img', 'aria-label': label, title: label,
+}, '⠿');

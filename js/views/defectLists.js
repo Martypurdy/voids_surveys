@@ -3,10 +3,10 @@
 // change the wording or unit of your own. Same data as the − / 📌 buttons in a room.
 import { UNITS } from '../data/parts.js';
 import { AREA_PRESETS, FEATURES, SUGGESTIONS, defaultFeatures } from '../data/features.js';
-import { setHidden, setAdded, updateAdded, templateRoomTypes } from '../templates.js';
+import { setHidden, setAdded, updateAdded, templateRoomTypes, orderFor, setOrder } from '../templates.js';
 import { templateOptions } from '../defectOptions.js';
 import { uid } from '../model.js';
-import { h, toast, confirmDialog } from '../ui.js';
+import { h, toast, confirmDialog, makeSortable, dragHandle } from '../ui.js';
 
 const OWN_UNITS = [['nr', 'Qty'], ['m2', 'm²'], ['m', 'm']];
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -67,7 +67,8 @@ export function defectListEditor(library) {
     const rows = tpl.visible.map((o) => {
       const unit = UNITS[o.u] || UNITS.nr;
       if (o.custom) {
-        return h('div', { class: 'tpl-row' },
+        return h('div', { class: 'tpl-row', dataset: { key: o.c } },
+          dragHandle(),
           h('input', {
             type: 'text',
             value: o.d,
@@ -91,7 +92,8 @@ export function defectListEditor(library) {
             },
           }, '−'));
       }
-      return h('div', { class: 'tpl-row' },
+      return h('div', { class: 'tpl-row', dataset: { key: o.c } },
+        dragHandle(),
         h('span', { class: 'defect-text' },
           h('span', { class: 'defect-label' }, o.d),
           h('span', { class: 'defect-code' }, [library && !o.custom ? o.c : '', unit.label, o.pinned ? '📌 added by you' : 'standard'].filter(Boolean).join(' · '))),
@@ -107,8 +109,24 @@ export function defectListEditor(library) {
         }, '−'));
     });
 
+    // Drag ⠿ to put the most used defects at the top.
+    const rowsWrap = h('div', { class: 'tpl-rows' }, rows);
+    makeSortable(rowsWrap, {
+      onReorder: (keys) => {
+        setOrder(roomName, part.key, keys);
+        toast('Order saved');
+        render();
+      },
+    });
+    const ordered = orderFor(roomName, part.key).length > 0;
     list.replaceChildren(
-      ...rows,
+      rows.length ? h('p', { class: 'hint' }, 'Drag ⠿ to put your most used defects at the top. ',
+        ordered ? h('button', {
+          type: 'button',
+          class: 'btn-small',
+          onclick: () => { setOrder(roomName, part.key, []); render(); toast('Back to the standard order'); },
+        }, 'Reset order') : null) : '',
+      rowsWrap,
       rows.length ? '' : h('p', { class: 'hint' }, 'This list is empty – add your own below or restore standard ones.'),
       h('div', { class: 'add-own' },
         h('span', { class: 'field-label' }, '+ Add your own defect'),

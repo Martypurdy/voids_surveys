@@ -942,3 +942,17 @@ body.no-scroll { overflow: hidden; }
 .yes-no { grid-template-columns: 1fr 1fr; }
 .yes-no button[aria-pressed="true"][data-v="yes"] { background: var(--poor); }
 .yes-no button[aria-pressed="true"][data-v="no"] { background: var(--good); }
+
+/* Drag-and-drop ordering of defect lists */
+.drag-handle { flex: none; display: grid; place-items: center; width: 40px; min-height: 44px; font-size: 1.4rem; line-height: 1; color: var(--muted); cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; border-radius: 8px; }
+.drag-handle:hover { background: var(--surface-2); }
+.dragging { opacity: .9; background: color-mix(in srgb, var(--primary) 12%, var(--surface)); box-shadow: 0 4px 14px rgb(0 0 0 / .18); border-radius: 10px; position: relative; z-index: 2; }
+.dragging .drag-handle { cursor: grabbing; color: var(--primary); }
+.reorder-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.reorder-row { display: flex; align-items: center; gap: 6px; padding: 4px 10px 4px 4px; min-height: 52px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.reorder-row .defect-text { flex: 1; min-width: 0; }
+.list-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 12px 0 6px; }
+.list-head .field-label { margin: 0; }
+.reorder-btn { min-height: 38px; padding: 0 12px; font-size: .9rem; font-weight: 600; }
+.reorder-btn[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: var(--primary-ink); }
+.tpl-rows { display: flex; flex-direction: column; }

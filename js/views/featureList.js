@@ -8,9 +8,9 @@ import { roomPart, roomAreas, roomStatus, uid } from '../model.js';
 import { UNITS, qtyText, defectInfo } from '../data/parts.js';
 import { FEATURES, SUGGESTIONS, featuresOf, customFeatureKey } from '../data/features.js';
 import { searchLibrary, libraryItem } from '../sor.js';
-import { setHidden, setAdded, updateAdded, setWording, roomTypeLabel } from '../templates.js';
+import { setHidden, setAdded, updateAdded, setWording, setOrder, roomTypeLabel } from '../templates.js';
 import { templateOptions } from '../defectOptions.js';
-import { h, textField, confirmDialog, toast, choose, trackOverlay } from '../ui.js';
+import { h, textField, confirmDialog, toast, choose, trackOverlay, makeSortable, dragHandle } from '../ui.js';
 import { photoField } from '../photos.js';
 
 /**
@@ -220,6 +220,7 @@ export function featureList({ job, room, kind, library, onChange = () => {} }) {
     }));
     let notes = p.notes || '';
     let query = '';
+    let reordering = false; // ↕ Reorder: drag the list into the surveyor's own order
 
     const defaultQty = (u) => (UNITS[u]?.count ? '1' : (u === 'm2' || u === 'm') && prefill ? String(prefill) : '');
 
@@ -402,6 +403,33 @@ export function featureList({ job, room, kind, library, onChange = () => {} }) {
 
     const renderSheet = () => {
       const shown = tpl.visible;
+      const listHead = h('div', { class: 'list-head' },
+        h('p', { class: 'field-label' }, `${typeLabel} – ${part.label.toLowerCase()}`),
+        shown.length > 1 ? h('button', {
+          type: 'button',
+          class: 'reorder-btn',
+          'aria-pressed': String(reordering),
+          onclick: () => { reordering = !reordering; renderSheet(); },
+        }, reordering ? '✓ Done' : '↕ Reorder') : null);
+      if (reordering) {
+        // Drag ⠿ to order this list; saved for every survey on this device.
+        const order = h('div', { class: 'reorder-list' }, shown.map((o) => h('div', { class: 'reorder-row', dataset: { key: o.c } },
+          dragHandle(),
+          h('span', { class: 'defect-text' },
+            h('span', { class: 'defect-label' }, o.d),
+            chosen.has(o.c) ? h('span', { class: 'defect-code' }, '✓ selected') : null))));
+        makeSortable(order, {
+          onReorder: (keys) => {
+            setOrder(room.name, part.key, keys);
+            refreshTemplate();
+          },
+        });
+        listEl.replaceChildren(listHead,
+          h('p', { class: 'hint' }, `Drag ⠿ to put your most used defects at the top. The order is kept for every ${typeLabel} on this device. Tap Done when finished.`),
+          order);
+        results.replaceChildren();
+        return;
+      }
       const shownCodes = new Set(shown.map((o) => o.c));
       const extras = [...chosen].filter(([code]) => !shownCodes.has(code))
         .map(([code, v]) => ({ c: code, d: v.d, u: v.u }));
@@ -409,7 +437,7 @@ export function featureList({ job, room, kind, library, onChange = () => {} }) {
       listEl.replaceChildren(
         extras.length ? h('p', { class: 'field-label' }, 'Also selected') : '',
         ...extras.map((o) => row(o, { pinnable: true })),
-        h('p', { class: 'field-label' }, `${typeLabel} – ${part.label.toLowerCase()}`),
+        listHead,
         ...shown.map((o) => row(o, { removable: true })),
         shown.length ? '' : h('p', { class: 'hint' }, 'No standard defects – add your own below.'),
         addOwn,
