@@ -277,14 +277,20 @@ export function featureList({ job, room, kind, library, onChange = () => {} }) {
         type: 'button',
         class: 'defect-toggle',
         'aria-pressed': String(on),
-        title: 'Tap to select · press and hold to edit the wording',
+        title: 'Click to select · right-click to edit the wording',
         onclick: () => {
           if (toggle.dataset.held) { delete toggle.dataset.held; return; } // long press handled it
           if (on) chosen.delete(opt.c);
           else chosen.set(opt.c, { qty: defaultQty(opt.u), d: opt.d, u: opt.u });
           renderSheet();
         },
-        oncontextmenu: (e) => e.preventDefault(),
+        // Right-click with a mouse edits the wording. On touch screens the long press
+        // (below) does it – phones also send a context menu on long press, so ignore that one.
+        onpointerdown: (e) => { toggle.dataset.pointer = e.pointerType; },
+        oncontextmenu: (e) => {
+          e.preventDefault();
+          if (toggle.dataset.pointer !== 'touch') editWording(opt);
+        },
       },
       h('span', { class: 'works-tick', 'aria-hidden': 'true' }, on ? '✓' : ''),
       h('span', { class: 'defect-text' },
@@ -458,7 +464,7 @@ export function featureList({ job, room, kind, library, onChange = () => {} }) {
         h('p', { class: 'hint' }, prefill
           ? `m² / m are pre-filled from the room size (${prefill}) – change them as needed. `
           : 'Tick each defect and enter the quantity. ',
-        'Press and hold a defect to change its wording – it’s remembered for next time.'),
+        'Press and hold a defect (right-click on a computer) to change its wording – it’s remembered for next time.'),
         listEl,
         textField('Notes', notes, (v) => { notes = v; }, { multiline: true, autocapitalize: 'sentences', placeholder: 'Anything the contractor should know' }),
         h('span', { class: 'field-label' }, 'Photos'),
