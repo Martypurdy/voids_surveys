@@ -208,17 +208,99 @@ export function photoField(job, list, onChange = () => {}) {
 
   grid.append(...list.map(thumbButton));
 
-  return h('div', { class: 'photo-field' },
+  const field = h('div', { class: 'photo-field' },
     h('div', { class: 'photo-actions' },
       h('button', { type: 'button', class: 'add-photos', onclick: addPhotos }, icon(ICONS.camera), ' Add photos')),
     pickInput,
     camInput,
     status,
     grid);
+  field.takePhotos = takePhotos; // used by photoButton
+  return field;
 }
 
 /** Load photo records for ids, skipping missing ones. */
 export async function loadPhotos(ids) {
   if (!ids.length) return [];
   return (await getPhotos(ids)).filter(Boolean);
+}
+
+/**
+ * Compact camera button for a row (sits next to a tick or quantity box).
+ * Tap: take photos straight away. Turns green with a count once photos are taken.
+ * Long press (touch) or right-click: a pop-up to view, delete or upload photos.
+ *
+ * @param {object} job
+ * @param {string[]} list  the photos array – mutated in place
+ * @param {() => void} [onChange]
+ */
+export function photoButton(job, list, onChange = () => {}, { label = 'Photos' } = {}) {
+  const count = h('span', { class: 'photo-btn-count' });
+  const btn = h('button', { type: 'button', class: 'photo-btn' }, icon(ICONS.camera), count);
+  const render = () => {
+    btn.dataset.has = String(list.length > 0);
+    count.textContent = list.length ? String(list.length) : '';
+    const n = list.length;
+    btn.setAttribute('aria-label', `${label}: ${n ? `${n} photo${n === 1 ? '' : 's'}` : 'none yet'}. Tap to take photos, hold to view or edit.`);
+    btn.title = 'Tap to take photos · hold (or right-click) to view or edit';
+  };
+  const changed = () => { render(); onChange(); };
+  // A hidden photo field does the capturing and saving.
+  const field = photoField(job, list, changed);
+
+  // ----- Long press / right-click: photo pop-up -----
+  let timer = null;
+  let opened = 0;
+  const openPopup = () => {
+    opened = Date.now();
+    navigator.vibrate?.(15);
+    // Lifting the finger after a long press sends a tap to whatever is now under it
+    // (the pop-up) – ignore taps for a moment so it doesn't close straight away.
+    const swallow = (e) => { e.stopPropagation(); e.preventDefault(); };
+    document.addEventListener('click', swallow, true);
+    setTimeout(() => document.removeEventListener('click', swallow, true), 700);
+    const inner = photoField(job, list, changed);
+    let untrack = () => {};
+    const close = () => {
+      if (!pop.isConnected) return;
+      pop.remove();
+      untrack();
+      render();
+    };
+    const pop = h('div', {
+      class: 'photo-pop',
+      role: 'dialog',
+      'aria-modal': 'true',
+      'aria-label': label,
+      onclick: (e) => { if (e.target === pop) close(); },
+    },
+    h('div', { class: 'photo-pop-card' },
+      h('div', { class: 'photo-pop-head' }, h('strong', null, label),
+        h('button', { type: 'button', class: 'btn-primary', onclick: close }, 'Done')),
+      list.length ? h('p', { class: 'hint' }, 'Tap a photo to view or delete it.') : null,
+      inner));
+    document.body.append(pop);
+    untrack = trackOverlay(() => { untrack = () => {}; close(); }); // phone back button
+  };
+  const cancel = () => { clearTimeout(timer); timer = null; };
+  btn.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    cancel();
+    timer = setTimeout(() => { timer = null; openPopup(); }, 550);
+  });
+  btn.addEventListener('pointerup', cancel);
+  btn.addEventListener('pointerleave', cancel);
+  btn.addEventListener('pointercancel', cancel);
+  btn.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    cancel();
+    if (Date.now() - opened > 800) openPopup(); // right-click (a long press has already opened it)
+  });
+  btn.addEventListener('click', () => {
+    if (Date.now() - opened < 800) return; // the long press opened the pop-up
+    field.takePhotos();
+  });
+
+  render();
+  return h('span', { class: 'photo-btn-wrap' }, btn, h('span', { hidden: true }, field));
 }

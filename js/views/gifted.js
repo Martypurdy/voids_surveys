@@ -3,7 +3,7 @@
 import { scheduleSave } from '../db.js';
 import { GIFT_ITEMS, isRtl } from '../model.js';
 import { h, multiSelect, worksButton, confirmDialog, toast, yesNo, textField } from '../ui.js';
-import { photoField } from '../photos.js';
+import { photoButton } from '../photos.js';
 import { loadJobOr404, jobChrome, completeFooter } from './chrome.js';
 
 const WHOLE = 'Whole property';
@@ -73,10 +73,9 @@ export default async function gifted(root, { id }) {
   let voucher = null;
   if (isRtl(job)) {
     const v = job.rtl.voucher;
-    const details = h('div', null,
-      textField('Value of voucher (£)', v.value, (x) => { v.value = x; save(); }, { inputmode: 'decimal', placeholder: 'e.g. 150' }),
-      h('span', { class: 'field-label' }, 'Voucher photos'),
-      photoField(job, v.photos));
+    const details = h('div', { class: 'inline-row inline-bottom' },
+      h('div', { class: 'inline-grow' }, textField('Value of voucher (£)', v.value, (x) => { v.value = x; save(); }, { inputmode: 'decimal', placeholder: 'e.g. 150' })),
+      photoButton(job, v.photos, () => {}, { label: 'Voucher photos' }));
     details.hidden = v.required !== 'yes';
     voucher = h('div', { class: 'card card-body' },
       h('span', { class: 'field-label' }, 'Is a decorating voucher required?'),

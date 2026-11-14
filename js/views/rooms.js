@@ -4,8 +4,9 @@
 import { scheduleSave, flushSave, deletePhotos } from '../db.js';
 import { newRoom, nextNumberedName, roomStatus, isRtl } from '../model.js';
 import { AREA_PRESETS, featuresOf } from '../data/features.js';
-import { h, icon, ICONS, confirmDialog, toast } from '../ui.js';
+import { h, icon, ICONS, confirmDialog, toast, worksButton } from '../ui.js';
 import { go } from '../router.js';
+import { photoButton } from '../photos.js';
 import { loadJobOr404, jobChrome, completeFooter } from './chrome.js';
 
 const NUMBERED = new Set(['Bedroom']);
@@ -47,9 +48,22 @@ export default async function rooms(root, { id, kind = 'rooms' }) {
   };
 
   const empty = h('p', { class: 'empty' }, `No ${noun}s yet. Tap a ${noun} type above to add it.`);
+  // Ready to let: one line per room – Works complete tick, camera, delete. No page to open.
+  const rtlRow = (room) => {
+    const slot = h('div', { class: 'inline-grow works-list', style: 'margin:0' });
+    const renderTick = () => slot.replaceChildren(worksButton(room.name || `Untitled ${noun}`,
+      room.done ? 'Works complete' : 'Tap when works are complete', Boolean(room.done), () => {
+        room.done = !room.done;
+        scheduleSave(job);
+        renderTick();
+      }));
+    renderTick();
+    return [slot, photoButton(job, room.photos, () => scheduleSave(job), { label: `${room.name || noun} photos` })];
+  };
+
   const render = () => {
-    list.replaceChildren(...areas.map((room) => h('div', { class: 'room-row' },
-      roomButton(room),
+    list.replaceChildren(...areas.map((room) => h('div', { class: rtl ? 'inline-row' : 'room-row' },
+      rtl ? rtlRow(room) : roomButton(room),
       h('button', {
         type: 'button',
         class: 'room-delete',
@@ -113,7 +127,7 @@ export default async function rooms(root, { id, kind = 'rooms' }) {
         h('div', { class: 'field' }, customInput),
         h('button', { type: 'button', onclick: addCustom }, 'Add')),
       h('h2', null, isRoom ? 'Rooms' : 'Areas'),
-      h('p', { class: 'hint' }, rtl ? 'Amber = not checked yet · Green = works complete' : 'Amber = not finished · Red = work needed · Green = all OK'),
+      h('p', { class: 'hint' }, rtl ? 'Tick each one when the works are complete – it turns green. Tap 📷 for photos; hold 📷 to view or edit them.' : 'Amber = not finished · Red = work needed · Green = all OK'),
       list,
       empty,
       completeFooter(job, kind)));

@@ -2,7 +2,7 @@
 import { scheduleSave, flushSave, deletePhotos } from '../db.js';
 import { newMeter, UTILITIES, HEATING_TYPES, serviceTitle, hasMeterDoor, isRtl } from '../model.js';
 import { h, textField, selectField, confirmDialog, multiSelect } from '../ui.js';
-import { photoField } from '../photos.js';
+import { photoButton } from '../photos.js';
 import { loadJobOr404, jobChrome, completeFooter } from './chrome.js';
 
 const DEFAULT_UTILITIES = new Set(UTILITIES);
@@ -89,14 +89,15 @@ export default async function meters(root, { id }) {
         removable
           ? selectField('Type', m.utility, UTILITIES.map((u) => [u, serviceTitle(u)]), (v) => { m.utility = v; sync(); save(); }, { placeholder: null })
           : null,
-        textField('Location', m.location, (v) => {
-          m.location = v;
-          sync();
-          save();
-        }, { placeholder: LOCATION_HINTS[m.utility] || 'e.g. Under-stairs cupboard', autocapitalize: 'sentences' }),
+        // Location with the camera on the same line (tap = take photos, hold = view / edit).
+        h('div', { class: 'inline-row inline-bottom' },
+          h('div', { class: 'inline-grow' }, textField('Location', m.location, (v) => {
+            m.location = v;
+            sync();
+            save();
+          }, { placeholder: LOCATION_HINTS[m.utility] || 'e.g. Under-stairs cupboard', autocapitalize: 'sentences' })),
+          photoButton(job, m.photos, sync, { label: `${serviceTitle(m.utility)} photos` })),
         doorBlock,
-        h('span', { class: 'field-label' }, 'Photos'),
-        photoField(job, m.photos, sync),
         removable
           ? h('div', { class: 'btn-row' },
             h('button', {
@@ -126,7 +127,7 @@ export default async function meters(root, { id }) {
       h('span', { class: 'works-tick', 'aria-hidden': 'true' }, leg.done ? '✓' : ''),
       h('span', { class: 'works-text' },
         h('span', { class: 'works-label' }, 'Legionella flush completed'),
-        h('span', { class: 'works-detail' }, leg.done ? 'Done – form left on site' : 'Tap to tick when done')));
+        h('span', { class: 'works-detail' }, leg.done ? 'Done – form left on site' : 'Tap to tick when done · 📷 photo the form')));
   };
   legBtn.addEventListener('click', () => {
     leg.done = !leg.done;
@@ -135,9 +136,7 @@ export default async function meters(root, { id }) {
   });
   renderLeg();
   const legionellaCard = h('div', { class: 'card card-body legionella' },
-    h('div', { class: 'works-list' }, legBtn),
-    h('span', { class: 'field-label' }, 'Photo of the legionella form'),
-    photoField(job, leg.photos, () => {}),
+    h('div', { class: 'inline-row', style: 'margin-bottom:12px' }, legBtn, photoButton(job, leg.photos, () => {}, { label: 'Legionella form photos' })),
     textField('Notes', leg.notes, (v) => { leg.notes = v; save(); },
       { multiline: true, autocapitalize: 'sentences', placeholder: 'Anything to note about the flush' }));
 
