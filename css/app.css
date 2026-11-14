@@ -779,3 +779,6 @@ body.no-scroll { overflow: hidden; }
 .demo-dots { display: flex; justify-content: center; gap: 6px; margin: 4px 0 8px; }
 .demo-dots span { width: 8px; height: 8px; border-radius: 50%; background: var(--border); }
 .demo-dots span.on { background: var(--primary); width: 22px; border-radius: 4px; }
+
+.addon-pill { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #7b3fc4; color: #fff; font-size: .68rem; font-weight: 800; letter-spacing: .03em; vertical-align: middle; }
+.intro-banner .addon-pill { align-self: flex-start; margin: 0 0 4px; }

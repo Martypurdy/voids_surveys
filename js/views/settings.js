@@ -1,4 +1,4 @@
-// Screen: settings, in three tabs –
+// Screen: settings, in three tabs (SOR library and Sync & sharing are proposed add-ons) –
 //   Sync & sharing  how data is stored today, and how connected storage would work (with a demo sign-in)
 //   Defect lists    this device's defect list for each room type and feature
 //   SOR library     load / remove the private SOR library on this device
@@ -10,10 +10,11 @@ import { refresh } from '../router.js';
 import { defectListEditor } from './defectLists.js';
 import { openSyncDemo } from './syncDemo.js';
 
+// Defect lists are part of the app; the other two are proposed add-on features.
 const TABS = [
-  ['sync', 'Sync & sharing'],
-  ['defects', 'Defect lists'],
-  ['sor', 'SOR library'],
+  ['defects', 'Defect lists', false],
+  ['sor', 'SOR library', true],
+  ['sync', 'Sync & sharing', true],
 ];
 const LAST_TAB = 'voids.settingsTab';
 
@@ -21,19 +22,27 @@ export default async function settings(root, { tab } = {}) {
   if (!TABS.some(([k]) => k === tab)) {
     let last = null;
     try { last = localStorage.getItem(LAST_TAB); } catch { /* storage blocked */ }
-    tab = TABS.some(([k]) => k === last) ? last : 'sync';
+    tab = TABS.some(([k]) => k === last) ? last : 'defects';
   }
   try { localStorage.setItem(LAST_TAB, tab); } catch { /* storage blocked */ }
   const lib = await getLibrary();
 
   const nav = h('nav', { class: 'tabs', 'aria-label': 'Settings sections' },
-    TABS.map(([k, label]) => h('a', {
+    TABS.map(([k, label, addOn]) => h('a', {
       href: `#/settings/${k}`,
       'aria-current': k === tab ? 'page' : null,
-    }, label)));
+    }, label, addOn ? h('span', { class: 'addon-pill' }, 'Add-on') : null)));
 
   const body = tab === 'defects' ? defectsTab(lib) : tab === 'sor' ? sorTab(lib) : syncTab();
   root.append(pageHeader('Settings', { back: '#/' }), nav, h('div', { class: 'content' }, body));
+}
+
+/** "Proposed add-on" banner at the top of an add-on tab. */
+function proposal(title, text) {
+  return h('div', { class: 'intro-banner' },
+    h('span', { class: 'addon-pill' }, 'Proposed add-on'),
+    h('strong', null, title),
+    h('span', null, text));
 }
 
 // ---------- Sync & sharing ----------
@@ -47,9 +56,8 @@ function syncTab() {
     h('ul', { class: 'intro-list' }, points.map((p) => h('li', null, p))));
 
   return [
-    h('div', { class: 'intro-banner' },
-      h('strong', null, 'Not switched on yet'),
-      h('span', null, 'This page explains what connected storage would add if the app is adopted. Today everything stays on this device.')),
+    proposal('Sync & sharing across devices and teams',
+      'An optional extra that could be added if the app is adopted. It isn’t switched on – today everything stays on this device.'),
 
     h('h2', null, 'How your data is stored today'),
     h('div', { class: 'card card-body' },
@@ -162,6 +170,8 @@ function sorTab(lib) {
       h('button', { type: 'button', class: 'btn-primary btn-block btn-big', onclick: () => fileInput.click() }, 'Load SOR library file'));
 
   return [
+    proposal('SOR integration',
+      'An optional extra for organisations that hold a Schedule of Rates licence. The app works fully without it.'),
     h('h2', null, 'SOR library'),
     h('div', { class: 'card card-body intro-card' },
       h('p', null, 'A Schedule of Rates (SOR) is the priced list of standard repair items that contractors work to. Loading your organisation’s licensed SOR links each defect to its SOR code.'),
@@ -173,7 +183,13 @@ function sorTab(lib) {
       h('h3', null, 'Without one'),
       h('p', { class: 'hint' }, 'The app works fully using its built-in defect wording – no codes are shown. Useful for demonstrations.'),
       h('h3', null, 'Licensing'),
-      h('p', { class: 'hint' }, 'SOR content is licensed, so it is never part of the app or website. The library file (sor-library.json) is supplied separately to licensed users and is stored only on the device it is loaded on. It holds codes and descriptions – no prices.')),
+      h('p', { class: 'hint' }, 'SOR content is licensed, so it is never part of the app or website. The library file (sor-library.json) is supplied separately to licensed users and is stored only on the device it is loaded on. It holds codes and descriptions – no prices.'),
+      h('h3', null, 'How it would be added'),
+      h('ul', { class: 'intro-list' },
+        h('li', null, 'The organisation confirms its SOR licence covers use in the app.'),
+        h('li', null, 'A library file is prepared from the organisation’s own SOR, with the defect lists matched to its codes.'),
+        h('li', null, 'Licensed users load it here – or, with the Sync & sharing add-on, it reaches every licensed user automatically.'))),
+    h('h2', null, 'Load a library (licensed users)'),
     status,
     fileInput,
     h('h3', null, 'How to load it'),
