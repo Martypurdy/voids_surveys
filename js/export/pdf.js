@@ -248,7 +248,7 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
   const fobDefect = [...job.rooms, ...job.externals, job.security].filter(Boolean)
     .some((r) => Object.values(r.parts || {}).some((p) => (p.defects || []).some((d) => d.id === 'CDR-13' || /fob/i.test(d.d || ''))));
   if (locks.includes('Communal key')) {
-    alerts.push({ level: 'red', text: 'COMMUNAL KEY REQUIRED - must be arranged before the property is handed over.' });
+    alerts.push({ level: 'red', text: 'Communal keys required – Operative must arrange keys to be cut or communal lock change with manager before works are complete.' });
   }
   if (locks.includes('Communal fob') || fobDefect) {
     alerts.push({ level: 'amber', text: 'COMMUNAL FOB REQUIRED - arrange with the fob team before the property is handed over.' });

@@ -41,7 +41,7 @@ export default async function security(root, { id }) {
       w.cylinders?.includes('Communal key')
         ? h('div', { class: 'alert-box', role: 'alert' },
           h('strong', null, '⚠ ACTION REQUIRED'),
-          h('span', null, 'Communal key required – must be arranged before handover. Flagged in red on the PDF report.'))
+          h('span', null, 'Communal keys required – Operative must arrange keys to be cut or communal lock change with manager before works are complete.'))
         : '',
       w.cylinders?.includes('Communal fob')
         ? h('div', { class: 'alert-box alert-amber', role: 'alert' },
