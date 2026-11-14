@@ -456,6 +456,16 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
   const secWorks = worksSummary(job.works, 'security');
   const hasKeySafe = ks.location || ks.code || ks.lat != null || ks.photos.length;
   const secChecked = job.security && featuresOf(job.security, 'security').some((f) => job.security.parts?.[f.key]?.state);
+  if (rtl && hasKeySafe) {
+    heading('Key safe');
+    kv([
+      ['Location', ks.location],
+      ['Code', ks.code ? (includeCode ? ks.code : 'Withheld from this report') : 'Not recorded'],
+      ['GPS', ks.lat != null ? `${ks.lat}, ${ks.lng}${ks.accuracy != null ? ` (±${ks.accuracy} m)` : ''}` : ''],
+    ]);
+    await photoGrid(ks.photos);
+    y += 2;
+  }
   if (!rtl && (secWorks.length || hasKeySafe || secChecked)) {
     heading('Security');
     for (const [label, detail] of secWorks) {

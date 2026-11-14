@@ -12,7 +12,11 @@ import { loadJobOr404, jobChrome, completeFooter } from './chrome.js';
 export default async function security(root, { id }) {
   const job = await loadJobOr404(id);
   if (isRtl(job)) {
-    root.append(...jobChrome(job, 'security'), h('div', { class: 'content' }, rtlKeysSection(job), completeFooter(job, 'security')));
+    root.append(...jobChrome(job, 'security'), h('div', { class: 'content' },
+      h('h2', null, 'Key safe'),
+      h('div', { class: 'card card-body works-panel keysafe-panel' }, keySafeSection(job)),
+      rtlKeysSection(job),
+      completeFooter(job, 'security')));
     return;
   }
   const w = job.works;
