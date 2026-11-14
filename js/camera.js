@@ -24,12 +24,13 @@ const recall = (k) => { try { return localStorage.getItem(k); } catch { return n
 
 /**
  * Open the camera full screen.
- * @param {{ onCapture: (blob: Blob) => void, onNative?: () => void }} opts
+ * @param {{ onCapture: (blob: Blob) => void, onNative?: () => void, onGallery?: () => void }} opts
  *   onCapture – called for every shot; onNative – called (inside a tap) when the
- *   user chooses the phone's own camera app instead.
+ *   user chooses the phone's own camera app instead; onGallery – called (inside a tap)
+ *   when the user taps "Gallery" to upload photos already on the device.
  * @returns {Promise<{ count: number, error?: Error }>} when closed
  */
-export function openCamera({ onCapture, onNative }) {
+export function openCamera({ onCapture, onNative, onGallery }) {
   return new Promise((resolve) => {
     let stream = null;
     let track = null;
@@ -55,10 +56,14 @@ export function openCamera({ onCapture, onNative }) {
     const message = h('div', { class: 'cam-message', hidden: true, role: 'status' });
     const shutter = h('button', { type: 'button', class: 'cam-shutter', 'aria-label': 'Take photo', onclick: snap });
     const doneBtn = h('button', { type: 'button', class: 'cam-done', onclick: () => close() }, 'Done');
+    // Upload photos already on the phone: closes the camera and opens the gallery picker.
+    const galleryBtn = onGallery
+      ? h('button', { type: 'button', class: 'cam-torch cam-gallery', onclick: () => { close(); onGallery(); } }, '🖼 Gallery')
+      : null;
 
     const overlay = h('div', { class: 'camera', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Camera' },
       video, flash, message,
-      h('div', { class: 'cam-top' }, counter, torchBtn),
+      h('div', { class: 'cam-top' }, counter, h('div', { class: 'cam-top-btns' }, galleryBtn, torchBtn)),
       h('div', { class: 'cam-bottom' },
         zoomBar,
         h('div', { class: 'cam-controls' }, lastThumb, shutter, doneBtn)));

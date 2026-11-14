@@ -132,7 +132,7 @@ export function photoField(job, list, onChange = () => {}) {
 
   const takePhotos = async () => {
     if (!cameraSupported()) return camInput.click();
-    const { error } = await openCamera({ onCapture: saveShot, onNative: () => camInput.click() });
+    const { error } = await openCamera({ onCapture: saveShot, onNative: () => camInput.click(), onGallery: () => pickInput.click() });
     if (error) {
       console.warn(error);
       // A fresh tap is needed before the browser will open the phone's camera app.
@@ -143,6 +143,7 @@ export function photoField(job, list, onChange = () => {}) {
           : 'The camera couldn’t be started. You can use the phone’s camera app instead.',
         buttons: [
           { label: '📷 Use phone camera app', value: 'native', class: 'btn-primary btn-big', onClick: () => camInput.click() },
+          { label: '🖼 Upload from phone', value: 'upload', class: 'btn-big', onClick: () => pickInput.click() },
           { label: 'Cancel', value: null },
         ],
       });
@@ -215,7 +216,9 @@ export function photoField(job, list, onChange = () => {}) {
     camInput,
     status,
     grid);
-  field.takePhotos = takePhotos; // used by photoButton
+  // Used by photoButton: straight to the in-app camera (which has a Gallery button),
+  // or – if this phone can't run it – the Take photos / Upload from phone choice.
+  field.quickAdd = () => (cameraSupported() ? takePhotos() : addPhotos());
   return field;
 }
 
@@ -298,7 +301,7 @@ export function photoButton(job, list, onChange = () => {}, { label = 'Photos' }
   });
   btn.addEventListener('click', () => {
     if (Date.now() - opened < 800) return; // the long press opened the pop-up
-    field.takePhotos();
+    field.quickAdd();
   });
 
   render();
