@@ -15,6 +15,7 @@ const TABS = [
   ['defects', 'Defect lists', false],
   ['sor', 'SOR library', true],
   ['sync', 'Sync & sharing', true],
+  ['rollout', 'Company roll-out', true],
 ];
 const LAST_TAB = 'voids.settingsTab';
 
@@ -33,7 +34,7 @@ export default async function settings(root, { tab } = {}) {
       'aria-current': k === tab ? 'page' : null,
     }, label, addOn ? h('span', { class: 'addon-pill' }, 'Add-on') : null)));
 
-  const body = tab === 'defects' ? defectsTab(lib) : tab === 'sor' ? sorTab(lib) : syncTab();
+  const body = tab === 'defects' ? defectsTab(lib) : tab === 'sor' ? sorTab(lib) : tab === 'rollout' ? rolloutTab() : syncTab();
   root.append(pageHeader('Settings', { back: '#/' }), nav, h('div', { class: 'content' }, body));
 }
 
@@ -110,6 +111,54 @@ function syncTab() {
 
     h('button', { type: 'button', class: 'btn-primary btn-block btn-big', onclick: openSyncDemo }, 'See how sign-in would look (demo)'),
     h('p', { class: 'footnote' }, 'The demo is a mock-up only – nothing is sent or saved.'),
+  ];
+}
+
+// ---------- Company roll-out ----------
+function rolloutTab() {
+  const benefit = (emoji, title, text) => h('li', { class: 'intro-benefit' },
+    h('span', { class: 'intro-benefit-icon', 'aria-hidden': 'true' }, emoji),
+    h('span', null, h('strong', null, title), h('br'), text));
+  return [
+    proposal('Company-wide roll-out through Company Portal',
+      'How the app could be offered to staff on work iPhones, iPads and Android devices – with no app store involved.'),
+
+    h('h2', null, 'What Company Portal is'),
+    h('div', { class: 'card card-body intro-card' },
+      h('p', null, 'Company Portal is the company’s own “app store” on work phones and tablets. It lists the apps IT has approved, and staff install them with one tap. It is managed by IT through Microsoft Intune.'),
+      h('p', null, 'Because this is a web app, IT can add it to Company Portal as a ', h('strong', null, 'web link'), ' – there is nothing to package, no Apple or Google approval and no store fees.')),
+
+    h('h2', null, 'Why it suits this app'),
+    h('ul', { class: 'intro-benefits' },
+      benefit('📲', 'One-tap install', 'Staff find it in Company Portal and tap Install – the app icon appears on their home screen.'),
+      benefit('🔄', 'Always up to date', 'Updates reach every device the next time the app opens. No re-installs, no version clashes.'),
+      benefit('🎯', 'Given to the right people', 'IT chooses who sees it – a pilot group first, then the voids team, then wider teams.'),
+      benefit('🔐', 'Under company control', 'IT can remove it from a device when someone leaves or a device is lost.'),
+      benefit('💷', 'No cost to deploy', 'No app store accounts, developer fees or packaging work.'),
+      benefit('📴', 'Works offline', 'Once opened it works on site with no signal, exactly as it does now.')),
+
+    h('h2', null, 'Suggested roll-out'),
+    h('ol', { class: 'intro-steps' },
+      guideStep(1, 'Pilot', 'Two or three surveyors use it on live voids for about four weeks and give feedback.'),
+      guideStep(2, 'Voids team', 'Offered to the whole voids team, with standard defect lists and materials agreed by the team.'),
+      guideStep(3, 'Wider teams', 'Repairs, planned maintenance, surveyors and trades – with new form templates added for their work.'),
+      guideStep(4, 'Partners', 'Contractors or other organisations can use it free from the web link, or through their own Company Portal.')),
+
+    h('h2', null, 'What IT would need'),
+    h('div', { class: 'card card-body intro-card' },
+      h('ul', { class: 'intro-list' },
+        h('li', null, h('strong', null, 'App link: '), location.origin + location.pathname.replace(/index\.html$/, '')),
+        h('li', null, h('strong', null, 'Name, icon and short description'), ' for the Company Portal listing.'),
+        h('li', null, h('strong', null, 'Which groups'), ' should see it (pilot group first).'),
+        h('li', null, h('strong', null, 'A quick security check'), ' of the app and its privacy note.')),
+      h('p', { class: 'hint' }, 'Adding a web link takes IT a few minutes. Shared storage and company sign-in are a separate step – see the Sync & sharing add-on.')),
+
+    h('h2', null, 'Good to know'),
+    h('div', { class: 'card card-body' },
+      h('ul', { class: 'intro-list' },
+        h('li', null, 'Surveys stay on each device, as now, until the Sync & sharing add-on is switched on.'),
+        h('li', null, 'The SOR library is never included – licensed users load it separately (see the SOR library add-on).'),
+        h('li', null, 'Staff can still use the web link on personal or non-managed devices if the company allows it.'))),
   ];
 }
 
