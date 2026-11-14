@@ -1,5 +1,5 @@
 // PDF report (jsPDF, loaded on demand from /vendor).
-import { addressLines, jobTitle, fmtDate, fmtDateTime, slug, todayLocal, allPhotoIds, worksSummary, roomStatus, roomAreas, serviceTitle, hasMeterDoor } from '../model.js';
+import { addressLines, jobTitle, fmtDate, fmtDateTime, slug, todayLocal, allPhotoIds, worksSummary, roomStatus, roomAreas, serviceTitle, hasMeterDoor, isRtl, formOf } from '../model.js';
 import { UNITS, defectInfo, isSorCode, qtyText as unitQty } from '../data/parts.js';
 import { FEATURES, featuresOf } from '../data/features.js';
 import { loadPhotos, resizeImage } from '../photos.js';
@@ -27,7 +27,7 @@ function loadJsPDF() {
 }
 
 export function pdfFilename(job) {
-  return `Empty home inspection - ${slug(jobTitle(job))} - ${todayLocal()}.pdf`;
+  return `${formOf(job).file} - ${slug(jobTitle(job))} - ${todayLocal()}.pdf`;
 }
 
 // The built-in PDF fonts only cover Latin-1, so normalise common "smart" characters.
@@ -41,6 +41,7 @@ const clean = (v) => String(v ?? '')
 const COND_RGB = {
   Good: [30, 125, 58], Fair: [168, 107, 0], Poor: [179, 38, 30], 'N/A': [107, 116, 128],
   'No work': [30, 125, 58], 'Work needed': [198, 40, 40], 'Not finished': [200, 130, 0],
+  'Works complete': [30, 125, 58], 'Not complete': [200, 130, 0],
 };
 const BRAND = [31, 95, 139];
 
@@ -50,6 +51,7 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
   // SOR codes are printed only while an SOR library is loaded on this device.
   const showCodes = Boolean(await getLibrary());
   const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
+  const rtl = isRtl(job); // Ready to let form
 
   const W = 210, H = 297, M = 15, CW = W - 2 * M, BOTTOM = H - M - 6;
   let y = M;
@@ -232,6 +234,12 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
     heading(title);
     for (const [i, room] of areas.entries()) {
       if (i) divider();
+      if (rtl) {
+        roomTitle(room.name || 'Untitled', room.done ? 'Works complete' : 'Not complete');
+        await photoGrid(room.photos);
+        y += 2;
+        continue;
+      }
       roomTitle(room.name || 'Untitled', areaBadge(room, kind));
       const a = roomAreas(room.size);
       if (kind === 'rooms' && a.ceiling) para(`Size ${room.size.length} x ${room.size.width} x ${room.size.height} m  -  ceiling/floor ${a.ceiling} m², walls ${a.walls} m², skirting ${a.perimeter} m`, { size: 9, rgb: [90, 98, 106] });
@@ -247,10 +255,10 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
   const locks = job.works.cylinders || [];
   const fobDefect = [...job.rooms, ...job.externals, job.security].filter(Boolean)
     .some((r) => Object.values(r.parts || {}).some((p) => (p.defects || []).some((d) => d.id === 'CDR-13' || /fob/i.test(d.d || ''))));
-  if (locks.includes('Communal key')) {
+  if (!rtl && locks.includes('Communal key')) {
     alerts.push({ level: 'red', text: 'Communal keys required – Operative must arrange keys to be cut or communal lock change with manager before works are complete.' });
   }
-  if (locks.includes('Communal fob') || fobDefect) {
+  if (!rtl && (locks.includes('Communal fob') || fobDefect)) {
     alerts.push({ level: 'amber', text: 'COMMUNAL FOB REQUIRED - arrange with the fob team before the property is handed over.' });
   }
   const ALERT_COLOURS = {
@@ -342,7 +350,7 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
   // ---------- cover ----------
   onProgress('Building report…');
   font(20, 'bold', BRAND);
-  doc.text('Empty Home Inspection', M, y + 7);
+  doc.text(formOf(job).pdfTitle, M, y + 7);
   font(9, 'bold', [120, 128, 136]);
   doc.text('PropertyPad', W - M, y + 6, { align: 'right' });
   y += 13;
@@ -382,8 +390,20 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
     const need = areas.filter((r, i) => st[i].works).map((r) => r.name);
     if (need.length) kv([['Work needed in', need.join(', ')]]);
   };
-  summarise('Rooms', job.rooms, 'rooms');
-  summarise('Outside areas', job.externals, 'externals');
+  const summariseRtl = (label, areas) => {
+    if (!areas.length) return;
+    const open = areas.filter((r) => !r.done).map((r) => r.name);
+    y += 2;
+    kv([[label, `${areas.length} checked - ${areas.length - open.length} works complete${open.length ? `, ${open.length} not complete` : ''}`]]);
+    if (open.length) kv([['Not complete', open.join(', ')]]);
+  };
+  if (rtl) {
+    summariseRtl('Rooms', job.rooms);
+    summariseRtl('Outside areas', job.externals);
+  } else {
+    summarise('Rooms', job.rooms, 'rooms');
+    summarise('Outside areas', job.externals, 'externals');
+  }
   if (alerts.length) {
     y += 3;
     alerts.forEach(alertBox);
@@ -392,8 +412,9 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
   // ---------- sections ----------
   // Same order as the app's tabs: property, security, services, rooms, externals.
   const prop = job.property;
-  const works = worksSummary(job.works, 'property');
-  if (prop.type || prop.style || prop.bedrooms || prop.storeys || prop.floor || prop.notes || works.length || otherPropertyPhotos.length) {
+  const works = rtl ? [] : worksSummary(job.works, 'property');
+  const rtlChecks = rtl ? [['Clearance', job.rtl.clearance], ['Cleaning', job.rtl.cleaning]] : [];
+  if (rtlChecks.some(([, c]) => c.done || c.notes) || prop.type || prop.style || prop.bedrooms || prop.storeys || prop.floor || prop.notes || works.length || otherPropertyPhotos.length) {
     heading('Property');
     kv([
       ['Type', prop.type],
@@ -411,13 +432,18 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
         y += 0.8;
       }
     }
+    for (const [label, c] of rtlChecks) {
+      y += 2;
+      subheading(label);
+      kv([['Completed', c.done ? 'Yes' : 'Not ticked'], ['Notes', c.notes]]);
+    }
     await photoGrid(otherPropertyPhotos);
     y += 2;
   }
 
   if (job.keys.length) {
-    heading('Key register');
-    keyTable(job.keys);
+    heading(rtl ? 'Keys' : 'Key register');
+    keyTable(job.keys, rtl);
     for (const k of job.keys) {
       if (!k.photos.length) continue;
       subheading(`Photos - ${k.keySet || 'key set'}`);
@@ -430,7 +456,7 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
   const secWorks = worksSummary(job.works, 'security');
   const hasKeySafe = ks.location || ks.code || ks.lat != null || ks.photos.length;
   const secChecked = job.security && featuresOf(job.security, 'security').some((f) => job.security.parts?.[f.key]?.state);
-  if (secWorks.length || hasKeySafe || secChecked) {
+  if (!rtl && (secWorks.length || hasKeySafe || secChecked)) {
     heading('Security');
     for (const [label, detail] of secWorks) {
       para(`-  ${label}${detail ? `: ${detail}` : ''}`, { size: 10.5 });
@@ -492,14 +518,38 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
 
   // ----- Gifted items (left for the incoming tenant) -----
   const gifts = Object.entries(job.gifted?.selected || {}).filter(([, rooms]) => rooms.length);
+  const voucher = rtl ? job.rtl.voucher : null;
+  if (voucher?.required) {
+    heading('Decorating voucher');
+    kv([
+      ['Required', voucher.required === 'yes' ? 'Yes' : 'No'],
+      ['Value', voucher.required === 'yes' && voucher.value ? `£${voucher.value}` : ''],
+    ]);
+    if (voucher.required === 'yes') await photoGrid(voucher.photos);
+    y += 2;
+  }
   if (gifts.length) {
     heading('Gifted items');
     para('Items left for the incoming tenant.', { size: 9, rgb: [90, 98, 106] });
     y += 1;
     kv(gifts.map(([item, rooms]) => [item, rooms.join(', ')]), { labelW: 48 });
   }
-  scheduleSection();
-  materialsSection();
+  if (rtl) {
+    // ----- Sign off: appliances to be maintained -----
+    const ap = job.rtl.appliances;
+    if (ap.any || ap.notes || ap.photos.length) {
+      heading('Sign off');
+      kv([
+        ['Appliances to be maintained', ap.any === 'yes' ? 'Yes' : ap.any === 'no' ? 'No' : ''],
+        ['Appliances', ap.any === 'yes' ? ap.list.join(', ') : ''],
+        ['Notes', ap.notes],
+      ], { labelW: 60 });
+      await photoGrid(ap.photos);
+    }
+  } else {
+    scheduleSection();
+    materialsSection();
+  }
 
   // ---------- footers ----------
   const pages = doc.getNumberOfPages();
@@ -514,10 +564,10 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
   return doc.output('blob');
 
   // ---------- key table (hoisted) ----------
-  function keyTable(keys) {
-    const cols = [
-      ['Key set', 52], ['Qty', 12], ['Received from', 40], ['Issued to', 40], ['Date', 36],
-    ];
+  function keyTable(keys, simple = false) {
+    const cols = simple
+      ? [['Key type', 120], ['Quantity', 60]]
+      : [['Key set', 52], ['Qty', 12], ['Received from', 40], ['Issued to', 40], ['Date', 36]];
     const pad = 1.5, size = 9, lh = lineH(size);
     const drawRow = (cells, { header = false } = {}) => {
       font(size, header ? 'bold' : 'normal');
@@ -544,7 +594,7 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
       y += rowH;
     };
     drawRow(cols.map((c) => c[0]), { header: true });
-    for (const k of keys) drawRow([k.keySet, k.quantity, k.receivedFrom, k.issuedTo, fmtDate(k.date)]);
+    for (const k of keys) drawRow(simple ? [k.keySet, k.quantity] : [k.keySet, k.quantity, k.receivedFrom, k.issuedTo, fmtDate(k.date)]);
     y += 4;
   }
 }

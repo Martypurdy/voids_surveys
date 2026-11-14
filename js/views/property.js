@@ -3,7 +3,7 @@
 import { scheduleSave } from '../db.js';
 import {
   PROPERTY_TYPES, PROPERTY_STYLES,
-  CLEARANCE_OPTIONS, CLEARANCE_HINTS, CLEARANCE_BY,
+  CLEARANCE_OPTIONS, CLEARANCE_HINTS, CLEARANCE_BY, isRtl,
 } from '../model.js';
 import { h, textField, selectField, multiSelect, worksButton } from '../ui.js';
 import { photoField } from '../photos.js';
@@ -66,6 +66,16 @@ export default async function property(root, { id }) {
   };
   renderList();
 
+  // Ready to let: clearance and cleaning are each a Yes tick with notes.
+  const rtlCheck = (key, label) => {
+    const c = job.rtl[key];
+    const slot = h('div', { class: 'works-list' });
+    const render = () => slot.replaceChildren(worksButton(label, c.done ? 'Yes' : 'Tap to tick', c.done, () => { c.done = !c.done; save(); render(); }));
+    render();
+    return [slot, textField('Notes', c.notes, (v) => { c.notes = v; save(); }, { multiline: true, autocapitalize: 'sentences' })];
+  };
+  const rtl = isRtl(job);
+
   root.append(
     ...jobChrome(job, 'property'),
     h('div', { class: 'content' },
@@ -81,7 +91,9 @@ export default async function property(root, { id }) {
       h('p', { class: 'hint' }, 'The first photo appears at the top of the PDF report.'),
       photoField(job, p.photos),
 
-      h('h2', null, 'Clearance / clean'),
-      list,
+      rtl ? [
+        h('h2', null, 'Clearance'), ...rtlCheck('clearance', 'Clearance completed'),
+        h('h2', null, 'Cleaning'), ...rtlCheck('cleaning', 'Cleaning completed'),
+      ] : [h('h2', null, 'Clearance / clean'), list],
       completeFooter(job, 'property')));
 }

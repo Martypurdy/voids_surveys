@@ -38,6 +38,35 @@ export const SECTIONS = [
   ['materials', 'Materials', 'materials'],
 ];
 
+// ----- Forms -----
+// 'void' = Empty home inspection (the original survey); 'rtl' = Ready to let.
+// Ready to let shares the Address, Property, Security, Services, Rooms, Externals and
+// Gifted items tabs (each showing its own, simpler content) and ends with Sign off.
+export const FORMS = {
+  void: { title: 'Empty home inspection', pdfTitle: 'Empty Home Inspection', file: 'Empty home inspection' },
+  rtl: { title: 'Ready to let', pdfTitle: 'Ready to Let Inspection', file: 'Ready to let' },
+};
+const RTL_SECTIONS = [...SECTIONS.slice(0, 7), ['signoff', 'Sign off', 'signoff']];
+export const isRtl = (job) => job.form === 'rtl';
+/** The tabs for this job's form. */
+export const sectionsOf = (job) => (isRtl(job) ? RTL_SECTIONS : SECTIONS);
+export const formOf = (job) => FORMS[job.form] || FORMS.void;
+
+/** Ready to let: key types to record (fobs count as communal key / fob). */
+export const RTL_KEY_TYPES = ['Front door', 'Back door', 'Patio door', 'French doors', 'Window keys', 'Shed', 'Gate', 'Garage', 'Post box', 'Meter box', 'Communal key / fob'];
+/** Ready to let: appliances that may need maintaining. */
+export const APPLIANCES = ['Cooker', 'Oven', 'Hob', 'Cooker hood / extractor', 'Fridge', 'Freezer', 'Fridge freezer', 'Washing machine', 'Tumble dryer', 'Dishwasher', 'Microwave', 'Gas fire', 'Electric fire', 'Electric shower', 'Stairlift', 'Through-floor lift', 'Hoist', 'Specialist bath'];
+
+/** Ready to let extras. Rooms / outside areas use room.done (works complete). */
+export function newRtl() {
+  return {
+    clearance: { done: false, notes: '' },
+    cleaning: { done: false, notes: '' },
+    voucher: { required: '', value: '', photos: [] }, // required: '' | 'yes' | 'no'
+    appliances: { any: '', list: [], notes: '', photos: [] }, // any: '' | 'yes' | 'no'
+  };
+}
+
 export const PROPERTY_TYPES = ['House', 'Flat', 'Bungalow', 'Maisonette', 'Bedsit', 'Other'];
 export const PROPERTY_STYLES = ['Detached', 'Semi-detached', 'Mid-terrace', 'End-terrace'];
 
@@ -82,10 +111,16 @@ export function worksSummary(w, which = 'all') {
 
 /** Section progress: undefined (not started) | 'started' | 'complete'. */
 export const sectionState = (job, key) => job.progress?.[key];
-export const completedCount = (job) => SECTIONS.filter(([k]) => job.progress?.[k] === 'complete').length;
+export const completedCount = (job) => sectionsOf(job).filter(([k]) => job.progress?.[k] === 'complete').length;
 
 /** Bring a job saved by an older version up to the current shape (in place). */
 export function upgradeJob(job) {
+  job.form ??= 'void';
+  if (isRtl(job)) {
+    const d = newRtl();
+    job.rtl = { ...d, ...(job.rtl || {}) };
+    for (const k of Object.keys(d)) job.rtl[k] = { ...d[k], ...(job.rtl[k] || {}) };
+  }
   normalizeAddress(job.address);
   job.progress ??= {};
   job.property = { ...newProperty(), ...(job.property || {}) };
@@ -136,10 +171,12 @@ export function todayLocal() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-export function newJob({ surveyor = '' } = {}) {
+export function newJob({ surveyor = '', form = 'void' } = {}) {
   const t = nowISO();
   return {
     schema: SCHEMA,
+    form,
+    ...(form === 'rtl' ? { rtl: newRtl() } : {}),
     id: uid(),
     created: t,
     updated: t,
@@ -271,6 +308,8 @@ export function photoLists(job) {
     job.keySafe.photos,
     ...job.meters.map((x) => x.photos),
     job.legionella?.photos || [],
+    job.rtl?.voucher?.photos || [],
+    job.rtl?.appliances?.photos || [],
   ];
 }
 

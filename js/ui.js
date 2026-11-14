@@ -153,6 +153,27 @@ export function worksButton(label, detail, on, onclick, { chevron, ...attrs } = 
   chevron ? h('span', { class: 'works-chevron', 'aria-hidden': 'true' }, chevron) : null);
 }
 
+/**
+ * Yes / No question buttons. value: '' | 'yes' | 'no'; tapping the selected answer clears it.
+ * onChange(newValue) is called after each tap.
+ */
+export function yesNo(label, value, onChange) {
+  const group = h('div', { class: 'segmented yes-no yes-no-plain', role: 'group', 'aria-label': label });
+  let v = value;
+  const render = () => group.replaceChildren(...[['yes', 'Yes'], ['no', 'No']].map(([k, text]) => h('button', {
+    type: 'button',
+    dataset: { v: k },
+    'aria-pressed': String(v === k),
+    onclick: () => {
+      v = v === k ? '' : k;
+      render();
+      onChange(v);
+    },
+  }, text)));
+  render();
+  return group;
+}
+
 export function badge(condition) {
   return condition ? h('span', { class: 'badge', dataset: { v: condition } }, condition) : null;
 }

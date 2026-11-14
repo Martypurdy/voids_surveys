@@ -1,8 +1,9 @@
 // Screen: gifted items – things left for the incoming tenant (carpets, blinds…).
 // Tap an item, pick the rooms / areas it applies to; it turns green. Add your own items.
 import { scheduleSave } from '../db.js';
-import { GIFT_ITEMS } from '../model.js';
-import { h, multiSelect, worksButton, confirmDialog, toast } from '../ui.js';
+import { GIFT_ITEMS, isRtl } from '../model.js';
+import { h, multiSelect, worksButton, confirmDialog, toast, yesNo, textField } from '../ui.js';
+import { photoField } from '../photos.js';
 import { loadJobOr404, jobChrome, completeFooter } from './chrome.js';
 
 const WHOLE = 'Whole property';
@@ -67,9 +68,30 @@ export default async function gifted(root, { id }) {
   own.addEventListener('keydown', (e) => { if (e.key === 'Enter') addOwn(); });
 
   render();
+
+  // Ready to let: decorating voucher – required? then its value and photos.
+  let voucher = null;
+  if (isRtl(job)) {
+    const v = job.rtl.voucher;
+    const details = h('div', null,
+      textField('Value of voucher (£)', v.value, (x) => { v.value = x; save(); }, { inputmode: 'decimal', placeholder: 'e.g. 150' }),
+      h('span', { class: 'field-label' }, 'Voucher photos'),
+      photoField(job, v.photos));
+    details.hidden = v.required !== 'yes';
+    voucher = h('div', { class: 'card card-body' },
+      h('span', { class: 'field-label' }, 'Is a decorating voucher required?'),
+      yesNo('Decorating voucher required?', v.required, (x) => {
+        v.required = x;
+        details.hidden = x !== 'yes';
+        save();
+      }),
+      details);
+  }
+
   root.append(
     ...jobChrome(job, 'gifted'),
     h('div', { class: 'content' },
+      voucher ? [h('h2', null, 'Decorating voucher'), voucher] : null,
       h('h2', null, 'Gifted items'),
       h('p', { class: 'hint' }, 'Items left for the incoming tenant. Tap an item and choose the rooms it applies to – selected items turn green.'),
       list,

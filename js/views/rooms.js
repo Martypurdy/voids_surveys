@@ -2,7 +2,7 @@
 // Add from presets or a custom name; each is a button coloured by progress
 // (amber = not finished, red = needs work, green = all OK) with a delete button.
 import { scheduleSave, flushSave, deletePhotos } from '../db.js';
-import { newRoom, nextNumberedName, roomStatus } from '../model.js';
+import { newRoom, nextNumberedName, roomStatus, isRtl } from '../model.js';
 import { AREA_PRESETS, featuresOf } from '../data/features.js';
 import { h, icon, ICONS, confirmDialog, toast } from '../ui.js';
 import { go } from '../router.js';
@@ -26,8 +26,13 @@ export default async function rooms(root, { id, kind = 'rooms' }) {
   const noun = isRoom ? 'room' : 'area';
   const list = h('div', { class: 'works-list' });
 
+  const rtl = isRtl(job);
+  // Ready to let: green once "Works complete" is ticked, amber until then.
+  const rtlState = (room) => (room.done ? 'ok' : 'todo');
+  const rtlSummary = (room) => [room.done ? 'Works complete' : 'Tap to check', room.photos.length ? `📷 ${room.photos.length}` : ''].filter(Boolean).join(' · ');
+
   const roomButton = (room) => {
-    const s = roomStatus(room, featuresOf(room, kind));
+    const s = rtl ? { state: rtlState(room) } : roomStatus(room, featuresOf(room, kind));
     return h('button', {
       type: 'button',
       class: 'works-item room-item',
@@ -37,7 +42,7 @@ export default async function rooms(root, { id, kind = 'rooms' }) {
     h('span', { class: 'works-tick', 'aria-hidden': 'true' }, s.state === 'ok' ? '✓' : s.state === 'attention' ? '!' : ''),
     h('span', { class: 'works-text' },
       h('span', { class: 'works-label' }, room.name || `Untitled ${noun}`),
-      h('span', { class: 'works-detail' }, roomSummary(room, kind))),
+      h('span', { class: 'works-detail' }, rtl ? rtlSummary(room) : roomSummary(room, kind))),
     h('span', { class: 'works-chevron', 'aria-hidden': 'true' }, '›'));
   };
 
@@ -108,7 +113,7 @@ export default async function rooms(root, { id, kind = 'rooms' }) {
         h('div', { class: 'field' }, customInput),
         h('button', { type: 'button', onclick: addCustom }, 'Add')),
       h('h2', null, isRoom ? 'Rooms' : 'Areas'),
-      h('p', { class: 'hint' }, 'Amber = not finished · Red = work needed · Green = all OK'),
+      h('p', { class: 'hint' }, rtl ? 'Amber = not checked yet · Green = works complete' : 'Amber = not finished · Red = work needed · Green = all OK'),
       list,
       empty,
       completeFooter(job, kind)));

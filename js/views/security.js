@@ -1,7 +1,8 @@
 // Screen: security – key safe (with its details always shown), gain entry, renew
 // locks, then the external doors and window security as features (OK / defects).
 import { scheduleSave } from '../db.js';
-import { CYLINDER_OPTIONS, CYLINDER_DEFAULT } from '../model.js';
+import { CYLINDER_OPTIONS, CYLINDER_DEFAULT, isRtl } from '../model.js';
+import { rtlKeysSection } from './keysRtl.js';
 import { getLibrary } from '../sor.js';
 import { h, multiSelect, worksButton } from '../ui.js';
 import { keySafeSection } from './keySafe.js';
@@ -10,6 +11,10 @@ import { loadJobOr404, jobChrome, completeFooter } from './chrome.js';
 
 export default async function security(root, { id }) {
   const job = await loadJobOr404(id);
+  if (isRtl(job)) {
+    root.append(...jobChrome(job, 'security'), h('div', { class: 'content' }, rtlKeysSection(job), completeFooter(job, 'security')));
+    return;
+  }
   const w = job.works;
   const library = await getLibrary();
   const save = () => scheduleSave(job);

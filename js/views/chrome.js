@@ -2,7 +2,7 @@
 // and the "Mark complete" footer. Opening a section marks it started (amber);
 // the footer button marks it complete (green) and moves to the next section.
 import { getJob, scheduleSave, flushSave } from '../db.js';
-import { SECTIONS, jobTitle, sectionState } from '../model.js';
+import { sectionsOf, jobTitle, sectionState } from '../model.js';
 import { h, icon, ICONS, pageHeader, toast, scrollTabs } from '../ui.js';
 import { jobActions } from './jobActions.js';
 import { go } from '../router.js';
@@ -18,7 +18,7 @@ const sectionHref = (job, path) => `#/job/${job.id}${path ? '/' + path : ''}`;
 function tabs(job, active) {
   const nav = h('nav', { class: 'tabs', 'aria-label': 'Survey sections' });
   const render = () => {
-    nav.replaceChildren(...SECTIONS.map(([key, label, path]) => {
+    nav.replaceChildren(...sectionsOf(job).map(([key, label, path]) => {
       const state = sectionState(job, key) || 'todo';
       return h('a', {
         href: sectionHref(job, path),
@@ -60,6 +60,7 @@ export function jobChrome(job, section, { back = '#/', title } = {}) {
 /** Big button at the bottom of each section: mark complete / reopen. */
 // check(): optional – return false (or a promise of false) to stop the section being marked complete.
 export function completeFooter(job, section, { check } = {}) {
+  const SECTIONS = sectionsOf(job);
   const idx = SECTIONS.findIndex(([k]) => k === section);
   const label = SECTIONS[idx][1];
   const wrap = h('div', { class: 'complete-footer' });

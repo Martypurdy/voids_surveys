@@ -984,6 +984,10 @@ body.no-scroll { overflow: hidden; }
 .yes-no { grid-template-columns: 1fr 1fr; }
 .yes-no button[aria-pressed="true"][data-v="yes"] { background: var(--poor); }
 .yes-no button[aria-pressed="true"][data-v="no"] { background: var(--good); }
+.yes-no-plain button[aria-pressed="true"][data-v="yes"],
+.yes-no-plain button[aria-pressed="true"][data-v="no"] { background: var(--primary); }
+.rtl-key { margin-bottom: 0; }
+.rtl-key .works-panel { margin: 0; }
 
 /* Drag-and-drop ordering of defect lists */
 .drag-handle { flex: none; display: grid; place-items: center; width: 40px; min-height: 44px; font-size: 1.4rem; line-height: 1; color: var(--muted); cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; border-radius: 8px; }

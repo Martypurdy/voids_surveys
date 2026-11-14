@@ -1,6 +1,6 @@
 // Screen: services – heating, fuse board, stop tap & meters – heating type (pop-up), then each meter's location and photos.
 import { scheduleSave, flushSave, deletePhotos } from '../db.js';
-import { newMeter, UTILITIES, HEATING_TYPES, serviceTitle, hasMeterDoor } from '../model.js';
+import { newMeter, UTILITIES, HEATING_TYPES, serviceTitle, hasMeterDoor, isRtl } from '../model.js';
 import { h, textField, selectField, confirmDialog, multiSelect } from '../ui.js';
 import { photoField } from '../photos.js';
 import { loadJobOr404, jobChrome, completeFooter } from './chrome.js';
@@ -144,8 +144,8 @@ export default async function meters(root, { id }) {
   root.append(
     ...jobChrome(job, 'meters'),
     h('div', { class: 'content' },
-      h('h2', null, 'Heating'),
-      h('div', { class: 'works-list' }, heatingBtn),
+      // Heating type isn't needed on the Ready to let form.
+      isRtl(job) ? null : [h('h2', null, 'Heating'), h('div', { class: 'works-list' }, heatingBtn)],
       h('h2', null, 'Fuse board, stop tap & meters'),
       container,
       h('button', {

@@ -18,6 +18,7 @@ route('/job/:id/externals/:roomId', () => import('./views/room.js'), { kind: 'ex
 route('/job/:id/meters', () => import('./views/meters.js'));
 route('/job/:id/gifted', () => import('./views/gifted.js'));
 route('/job/:id/materials', () => import('./views/materials.js'));
+route('/job/:id/signoff', () => import('./views/signoff.js'));
 
 start(document.getElementById('app'));
 

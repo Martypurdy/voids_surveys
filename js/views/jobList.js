@@ -1,7 +1,7 @@
 // Screen 1: home – branded header, quick stats, start a new form, and the
 // surveys on this device (search / filter once there are a few).
 import { listJobs, saveJob, requestPersist, storageInfo } from '../db.js';
-import { newJob, jobTitle, backupStatus, fmtDate, allPhotoIds, SECTIONS, completedCount, sectionState } from '../model.js';
+import { newJob, jobTitle, backupStatus, fmtDate, allPhotoIds, sectionsOf, completedCount, sectionState, formOf, isRtl } from '../model.js';
 import { h, icon, ICONS } from '../ui.js';
 import { go, refresh } from '../router.js';
 import { jobActions } from './jobActions.js';
@@ -19,15 +19,15 @@ function logo() {
 }
 const FILTER_KEY = 'voids.homeFilter';
 
-/** Forms the app offers. Only the void survey exists so far; the rest show what's planned. */
+/** Forms the app offers (form = the job's form key); the rest show what's planned. */
 const FORMS = [
-  { key: 'void', emoji: '🏠', title: 'Empty home inspection', text: 'Rooms, defects, security, services, materials and a PDF report.', ready: true },
-  { key: 'handover', emoji: '🔑', title: 'Ready to let', text: 'Works check, final readings, keys and sign-off.' },
+  { key: 'void', form: 'void', emoji: '🏠', title: 'Empty home inspection', text: 'Rooms, defects, security, services, materials and a PDF report.', ready: true },
+  { key: 'handover', form: 'rtl', emoji: '🔑', title: 'Ready to let', text: 'Works complete check, keys, services, gifted items and sign off.', ready: true },
   { key: 'repair', emoji: '🛠️', title: 'Repair job sheet', text: 'Job details, materials used, photos and completion.' },
   { key: 'inspect', emoji: '📋', title: 'Property inspection', text: 'Tenancy, estate and compliance inspections.' },
 ];
 
-const isDone = (job) => completedCount(job) === SECTIONS.length;
+const isDone = (job) => completedCount(job) === sectionsOf(job).length;
 
 function greeting() {
   const hr = new Date().getHours();
@@ -79,7 +79,7 @@ export default async function jobList(root) {
   const formCard = (f) => h(f.ready ? 'button' : 'div', {
     type: f.ready ? 'button' : null,
     class: `form-card${f.ready ? ' form-card-ready' : ''}`,
-    onclick: f.ready ? createJob : null,
+    onclick: f.ready ? () => createJob(f.form) : null,
     'aria-disabled': f.ready ? null : 'true',
   },
   h('span', { class: 'form-emoji', 'aria-hidden': 'true' }, f.emoji),
@@ -131,12 +131,12 @@ export default async function jobList(root) {
         : h('div', { class: 'home-empty' },
           h('span', { 'aria-hidden': 'true' }, '📝'),
           h('strong', null, 'No surveys yet'),
-          h('span', null, 'Tap “Empty home inspection” above to start your first one.')),
+          h('span', null, 'Tap a form above to start your first one.')),
       footnote()));
 }
 
-async function createJob() {
-  const job = newJob({ surveyor: getLastSurveyor() });
+async function createJob(form) {
+  const job = newJob({ surveyor: getLastSurveyor(), form });
   await saveJob(job);
   // Ask the browser to keep our data (helps against eviction, esp. on iOS).
   requestPersist();
@@ -146,15 +146,16 @@ async function createJob() {
 function jobCard(job) {
   const status = backupStatus(job);
   const nPhotos = allPhotoIds(job).length;
+  const SECTIONS = sectionsOf(job);
   const done = completedCount(job);
   const state = done === SECTIONS.length ? 'done' : done || Object.keys(job.progress || {}).length ? 'progress' : 'new';
   const pct = Math.round((done / SECTIONS.length) * 100);
-  return h('div', { class: 'card job-card', dataset: { state } },
+  return h('div', { class: 'card job-card', dataset: { state, form: job.form || 'void' } },
     h('a', { href: `#/job/${job.id}` },
       h('div', { class: 'job-head' },
         h('div', { class: 'job-title' }, jobTitle(job)),
         h('span', { class: 'job-pill' }, state === 'done' ? '✓ Complete' : state === 'progress' ? 'In progress' : 'New')),
-      h('div', { class: 'job-sub' }, ['Empty home inspection', job.surveyor].filter(Boolean).join(' · ')),
+      h('div', { class: 'job-sub' }, [(isRtl(job) ? '🔑 ' : '🏠 ') + formOf(job).title, job.surveyor].filter(Boolean).join(' · ')),
       h('div', { class: 'job-progress' },
         h('div', { class: 'progress', 'aria-hidden': 'true' }, SECTIONS.map(([k]) => h('span', { dataset: { state: sectionState(job, k) || 'todo' } }))),
         h('span', { class: 'job-pct' }, `${pct}%`)),
