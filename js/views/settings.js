@@ -9,6 +9,7 @@ import { fmtDateTime } from '../model.js';
 import { refresh } from '../router.js';
 import { defectListEditor } from './defectLists.js';
 import { openSyncDemo } from './syncDemo.js';
+import { getTheme, setTheme } from '../theme.js';
 
 // Defect lists are part of the app; the other two are proposed add-on features.
 const TABS = [
@@ -36,7 +37,25 @@ export default async function settings(root, { tab } = {}) {
     }, label, addOn ? h('span', { class: 'addon-pill' }, 'Add-on') : null)));
 
   const body = tab === 'defects' ? defectsTab(lib) : tab === 'sor' ? sorTab(lib) : tab === 'rollout' ? rolloutTab() : tab === 'branding' ? brandingTab() : syncTab();
-  root.append(pageHeader('Settings', { back: '#/' }), nav, h('div', { class: 'content' }, body));
+  root.append(pageHeader('Settings', { back: '#/' }), appearance(), nav, h('div', { class: 'content' }, body));
+}
+
+/** Light / Dark / Auto switch, always at the top of Settings. */
+function appearance() {
+  const wrap = h('div', { class: 'segmented theme-switch', role: 'group', 'aria-label': 'Appearance' });
+  const render = () => {
+    const t = getTheme();
+    wrap.replaceChildren(...[['light', '☀️ Light'], ['dark', '🌙 Dark'], ['auto', '📱 Auto']].map(([v, label]) => h('button', {
+      type: 'button',
+      'aria-pressed': String(t === v),
+      onclick: () => { setTheme(v); render(); },
+    }, label)));
+  };
+  render();
+  return h('div', { class: 'theme-bar' },
+    h('span', { class: 'field-label' }, 'Appearance'),
+    wrap,
+    h('span', { class: 'theme-hint' }, 'Auto follows your phone’s light / dark setting.'));
 }
 
 /** Numbered step with a title and any content. */

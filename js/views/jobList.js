@@ -7,7 +7,16 @@ import { go, refresh } from '../router.js';
 import { jobActions } from './jobActions.js';
 import { getLastSurveyor } from '../surveyors.js';
 
-const LOGO = '<path d="M12 3 21 10h-3v10h-5v-6h-2v6H6V10H3z" fill="currentColor" stroke="none"/>';
+// App logo (house on a notepad), drawn on the white square in the header.
+const LOGO_SVG = '<svg viewBox="8 8 84 84" aria-hidden="true"><rect x="23" y="21" width="54" height="63" rx="7" fill="#eef4f9"/>'
+  + [33, 43, 53, 63].map((x) => `<rect x="${x}" y="14" width="5" height="14" rx="2.5" fill="#f2b233" stroke="#174a6d" stroke-width="1.5"/>`).join('')
+  + '<path d="M50 33 66 46h-4v13H38V46h-4z" fill="#1f5f8b"/><rect x="46.5" y="50" width="7" height="9" rx="1" fill="#eef4f9"/>'
+  + '<rect x="33" y="65" width="34" height="3.5" rx="1.75" fill="#9cc3dd"/><rect x="33" y="72" width="22" height="3.5" rx="1.75" fill="#9cc3dd"/></svg>';
+function logo() {
+  const el = h('span', { class: 'hero-logo' });
+  el.innerHTML = LOGO_SVG;
+  return el;
+}
 const FILTER_KEY = 'voids.homeFilter';
 
 /** Forms the app offers. Only the void survey exists so far; the rest show what's planned. */
@@ -52,7 +61,7 @@ export default async function jobList(root) {
     h('strong', null, String(n)), h('span', null, label));
   const hero = h('header', { class: 'hero' },
     h('div', { class: 'hero-top' },
-      h('span', { class: 'hero-logo', 'aria-hidden': 'true' }, icon(LOGO)),
+      logo(),
       h('div', { class: 'hero-brand' },
         h('h1', null, 'PropertyPad'),
         h('span', null, 'Surveys & site forms')),

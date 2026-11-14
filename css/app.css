@@ -23,7 +23,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+:root:not([data-theme="light"]) {
     --bg: #11161b;
     --surface: #1a2128;
     --surface-2: #232c35;
@@ -42,6 +42,24 @@
     --shadow: none;
   }
 }
+:root[data-theme="dark"] {
+    --bg: #11161b;
+    --surface: #1a2128;
+    --surface-2: #232c35;
+    --text: #e8edf2;
+    --muted: #9aa6b2;
+    --border: #33404c;
+    --primary: #5aa3d6;
+    --primary-ink: #0c1a24;
+    --danger: #ff8a80;
+    --warn-bg: #3a2f10;
+    --warn-ink: #ffd877;
+    --good: #5cc97c;
+    --fair: #f0b44c;
+    --poor: #ff8a80;
+    --na: #9aa6b2;
+    --shadow: none;
+  }
 
 * { box-sizing: border-box; }
 
@@ -166,7 +184,10 @@ input, select, textarea {
 textarea { min-height: 88px; resize: vertical; }
 /* Typing boxes: thin purple border until something is entered, then green. */
 :root { --input-todo: #7b3fc4; --input-done: #1e7d3a; }
-@media (prefers-color-scheme: dark) { :root { --input-todo: #b48cf2; --input-done: #5cc97c; } }
+@media (prefers-color-scheme: dark) {
+:root:not([data-theme="light"]) { --input-todo: #b48cf2; --input-done: #5cc97c; }
+}
+:root[data-theme="dark"] { --input-todo: #b48cf2; --input-done: #5cc97c; }
 input:is([type="text"], [type="search"], [type="number"], [type="tel"], [type="email"], :not([type])), textarea {
   border: 2px solid var(--input-todo);
 }
@@ -194,7 +215,10 @@ input:focus, select:focus, textarea:focus, button:focus-visible, .btn:focus-visi
 .segmented button[aria-pressed="true"][data-v="Fair"] { background: var(--fair); }
 .segmented button[aria-pressed="true"][data-v="Poor"] { background: var(--poor); }
 .segmented button[aria-pressed="true"][data-v="N/A"] { background: var(--na); }
-@media (prefers-color-scheme: dark) { .segmented button[aria-pressed="true"] { color: #10161b; } }
+@media (prefers-color-scheme: dark) {
+:root:not([data-theme="light"]) .segmented button[aria-pressed="true"] { color: #10161b; }
+}
+:root[data-theme="dark"] .segmented button[aria-pressed="true"] { color: #10161b; }
 
 /* ---------- Cards / lists ---------- */
 .card {
@@ -236,7 +260,10 @@ details.card[open] > summary { border-bottom: 1px solid var(--border); }
 .badge[data-v="Good"] { background: var(--good); }
 .badge[data-v="Fair"] { background: var(--fair); }
 .badge[data-v="Poor"] { background: var(--poor); }
-@media (prefers-color-scheme: dark) { .badge { color: #10161b; } }
+@media (prefers-color-scheme: dark) {
+:root:not([data-theme="light"]) .badge { color: #10161b; }
+}
+:root[data-theme="dark"] .badge { color: #10161b; }
 
 .job-card { display: flex; align-items: stretch; }
 .job-card > a {
@@ -361,7 +388,7 @@ dialog::backdrop { background: rgb(0 0 0 / .45); }
   --done-line: #1e7d3a;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+:root:not([data-theme="light"]) {
     --started-bg: #3d2c0c;
     --started-ink: #ffcc70;
     --started-line: #f0b44c;
@@ -370,6 +397,14 @@ dialog::backdrop { background: rgb(0 0 0 / .45); }
     --done-line: #5cc97c;
   }
 }
+:root[data-theme="dark"] {
+    --started-bg: #3d2c0c;
+    --started-ink: #ffcc70;
+    --started-line: #f0b44c;
+    --done-bg: #12351f;
+    --done-ink: #8ee0a6;
+    --done-line: #5cc97c;
+  }
 
 .tabs { gap: 4px; padding: 6px 6px 0; }
 .tabs a { border-radius: 8px 8px 0 0; padding: 12px 12px 10px; }
@@ -392,7 +427,10 @@ dialog::backdrop { background: rgb(0 0 0 / .45); }
   font-size: 1.05rem;
   font-weight: 700;
 }
-@media (prefers-color-scheme: dark) { .btn-complete { color: #0d2416; } }
+@media (prefers-color-scheme: dark) {
+:root:not([data-theme="light"]) .btn-complete { color: #0d2416; }
+}
+:root[data-theme="dark"] .btn-complete { color: #0d2416; }
 .complete-note { margin: 0 0 8px; padding: 10px 12px; border-radius: 10px; background: var(--done-bg); color: var(--done-ink); font-weight: 700; text-align: center; }
 
 .section-title { margin-top: 8px; }
@@ -547,7 +585,10 @@ body.no-scroll { overflow: hidden; }
 
 /* ---------- Rooms: room buttons, parts, defects sheet ---------- */
 :root { --attn-bg: #fde3e1; --attn-ink: #8c1d16; --attn-line: #c62828; }
-@media (prefers-color-scheme: dark) { :root { --attn-bg: #3d1513; --attn-ink: #ffb3ab; --attn-line: #ff6f61; } }
+@media (prefers-color-scheme: dark) {
+:root:not([data-theme="light"]) { --attn-bg: #3d1513; --attn-ink: #ffb3ab; --attn-line: #ff6f61; }
+}
+:root[data-theme="dark"] { --attn-bg: #3d1513; --attn-ink: #ffb3ab; --attn-line: #ff6f61; }
 
 .works-item[data-state="todo"], .works-item[data-state="started"] { background: var(--started-bg); border-color: var(--started-line); color: var(--started-ink); }
 .works-item[data-state="attention"] { background: var(--attn-bg); border-color: var(--attn-line); color: var(--attn-ink); }
@@ -882,3 +923,15 @@ body.no-scroll { overflow: hidden; }
 .bp-surveyor { display: flex; flex-direction: column; padding: 8px 10px; border-radius: 6px; background: #f4f0fb; border-left: 3px solid #7b3fc4; }
 .bp-sign { font-family: "Segoe Script", "Brush Script MT", cursive; font-size: 1rem; color: #1f3a8a; margin-top: 2px; }
 .bp-foot { margin-top: 6px; display: flex; justify-content: space-between; gap: 8px; padding-top: 6px; border-top: 1px solid #ddd; font-size: .58rem; color: #666; }
+
+/* Manual light / dark choice (Settings) – also switches built-in controls */
+:root[data-theme="dark"] { color-scheme: dark; }
+:root[data-theme="light"] { color-scheme: light; }
+
+/* Settings: appearance switch */
+.theme-bar { padding: 12px 16px 6px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.theme-switch { grid-template-columns: repeat(3, 1fr); margin-bottom: 4px; }
+.theme-switch button { min-height: 44px; }
+.theme-switch button[aria-pressed="true"] { background: var(--primary); color: var(--primary-ink); }
+.theme-hint { display: block; font-size: .78rem; color: var(--muted); }
+.hero-logo svg { width: 38px; height: 38px; }

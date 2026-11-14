@@ -1,6 +1,6 @@
 // Service worker: precache the app shell, serve it cache-first so the app works offline.
 // Bump VERSION whenever any file below changes, so devices pick up the update.
-const VERSION = 'v33';
+const VERSION = 'v34';
 const CACHE = `voids-${VERSION}`;
 
 const ASSETS = [
@@ -12,6 +12,7 @@ const ASSETS = [
   'icons/icon-180.png',
   'icons/icon-192.png',
   'icons/icon-512.png',
+  'icons/icon-maskable-512.png',
   'vendor/idb-keyval.js',
   'vendor/jspdf.umd.min.js',
   'vendor/pdf.min.js',
@@ -32,6 +33,7 @@ const ASSETS = [
   'js/defectOptions.js',
   'js/views/defectLists.js',
   'js/views/settings.js',
+  'js/theme.js',
   'js/views/syncDemo.js',
   'js/views/jobList.js',
   'js/views/jobActions.js',
