@@ -39,6 +39,7 @@ export function icon(d) {
 }
 
 export const ICONS = {
+  home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/>',
   back: '<path d="M15 18l-6-6 6-6"/>',
   camera: '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
   more: '<circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>',
@@ -53,6 +54,8 @@ export function pageHeader(title, { back, actions = [] } = {}) {
   return h('header', { class: 'appbar' },
     back ? h('a', { class: 'btn icon-btn', href: back, 'aria-label': 'Back' }, icon(ICONS.back)) : h('span', { style: 'width:8px' }),
     h('h1', null, title),
+    // Home: straight back to the front screen from anywhere (saves first – see router).
+    h('a', { class: 'btn icon-btn home-btn', href: '#/', 'aria-label': 'Home', title: 'Home' }, icon(ICONS.home)),
     actions);
 }
 
