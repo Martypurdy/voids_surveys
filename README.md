@@ -59,7 +59,7 @@ has **OK** (green, no work) or a **defects list** (red) with quantities, notes a
    Environmental, Pest control, and by Operatives / Contractor).
 4. **Security** – **Fit key safe** (on by default) with the key safe details always shown under it
    (location, code, GPS pin, photos), **Gain entry**, **Renew locks** (pop-up: Front door
-   pre-ticked, Back, Patio, Shed, Gate, Garage, Windows, Post box, Communal key / fob – pick any),
+   pre-ticked, Back, Patio, Shed, Gate, Garage, Windows, Post box, Communal key, Communal fob – pick any),
    then **Doors & windows** as features: Front door, Rear door, Patio / side door, Windows –
    security (+ Garage door, Communal entrance door…).
 5. **Services** – **Heating type** pop-up (Gas boiler, Electric heaters, Heat pump – pick any),
@@ -108,7 +108,8 @@ has **OK** (green, no work) or a **defects list** (red) with quantities, notes a
 survey only. **Phone back button:** closes a defects list (saving it), photo, camera or preview,
 otherwise goes back one screen – entries are saved as you type.
 
-**Communal key / fob:** if selected in *Renew locks*, a red **ACTION REQUIRED** box appears on
+**Communal key / Communal fob:** if selected in *Renew locks*, a **red** (key) or **amber** (fob)
+**ACTION REQUIRED** box appears on
 the Security screen and on the PDF cover and schedule of works.
 
 Surveys made with older versions keep any key register or meter readings they recorded; these

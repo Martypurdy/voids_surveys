@@ -212,26 +212,34 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
     }
   };
 
-  // ----- Must-action alerts (e.g. communal key / fob) – shown in a red box -----
+  // ----- Must-action alerts: communal key (red), communal fob (amber) -----
   const alerts = [];
-  const fobInLocks = job.works.cylinders?.includes('Communal key / fob');
+  const locks = job.works.cylinders || [];
   const fobDefect = [...job.rooms, ...job.externals, job.security].filter(Boolean)
     .some((r) => Object.values(r.parts || {}).some((p) => (p.defects || []).some((d) => d.id === 'CDR-13' || /fob/i.test(d.d || ''))));
-  if (fobInLocks || fobDefect) {
-    alerts.push('COMMUNAL KEY / FOB REQUIRED - must be arranged with the fob team before the property is handed over.');
+  if (locks.includes('Communal key')) {
+    alerts.push({ level: 'red', text: 'COMMUNAL KEY REQUIRED - must be arranged before the property is handed over.' });
   }
-  const alertBox = (text) => {
+  if (locks.includes('Communal fob') || fobDefect) {
+    alerts.push({ level: 'amber', text: 'COMMUNAL FOB REQUIRED - arrange with the fob team before the property is handed over.' });
+  }
+  const ALERT_COLOURS = {
+    red: { fill: [253, 227, 225], line: [198, 40, 40], title: [198, 40, 40], text: [140, 29, 22] },
+    amber: { fill: [255, 241, 214], line: [224, 155, 26], title: [176, 106, 0], text: [122, 72, 0] },
+  };
+  const alertBox = ({ level, text }) => {
+    const c = ALERT_COLOURS[level];
     font(10.5, 'bold');
     const lines = doc.splitTextToSize(clean(text), CW - 12);
     const hgt = lines.length * lineH(10.5) + 10;
     ensure(hgt + 4);
-    doc.setFillColor(253, 227, 225);
-    doc.setDrawColor(198, 40, 40);
+    doc.setFillColor(...c.fill);
+    doc.setDrawColor(...c.line);
     doc.setLineWidth(1);
     doc.roundedRect(M, y, CW, hgt, 2, 2, 'FD');
-    font(9, 'bold', [198, 40, 40]);
+    font(9, 'bold', c.title);
     doc.text('ACTION REQUIRED', M + 6, y + 5.5);
-    font(10.5, 'bold', [140, 29, 22]);
+    font(10.5, 'bold', c.text);
     lines.forEach((l, i) => doc.text(l, M + 6, y + 10 + i * lineH(10.5)));
     y += hgt + 4;
   };

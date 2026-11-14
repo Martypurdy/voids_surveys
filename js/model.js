@@ -46,7 +46,7 @@ export function newProperty() {
 }
 
 // ----- Works required (Property type screen) -----
-export const CYLINDER_OPTIONS = ['Front door', 'Back door', 'Patio door', 'Shed', 'Gate', 'Garage', 'Windows', 'Post box', 'Communal key / fob'];
+export const CYLINDER_OPTIONS = ['Front door', 'Back door', 'Patio door', 'Shed', 'Gate', 'Garage', 'Windows', 'Post box', 'Communal key', 'Communal fob'];
 export const CYLINDER_DEFAULT = ['Front door'];
 export const CLEARANCE_OPTIONS = ['Full clearance', 'Partial clearance', 'Needle sweep', 'Environmental', 'Pest control'];
 export const CLEARANCE_BY = ['Operatives', 'Contractor'];
@@ -88,6 +88,11 @@ export function upgradeJob(job) {
   job.property = { ...newProperty(), ...(job.property || {}) };
   if (!Array.isArray(job.property.photos)) job.property.photos = [];
   job.works = { ...newWorks(), ...(job.works || {}) };
+  // 'Communal key / fob' was split into two options – keep both selected.
+  const cyl = job.works.cylinders;
+  if (Array.isArray(cyl) && cyl.includes('Communal key / fob')) {
+    job.works.cylinders = [...new Set(cyl.flatMap((c) => (c === 'Communal key / fob' ? ['Communal key', 'Communal fob'] : [c])))];
+  }
   if (!Array.isArray(job.heating)) job.heating = [];
   // Older surveys: add Fuse board and Mains stop tap at the top of Services.
   for (const u of ['Mains stop tap', 'Fuse board']) {

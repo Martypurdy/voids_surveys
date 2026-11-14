@@ -727,3 +727,5 @@ body.no-scroll { overflow: hidden; }
   font-weight: 600;
 }
 .alert-box strong { letter-spacing: .03em; }
+.alert-box.alert-amber { border-color: var(--started-line); background: var(--started-bg); color: var(--started-ink); }
+.alert-box + .alert-box { margin-top: 8px; }

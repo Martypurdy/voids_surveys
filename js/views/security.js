@@ -37,11 +37,16 @@ export default async function security(root, { id }) {
           save();
           renderList();
         }, { chevron: '›' }),
-      // Must-action: communal keys / fobs are a constant hold-up at handover.
-      w.cylinders?.includes('Communal key / fob')
+      // Must-action: communal keys (red) and fobs (amber) are constant hold-ups at handover.
+      w.cylinders?.includes('Communal key')
         ? h('div', { class: 'alert-box', role: 'alert' },
           h('strong', null, '⚠ ACTION REQUIRED'),
-          h('span', null, 'Communal key / fob required – arrange with the fob team before handover. This is flagged in red on the PDF report.'))
+          h('span', null, 'Communal key required – must be arranged before handover. Flagged in red on the PDF report.'))
+        : '',
+      w.cylinders?.includes('Communal fob')
+        ? h('div', { class: 'alert-box alert-amber', role: 'alert' },
+          h('strong', null, '⚠ ACTION REQUIRED'),
+          h('span', null, 'Communal fob required – arrange with the fob team before handover. Flagged in amber on the PDF report.'))
         : '');
   };
   renderList();
