@@ -1,11 +1,31 @@
-// Screen 1: job list – create, open, actions (export / delete), import.
+// Screen 1: home – branded header, quick stats, start a new form, and the
+// surveys on this device (search / filter once there are a few).
 import { listJobs, saveJob, requestPersist, storageInfo } from '../db.js';
 import { newJob, jobTitle, backupStatus, fmtDate, allPhotoIds, SECTIONS, completedCount, sectionState } from '../model.js';
-import { h, icon, ICONS, pageHeader } from '../ui.js';
+import { h, icon, ICONS } from '../ui.js';
 import { go, refresh } from '../router.js';
 import { jobActions } from './jobActions.js';
-
 import { getLastSurveyor } from '../surveyors.js';
+
+const LOGO = '<path d="M12 3 21 10h-3v10h-5v-6h-2v6H6V10H3z" fill="currentColor" stroke="none"/>';
+const FILTER_KEY = 'voids.homeFilter';
+
+/** Forms the app offers. Only the void survey exists so far; the rest show what's planned. */
+const FORMS = [
+  { key: 'void', emoji: '🏠', title: 'Void property survey', text: 'Rooms, defects, security, services, materials and a PDF report.', ready: true },
+  { key: 'handover', emoji: '🔑', title: 'Handover / close-down', text: 'Works check, final readings, keys and sign-off.' },
+  { key: 'repair', emoji: '🛠️', title: 'Repair job sheet', text: 'Job details, materials used, photos and completion.' },
+  { key: 'inspect', emoji: '📋', title: 'Property inspection', text: 'Tenancy, estate and compliance inspections.' },
+];
+
+const isDone = (job) => completedCount(job) === SECTIONS.length;
+
+function greeting() {
+  const hr = new Date().getHours();
+  const part = hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening';
+  const first = getLastSurveyor().trim().split(/\s+/)[0];
+  return first ? `${part}, ${first}` : part;
+}
 
 export default async function jobList(root) {
   const jobs = await listJobs();
@@ -24,15 +44,85 @@ export default async function jobList(root) {
     },
   });
 
+  // ---------- Hero ----------
+  const inProgress = jobs.filter((j) => !isDone(j)).length;
+  const complete = jobs.length - inProgress;
+  const photos = jobs.reduce((n, j) => n + allPhotoIds(j).length, 0);
+  const stat = (n, label, kind) => h('div', { class: `hero-stat hero-stat-${kind}` },
+    h('strong', null, String(n)), h('span', null, label));
+  const hero = h('header', { class: 'hero' },
+    h('div', { class: 'hero-top' },
+      h('span', { class: 'hero-logo', 'aria-hidden': 'true' }, icon(LOGO)),
+      h('div', { class: 'hero-brand' },
+        h('h1', null, 'PropertyPad'),
+        h('span', null, 'Surveys & site forms')),
+      h('button', { type: 'button', class: 'hero-btn', onclick: () => importInput.click(), 'aria-label': 'Import a survey file' }, 'Import'),
+      importInput,
+      h('a', { class: 'hero-btn hero-icon', href: '#/settings', 'aria-label': 'Settings' }, icon(ICONS.settings))),
+    h('p', { class: 'hero-hello' }, greeting(), h('span', null,
+      new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }))),
+    h('div', { class: 'hero-stats' },
+      stat(inProgress, 'In progress', 'progress'),
+      stat(complete, 'Complete', 'done'),
+      stat(photos, `Photo${photos === 1 ? '' : 's'}`, 'photos')));
+
+  // ---------- New form ----------
+  const formCard = (f) => h(f.ready ? 'button' : 'div', {
+    type: f.ready ? 'button' : null,
+    class: `form-card${f.ready ? ' form-card-ready' : ''}`,
+    onclick: f.ready ? createJob : null,
+    'aria-disabled': f.ready ? null : 'true',
+  },
+  h('span', { class: 'form-emoji', 'aria-hidden': 'true' }, f.emoji),
+  h('span', { class: 'form-text' },
+    h('span', { class: 'form-title' }, f.title, f.ready ? null : h('span', { class: 'soon-pill' }, 'Coming soon')),
+    h('span', { class: 'form-desc' }, f.text)),
+  f.ready ? h('span', { class: 'form-go', 'aria-hidden': 'true' }, '+') : null);
+
+  // ---------- Surveys ----------
+  let filter = 'all';
+  try { filter = localStorage.getItem(FILTER_KEY) || 'all'; } catch { /* storage blocked */ }
+  let query = '';
+  const listEl = h('div', { class: 'job-list' });
+  const chipsEl = h('div', { class: 'chips home-chips', role: 'group', 'aria-label': 'Show surveys' });
+  const renderList = () => {
+    const q = query.trim().toLowerCase();
+    const shown = jobs.filter((j) => (filter === 'all' || (filter === 'done') === isDone(j))
+      && (!q || `${jobTitle(j)} ${j.address.text} ${j.surveyor}`.toLowerCase().includes(q)));
+    chipsEl.replaceChildren(...[['all', `All ${jobs.length}`], ['progress', `In progress ${inProgress}`], ['done', `Complete ${complete}`]]
+      .map(([k, label]) => h('button', {
+        type: 'button',
+        'aria-pressed': String(filter === k),
+        onclick: () => {
+          filter = k;
+          try { localStorage.setItem(FILTER_KEY, k); } catch { /* storage blocked */ }
+          renderList();
+        },
+      }, label)));
+    listEl.replaceChildren(...(shown.length ? shown.map(jobCard)
+      : [h('p', { class: 'empty' }, q ? 'No surveys match your search.' : 'Nothing here yet.')]));
+  };
+  const search = h('input', {
+    type: 'search',
+    placeholder: '🔍 Search by address or surveyor…',
+    'aria-label': 'Search surveys',
+    oninput: (e) => { query = e.target.value; renderList(); },
+  });
+  if (jobs.length) renderList();
+
   root.append(
-    pageHeader('PropertyPad', {
-      actions: [h('button', { type: 'button', class: 'btn btn-small', style: 'color:inherit;background:transparent;border-color:currentColor', onclick: () => importInput.click() }, 'Import'), importInput, h('a', { class: 'btn icon-btn', href: '#/settings', 'aria-label': 'Settings', style: 'color:inherit' }, icon(ICONS.settings))],
-    }),
-    h('div', { class: 'content' },
-      h('button', { type: 'button', class: 'btn btn-primary btn-block', onclick: createJob }, '+ New survey'),
+    hero,
+    h('div', { class: 'content home' },
+      h('h2', { class: 'home-h' }, 'Start a new form'),
+      h('div', { class: 'form-grid' }, FORMS.map(formCard)),
+
+      h('h2', { class: 'home-h' }, 'Your surveys'),
       jobs.length
-        ? h('div', { style: 'margin-top:16px' }, jobs.map(jobCard))
-        : h('p', { class: 'empty' }, 'No surveys yet. Tap “New survey” to start.'),
+        ? [jobs.length > 3 ? search : null, jobs.length > 1 ? chipsEl : null, listEl]
+        : h('div', { class: 'home-empty' },
+          h('span', { 'aria-hidden': 'true' }, '📝'),
+          h('strong', null, 'No surveys yet'),
+          h('span', null, 'Tap “Void property survey” above to start your first one.')),
       footnote()));
 }
 
@@ -46,18 +136,21 @@ async function createJob() {
 
 function jobCard(job) {
   const status = backupStatus(job);
-  const counts = [
-    `${job.rooms.length} room${job.rooms.length === 1 ? '' : 's'}`,
-    `${allPhotoIds(job).length} photo${allPhotoIds(job).length === 1 ? '' : 's'}`,
-  ].join(' · ');
+  const nPhotos = allPhotoIds(job).length;
   const done = completedCount(job);
-  const sub = [job.surveyor, `${done} of ${SECTIONS.length} sections complete`].filter(Boolean).join(' · ');
-  return h('div', { class: 'card job-card' },
+  const state = done === SECTIONS.length ? 'done' : done || Object.keys(job.progress || {}).length ? 'progress' : 'new';
+  const pct = Math.round((done / SECTIONS.length) * 100);
+  return h('div', { class: 'card job-card', dataset: { state } },
     h('a', { href: `#/job/${job.id}` },
-      h('div', { class: 'job-title' }, jobTitle(job)),
-      h('div', { class: 'job-sub' }, sub),
-      h('div', { class: 'progress', 'aria-hidden': 'true' }, SECTIONS.map(([k]) => h('span', { dataset: { state: sectionState(job, k) || 'todo' } }))),
-      h('div', { class: 'job-meta' }, `Created ${fmtDate(job.created)} · ${counts}`),
+      h('div', { class: 'job-head' },
+        h('div', { class: 'job-title' }, jobTitle(job)),
+        h('span', { class: 'job-pill' }, state === 'done' ? '✓ Complete' : state === 'progress' ? 'In progress' : 'New')),
+      h('div', { class: 'job-sub' }, ['Void survey', job.surveyor].filter(Boolean).join(' · ')),
+      h('div', { class: 'job-progress' },
+        h('div', { class: 'progress', 'aria-hidden': 'true' }, SECTIONS.map(([k]) => h('span', { dataset: { state: sectionState(job, k) || 'todo' } }))),
+        h('span', { class: 'job-pct' }, `${pct}%`)),
+      h('div', { class: 'job-meta' },
+        `📅 ${fmtDate(job.created)} · 🚪 ${job.rooms.length} room${job.rooms.length === 1 ? '' : 's'} · 📷 ${nPhotos}`),
       status.stale ? h('span', { class: 'warn' }, '⚠ ', status.text) : null),
     h('button', {
       type: 'button',
@@ -70,13 +163,13 @@ function jobCard(job) {
 }
 
 function footnote() {
-  const el = h('p', { class: 'footnote' }, 'All survey data is stored on this device only.');
+  const text = h('span', null, 'All survey data is stored on this device only.');
+  const el = h('div', { class: 'home-foot' }, h('span', { 'aria-hidden': 'true' }, '🔒'), text);
   storageInfo().then(({ persisted, usage }) => {
     const parts = ['All survey data is stored on this device only.'];
     if (usage != null) parts.push(`Using ${(usage / 1048576).toFixed(1)} MB.`);
-    parts.push(persisted ? 'Persistent storage granted.' : 'Back up regularly – the browser may clear data. Installing the app (Add to Home Screen) helps.');
-    el.textContent = parts.join(' ');
+    parts.push(persisted ? 'Protected storage is on.' : 'Back up regularly – installing the app (Add to Home screen) helps keep data safe.');
+    text.textContent = parts.join(' ');
   });
   return el;
 }
-
