@@ -53,6 +53,9 @@ export async function jobActions(job) {
     return null;
   }
 
+  if (action === 'pdf' && !job.legionella?.done
+    && !(await confirmDialog('Legionella flush not recorded – export anyway?', { ok: 'Export anyway' }))) return null;
+
   if (action === 'pdf') {
     const progress = busy('Building report…');
     try {

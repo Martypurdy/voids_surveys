@@ -117,6 +117,30 @@ export default async function meters(root, { id }) {
 
   container.append(...job.meters.map((m) => meterCard(m)));
 
+  // ----- Legionella flush: the paper form is left on site; tick it and photo the form -----
+  const leg = job.legionella;
+  const legBtn = h('button', { type: 'button', class: 'works-item legionella-tick' });
+  const renderLeg = () => {
+    legBtn.setAttribute('aria-pressed', String(leg.done));
+    legBtn.replaceChildren(
+      h('span', { class: 'works-tick', 'aria-hidden': 'true' }, leg.done ? '✓' : ''),
+      h('span', { class: 'works-text' },
+        h('span', { class: 'works-label' }, 'Legionella flush completed'),
+        h('span', { class: 'works-detail' }, leg.done ? 'Done – form left on site' : 'Tap to tick when done')));
+  };
+  legBtn.addEventListener('click', () => {
+    leg.done = !leg.done;
+    renderLeg();
+    save();
+  });
+  renderLeg();
+  const legionellaCard = h('div', { class: 'card card-body legionella' },
+    h('div', { class: 'works-list' }, legBtn),
+    h('span', { class: 'field-label' }, 'Photo of the legionella form'),
+    photoField(job, leg.photos, () => {}),
+    textField('Notes', leg.notes, (v) => { leg.notes = v; save(); },
+      { multiline: true, autocapitalize: 'sentences', placeholder: 'Anything to note about the flush' }));
+
   root.append(
     ...jobChrome(job, 'meters'),
     h('div', { class: 'content' },
@@ -136,5 +160,9 @@ export default async function meters(root, { id }) {
           card.scrollIntoView({ behavior: 'smooth', block: 'start' });
         },
       }, '+ Add another meter / service'),
-      completeFooter(job, 'meters')));
+      h('h2', null, 'Legionella flush'),
+      legionellaCard,
+      completeFooter(job, 'meters', {
+        check: () => leg.done || confirmDialog('The legionella flush isn’t ticked yet. Mark Services complete anyway?', { ok: 'Mark complete' }),
+      })));
 }

@@ -455,7 +455,8 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
   }
 
   const meters = job.meters.filter((m) => m.location || m.photos.length || m.serial || m.reading || m.type || m.supply || m.doorDamaged || m.notes);
-  if (meters.length || job.heating.length) {
+  const leg = job.legionella || { done: false, notes: '', photos: [] };
+  {
     heading('Services');
     kv([['Heating type', job.heating.join(', ')]]);
     for (const m of meters) {
@@ -476,6 +477,14 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
       await photoGrid(m.photos);
       y += 3;
     }
+    ensure(30);
+    subheading('Legionella flush');
+    kv([
+      ['Flush', leg.done ? 'Completed – form left on site' : 'Not recorded'],
+      ['Notes', leg.notes],
+    ]);
+    await photoGrid(leg.photos);
+    y += 3;
   }
 
   await roomsSection('Rooms', job.rooms, 'rooms');

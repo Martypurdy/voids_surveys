@@ -117,6 +117,8 @@ export function upgradeJob(job) {
     delete job.gifted.selected['Lamp shades'];
   }
   job.security.parts ??= {};
+  job.legionella = { ...newLegionella(), ...(job.legionella || {}) };
+  if (!Array.isArray(job.legionella.photos)) job.legionella.photos = [];
   return job;
 }
 
@@ -156,6 +158,7 @@ export function newJob({ surveyor = '' } = {}) {
     security: newRoom('Security', 'security'),
     gifted: newGifted(),
     meters: UTILITIES.map((u) => newMeter(u)),
+    legionella: newLegionella(),
   };
 }
 
@@ -221,6 +224,11 @@ export function newKeySafe() {
   return { location: '', code: '', lat: null, lng: null, accuracy: null, photos: [] };
 }
 
+/** Legionella flush: the paper form is left on site – tick it's done, photo the form, add notes. */
+export function newLegionella() {
+  return { done: false, notes: '', photos: [] };
+}
+
 export function newMeter(utility = 'Electric') {
   return {
     id: uid(),
@@ -262,6 +270,7 @@ export function photoLists(job) {
     ...job.keys.map((x) => x.photos),
     job.keySafe.photos,
     ...job.meters.map((x) => x.photos),
+    job.legionella?.photos || [],
   ];
 }
 

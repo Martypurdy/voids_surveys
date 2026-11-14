@@ -58,7 +58,8 @@ export function jobChrome(job, section, { back = '#/', title } = {}) {
 }
 
 /** Big button at the bottom of each section: mark complete / reopen. */
-export function completeFooter(job, section) {
+// check(): optional – return false (or a promise of false) to stop the section being marked complete.
+export function completeFooter(job, section, { check } = {}) {
   const idx = SECTIONS.findIndex(([k]) => k === section);
   const label = SECTIONS[idx][1];
   const wrap = h('div', { class: 'complete-footer' });
@@ -82,6 +83,7 @@ export function completeFooter(job, section) {
         type: 'button',
         class: 'btn-complete btn-block',
         onclick: async () => {
+          if (check && !(await check())) return;
           job.progress[section] = 'complete';
           scheduleSave(job, 0);
           await flushSave();
