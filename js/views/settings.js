@@ -203,7 +203,7 @@ function brandingTab() {
       h('li', { class: 'intro-benefit' }, h('span', { class: 'intro-benefit-icon', 'aria-hidden': 'true' }, '✉️'),
         h('span', null, h('strong', null, 'Shared files'), h('br'), 'Company name in PDF file names when reports are emailed or saved.')),
       h('li', { class: 'intro-benefit' }, h('span', { class: 'intro-benefit-icon', 'aria-hidden': 'true' }, '🧩'),
-        h('span', null, h('strong', null, 'Future forms'), h('br'), 'Handover, repair and inspection forms pick up the same branding automatically.'))),
+        h('span', null, h('strong', null, 'Future forms'), h('br'), 'Ready to let, repair and inspection forms pick up the same branding automatically.'))),
 
     h('h2', null, 'How it would be set up'),
     h('ol', { class: 'intro-steps' },

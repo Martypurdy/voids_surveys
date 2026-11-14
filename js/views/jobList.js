@@ -21,8 +21,8 @@ const FILTER_KEY = 'voids.homeFilter';
 
 /** Forms the app offers. Only the void survey exists so far; the rest show what's planned. */
 const FORMS = [
-  { key: 'void', emoji: '🏠', title: 'Void property survey', text: 'Rooms, defects, security, services, materials and a PDF report.', ready: true },
-  { key: 'handover', emoji: '🔑', title: 'Handover / close-down', text: 'Works check, final readings, keys and sign-off.' },
+  { key: 'void', emoji: '🏠', title: 'Empty home inspection', text: 'Rooms, defects, security, services, materials and a PDF report.', ready: true },
+  { key: 'handover', emoji: '🔑', title: 'Ready to let', text: 'Works check, final readings, keys and sign-off.' },
   { key: 'repair', emoji: '🛠️', title: 'Repair job sheet', text: 'Job details, materials used, photos and completion.' },
   { key: 'inspect', emoji: '📋', title: 'Property inspection', text: 'Tenancy, estate and compliance inspections.' },
 ];
@@ -131,7 +131,7 @@ export default async function jobList(root) {
         : h('div', { class: 'home-empty' },
           h('span', { 'aria-hidden': 'true' }, '📝'),
           h('strong', null, 'No surveys yet'),
-          h('span', null, 'Tap “Void property survey” above to start your first one.')),
+          h('span', null, 'Tap “Empty home inspection” above to start your first one.')),
       footnote()));
 }
 
