@@ -547,7 +547,8 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
   if (rtl) {
     // ----- Sign off: appliances to be maintained -----
     const ap = job.rtl.appliances;
-    if (ap.any || ap.notes || ap.photos.length) {
+    const sg = job.rtl.signature || {};
+    if (ap.any || ap.notes || ap.photos.length || sg.image || sg.name) {
       heading('Sign off');
       kv([
         ['Appliances to be maintained', ap.any === 'yes' ? 'Yes' : ap.any === 'no' ? 'No' : ''],
@@ -555,6 +556,22 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
         ['Notes', ap.notes],
       ], { labelW: 60 });
       await photoGrid(ap.photos);
+      if (sg.image || sg.name) {
+        y += 3;
+        ensure(50);
+        subheading('Signature');
+        if (sg.image) {
+          const p = doc.getImageProperties(sg.image);
+          const w = 75, hgt = Math.min(35, (w * p.height) / p.width);
+          doc.addImage(sg.image, 'PNG', M, y, (hgt * p.width) / p.height, hgt);
+          y += hgt + 2;
+          doc.setDrawColor(150, 160, 170);
+          doc.setLineWidth(0.3);
+          doc.line(M, y, M + w, y);
+          y += 4;
+        }
+        kv([['Name', sg.name], ['Signed', sg.date ? fmtDateTime(sg.date) : 'Not signed']]);
+      }
     }
   } else {
     scheduleSection();

@@ -3,7 +3,7 @@
 // the footer button marks it complete (green) and moves to the next section.
 import { getJob, scheduleSave, flushSave } from '../db.js';
 import { sectionsOf, jobTitle, sectionState } from '../model.js';
-import { h, icon, ICONS, pageHeader, toast, scrollTabs } from '../ui.js';
+import { h, icon, ICONS, pageHeader, toast, scrollTabs, choose } from '../ui.js';
 import { jobActions } from './jobActions.js';
 import { go } from '../router.js';
 
@@ -92,7 +92,21 @@ export function completeFooter(job, section, { check } = {}) {
           // Go to the next section that isn't complete yet (wrapping round), else back to jobs.
           const order = [...SECTIONS.slice(idx + 1), ...SECTIONS.slice(0, idx)];
           const next = order.find(([k]) => sectionState(job, k) !== 'complete');
-          go(next ? sectionHref(job, next[2]).slice(1) : '/');
+          if (next) return go(sectionHref(job, next[2]).slice(1));
+          // Everything is complete: offer to close the form (or export the report first).
+          const v = await choose({
+            title: '✓ All sections complete',
+            message: 'Everything on this form is complete. Do you want to close the form now?',
+            buttons: [
+              { label: 'Close form', value: 'close', class: 'btn-primary btn-big' },
+              { label: 'Export / share report', value: 'export', class: 'btn-big' },
+              { label: 'Stay on this page', value: null },
+            ],
+          });
+          if (v === 'close') return go('/');
+          if (v === 'export' && (await jobActions(job)) === 'deleted') return go('/');
+          document.querySelector('.tabs')?.refresh?.();
+          render();
         },
       }, `✓ Mark ${label} complete`));
   };

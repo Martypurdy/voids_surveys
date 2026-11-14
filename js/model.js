@@ -64,6 +64,7 @@ export function newRtl() {
     cleaning: { done: false, notes: '' },
     voucher: { required: '', value: '', photos: [] }, // required: '' | 'yes' | 'no'
     appliances: { any: '', list: [], notes: '', photos: [] }, // any: '' | 'yes' | 'no'
+    signature: { name: '', image: '', date: '' }, // image: PNG data URL; date: ISO time signed
   };
 }
 

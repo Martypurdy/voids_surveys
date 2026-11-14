@@ -1,8 +1,9 @@
 // Ready to let › Sign off: are there any appliances to be maintained? Yes pops up the
 // appliance list; then photos and notes.
 import { scheduleSave } from '../db.js';
-import { APPLIANCES } from '../model.js';
-import { h, multiSelect, worksButton, textField, yesNo } from '../ui.js';
+import { APPLIANCES, fmtDateTime, nowISO } from '../model.js';
+import { h, multiSelect, worksButton, textField, yesNo, confirmDialog } from '../ui.js';
+import { captureSignature } from '../signature.js';
 import { photoField } from '../photos.js';
 import { loadJobOr404, jobChrome, completeFooter } from './chrome.js';
 
@@ -46,6 +47,37 @@ export default async function signoff(root, { id }) {
   });
   render();
 
+  // ----- Signature: tap to sign full screen in landscape -----
+  const sig = job.rtl.signature;
+  const sigBox = h('div');
+  const sign = async () => {
+    const image = await captureSignature({ title: sig.name ? `Sign below – ${sig.name}` : 'Sign below' });
+    if (!image) return;
+    sig.image = image;
+    sig.date = nowISO();
+    scheduleSave(job, 0);
+    renderSig();
+  };
+  const renderSig = () => sigBox.replaceChildren(sig.image
+    ? h('div', null,
+      h('img', { class: 'sig-preview', src: sig.image, alt: 'Signature' }),
+      h('p', { class: 'hint' }, `✓ Signed ${fmtDateTime(sig.date)}`),
+      h('div', { class: 'btn-row' },
+        h('button', { type: 'button', onclick: sign }, '✍️ Sign again'),
+        h('button', {
+          type: 'button',
+          class: 'btn-danger',
+          onclick: async () => {
+            if (!(await confirmDialog('Remove this signature?', { ok: 'Remove' }))) return;
+            sig.image = '';
+            sig.date = '';
+            save();
+            renderSig();
+          },
+        }, 'Remove')))
+    : h('button', { type: 'button', class: 'btn-primary btn-big btn-block sig-start', onclick: sign }, '✍️ Tap to sign'));
+  renderSig();
+
   root.append(
     ...jobChrome(job, 'signoff'),
     h('div', { class: 'content' },
@@ -55,5 +87,10 @@ export default async function signoff(root, { id }) {
         question),
       listSlot,
       more,
+      h('h2', null, 'Signature'),
+      h('div', { class: 'card card-body' },
+        textField('Name', sig.name, (v) => { sig.name = v; save(); }, { autocapitalize: 'words', placeholder: 'Name of the person signing' }),
+        h('span', { class: 'field-label' }, 'Signature'),
+        sigBox),
       completeFooter(job, 'signoff')));
 }

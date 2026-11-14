@@ -1076,3 +1076,20 @@ body.no-scroll { overflow: hidden; }
 
 /* Torch on / off in the top bar: yellow while on */
 .torch-btn[aria-pressed="true"] { background: #ffd23f; color: #3a2a00; border-color: #ffd23f; box-shadow: 0 0 12px rgb(255 210 63 / .8); }
+
+/* Signature pad (full screen, landscape) */
+.sig-overlay { position: fixed; inset: 0; z-index: 90; background: #eef1f4; color: #111; }
+.sig-stage { position: absolute; top: 0; left: 0; width: 100vw; height: 100dvh; display: flex; flex-direction: column; gap: 8px; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); box-sizing: border-box; }
+/* Phone upright: draw the pad turned sideways so it reads as landscape when the phone is turned */
+.sig-rotated .sig-stage { width: 100dvh; height: 100vw; transform-origin: top left; transform: rotate(90deg) translateY(-100%); }
+.sig-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.sig-head strong { font-size: 1.15rem; }
+.sig-btns { display: flex; gap: 8px; }
+.sig-btns button { min-height: 44px; background: #fff; color: #111; border: 1px solid #c9d3dc; }
+.sig-btns .btn-primary { background: #1f5f8b; color: #fff; border-color: #1f5f8b; }
+.sig-pad { position: relative; flex: 1; min-height: 0; background: #fff; border: 2px solid #c9d3dc; border-radius: 12px; overflow: hidden; }
+.sig-canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+.sig-line { position: absolute; left: 6%; right: 6%; bottom: 26%; border-bottom: 2px dashed #a5b0bb; pointer-events: none; }
+.sig-line-hint { position: absolute; left: 6%; bottom: calc(26% + 8px); color: #a5b0bb; font-size: 1.1rem; pointer-events: none; }
+.sig-line-hint[hidden] { display: none; }
+.sig-preview { display: block; width: 100%; max-height: 160px; object-fit: contain; background: #fff; border: 1px solid var(--border); border-radius: 10px; margin: 6px 0 8px; }
