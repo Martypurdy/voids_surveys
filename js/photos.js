@@ -1,7 +1,7 @@
 // Photo capture, on-device compression and the reusable photo field widget.
 import { putPhoto, getPhoto, getPhotos, deletePhotos, scheduleSave, flushSave } from './db.js';
 import { uid, nowISO } from './model.js';
-import { h, icon, ICONS, objectUrl, confirmDialog, choose, toast } from './ui.js';
+import { h, icon, ICONS, objectUrl, confirmDialog, choose, toast, trackOverlay } from './ui.js';
 import { openCamera, cameraSupported } from './camera.js';
 
 export const FULL_MAX = 1600;
@@ -173,10 +173,13 @@ export function photoField(job, list, onChange = () => {}) {
     const rec = await getPhoto(id);
     if (!rec) return;
     const url = URL.createObjectURL(rec.blob);
+    let untrack = () => {};
     const close = () => {
+      if (!box.isConnected) return;
       box.remove();
       URL.revokeObjectURL(url);
       document.removeEventListener('keydown', onKey);
+      untrack();
     };
     const onKey = (e) => { if (e.key === 'Escape') close(); };
     const box = h('div', { class: 'lightbox', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Photo' },
@@ -200,6 +203,7 @@ export function photoField(job, list, onChange = () => {}) {
         h('button', { type: 'button', onclick: close }, 'Close')));
     document.addEventListener('keydown', onKey);
     document.body.append(box);
+    untrack = trackOverlay(() => { untrack = () => {}; close(); }); // phone back button
   };
 
   grid.append(...list.map(thumbButton));

@@ -15,6 +15,7 @@ route('/job/:id/rooms/:roomId', () => import('./views/room.js'), { kind: 'rooms'
 route('/job/:id/externals', () => import('./views/rooms.js'), { kind: 'externals' });
 route('/job/:id/externals/:roomId', () => import('./views/room.js'), { kind: 'externals' });
 route('/job/:id/meters', () => import('./views/meters.js'));
+route('/job/:id/gifted', () => import('./views/gifted.js'));
 
 start(document.getElementById('app'));
 

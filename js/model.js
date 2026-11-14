@@ -20,6 +20,12 @@ export const HEATING_TYPES = ['Gas boiler', 'Electric heaters', 'Heat pump'];
 
 export const BACKUP_WARN_DAYS = 7;
 
+/** Items commonly left for (gifted to) the incoming tenant. */
+export const GIFT_ITEMS = ['Carpets', 'Laminate flooring', 'Sheet vinyl', 'Wallpaper', 'Curtains', 'Curtain poles', 'Blinds', 'Lamp shades', 'Cabinets', 'Sheds'];
+
+/** gifted = { selected: { [item]: [room / area names] }, extra: [your own item names] } */
+export const newGifted = () => ({ selected: {}, extra: [] });
+
 /** Survey sections in tab order: [key, label, route path under #/job/:id]. */
 export const SECTIONS = [
   ['address', 'Address', ''],
@@ -28,6 +34,7 @@ export const SECTIONS = [
   ['meters', 'Services', 'meters'],
   ['rooms', 'Rooms', 'rooms'],
   ['externals', 'Externals', 'externals'],
+  ['gifted', 'Gifted items', 'gifted'],
 ];
 
 export const PROPERTY_TYPES = ['House', 'Flat', 'Bungalow', 'Maisonette', 'Bedsit', 'Other'];
@@ -93,6 +100,7 @@ export function upgradeJob(job) {
     if (!Array.isArray(r.photos)) r.photos = [];
   }
   job.security ??= newRoom('Security', 'security');
+  job.gifted = { ...newGifted(), ...(job.gifted || {}) };
   job.security.parts ??= {};
   return job;
 }
@@ -131,6 +139,7 @@ export function newJob({ surveyor = '' } = {}) {
     keys: [],
     keySafe: newKeySafe(),
     security: newRoom('Security', 'security'),
+    gifted: newGifted(),
     meters: UTILITIES.map((u) => newMeter(u)),
   };
 }

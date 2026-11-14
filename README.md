@@ -32,11 +32,11 @@ Open devices will show “A new version is available – Reload”.
 
 ## Using it
 
-Each job has six sections, shown as tabs in this order: **Address, Property, Security, Services,
-Rooms, Externals**. A tab turns **amber** when you open it and **green ✓** when you tap the
+Each job has seven sections, shown as tabs in this order: **Address, Property, Security, Services,
+Rooms, Externals, Gifted items**. A tab turns **amber** when you open it and **green ✓** when you tap the
 *Mark … complete* button at the bottom of that screen (which then moves you to the next
 unfinished section). *Reopen section* undoes it. The job list shows a progress bar and
-“n of 6 sections complete”.
+“n of 7 sections complete”.
 
 Rooms, outside areas and Security all work the same way: each has **features**, each feature
 has **OK** (green, no work) or a **defects list** (red) with quantities, notes and photos.
@@ -101,6 +101,15 @@ has **OK** (green, no work) or a **defects list** (red) with quantities, notes a
    Gutters, Downpipes, Fascias & soffits, Walls & pointing, Drainage), **Front / Rear garden**
    (Paths, Lawn, Bushes & hedges, Trees – add Patio, Fence, Gate, Garden wall, Steps…),
    **Fencing & gates**, **Shed**, **Garage**, or a custom area.
+8. **Gifted items** – Carpets, Laminate flooring, Sheet vinyl, Wallpaper, Curtains, Curtain poles,
+   Blinds, Lamp shades, Cabinets, Sheds (+ your own): tap an item and pick the rooms it applies to.
+
+**In a defects list:** press and hold a defect (about a second) to edit its wording for this
+survey only. **Phone back button:** closes a defects list (saving it), photo, camera or preview,
+otherwise goes back one screen – entries are saved as you type.
+
+**Communal key / fob:** if selected in *Renew locks*, a red **ACTION REQUIRED** box appears on
+the Security screen and on the PDF cover and schedule of works.
 
 Surveys made with older versions keep any key register or meter readings they recorded; these
 still appear in the PDF.
@@ -132,7 +141,8 @@ and unit. Room-type defaults for the built-in lists live in `ROOM_DEFAULTS` in
 
 ## Exports & backups
 
-- **PDF report** – summary, every section, photos (re-encoded at 1024 px to keep size down).
+- **PDF report** – summary, every section, photos (re-encoded at 1024 px to keep size down). SOR
+  codes are printed only while an SOR library is loaded on the device.
 - **Backup file (.json)** – the whole job with photos as base64. Import it on any device.
   Importing a job that already exists offers *Replace* or *Keep both*.
 - The **key safe code is included** in both by default – untick *Include key safe code* to leave

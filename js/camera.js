@@ -11,7 +11,7 @@
 //   5. No wide lens available: offer the phone's own camera app.
 // 2x – hardware zoom on the main camera, otherwise a digital crop.
 // Zoom taps are ignored while a lens switch is in progress.
-import { h } from './ui.js';
+import { h, trackOverlay } from './ui.js';
 
 export const cameraSupported = () => Boolean(navigator.mediaDevices?.getUserMedia);
 
@@ -64,6 +64,8 @@ export function openCamera({ onCapture, onNative }) {
         h('div', { class: 'cam-controls' }, lastThumb, shutter, doneBtn)));
     document.body.append(overlay);
     document.body.classList.add('no-scroll');
+    // Phone back button closes the camera (photos already taken are kept).
+    let untrack = trackOverlay(() => { untrack = () => {}; close(); });
 
     // ---------- on-screen messages / questions ----------
     function showMessage(text, buttons = []) {
@@ -376,6 +378,7 @@ export function openCamera({ onCapture, onNative }) {
       if (lastThumb.src) URL.revokeObjectURL(lastThumb.src);
       overlay.remove();
       document.body.classList.remove('no-scroll');
+      untrack();
       resolve({ count, error });
     }
 

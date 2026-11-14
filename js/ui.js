@@ -234,6 +234,39 @@ export async function multiSelect({ title, message, groups }) {
   return groups.map((g, gi) => g.options.filter((o) => state[gi].has(o)));
 }
 
+// ---------- Phone back button for full-screen overlays ----------
+// Each full-screen overlay (defects sheet, photo viewer, camera, PDF preview) adds a
+// history entry, so the phone's back button closes the overlay instead of changing
+// the screen hidden underneath it.
+const overlayStack = [];
+let ignorePops = 0;
+
+/**
+ * Call when an overlay opens. onBack runs if the user presses the phone's back button.
+ * Returns closed(): call it when the overlay is closed by the app (✕, Save, Done…).
+ */
+export function trackOverlay(onBack) {
+  const entry = { onBack };
+  overlayStack.push(entry);
+  history.pushState({ overlay: overlayStack.length }, '');
+  return () => {
+    const i = overlayStack.indexOf(entry);
+    if (i === -1) return; // already closed by the back button
+    overlayStack.splice(i, 1);
+    ignorePops++;
+    history.back(); // drop our history entry
+  };
+}
+
+window.addEventListener('popstate', () => {
+  if (ignorePops) {
+    ignorePops--;
+    return;
+  }
+  const top = overlayStack.pop();
+  if (top) top.onBack();
+});
+
 // ---------- Toast & busy overlay ----------
 
 let toastEl = null;

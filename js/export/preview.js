@@ -1,6 +1,6 @@
 // In-app PDF preview (PDF.js, loaded on demand from /vendor). Works the same on
 // iPhone, Android and desktop – phones can't reliably show PDFs inside a page.
-import { h, toast } from '../ui.js';
+import { h, toast, trackOverlay } from '../ui.js';
 import { deliverFile } from './deliver.js';
 
 let libPromise = null;
@@ -27,7 +27,10 @@ export function previewPdf(blob, filename) {
   return new Promise(async (resolve) => {
     const pages = h('div', { class: 'preview-pages' }, h('p', { class: 'preview-status' }, 'Loading preview…'));
     let doc = null;
+    let untrack = () => {};
     const close = () => {
+      if (!overlay.isConnected) return;
+      untrack();
       overlay.remove();
       document.body.classList.remove('no-scroll');
       document.removeEventListener('keydown', onKey);
@@ -49,6 +52,7 @@ export function previewPdf(blob, filename) {
     document.body.append(overlay);
     document.body.classList.add('no-scroll');
     document.addEventListener('keydown', onKey);
+    untrack = trackOverlay(() => { untrack = () => {}; close(); }); // phone back button
 
     try {
       const pdfjs = await loadPdfJs();
@@ -69,6 +73,7 @@ export function previewPdf(blob, filename) {
         await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
       }
     } catch (e) {
+      if (!overlay.isConnected) return; // closed while still drawing – nothing to report
       console.error(e);
       pages.replaceChildren(h('p', { class: 'preview-status' }, 'The preview couldn’t be shown on this device – use Share / Save to open the PDF.'));
       toast(e.message);

@@ -10,8 +10,41 @@ import { FEATURES, SUGGESTIONS, featuresOf, customFeatureKey } from '../data/fea
 import { searchLibrary, libraryItem } from '../sor.js';
 import { setHidden, setAdded, roomTypeLabel } from '../templates.js';
 import { templateOptions } from '../defectOptions.js';
-import { h, textField, confirmDialog, toast } from '../ui.js';
+import { h, textField, confirmDialog, toast, choose, trackOverlay } from '../ui.js';
 import { photoField } from '../photos.js';
+
+/**
+ * Press and hold (~0.8 s, without moving) then let go → fn(). Opening on release
+ * means lifting the finger can't land on – and close – the edit box.
+ */
+function onLongPress(el, fn, ms = 800) {
+  let timer = 0;
+  let start = null;
+  let held = false;
+  const reset = () => { clearTimeout(timer); start = null; held = false; el.classList.remove('holding'); };
+  el.addEventListener('pointerdown', (e) => {
+    reset();
+    start = { x: e.clientX, y: e.clientY };
+    timer = setTimeout(() => {
+      held = true;
+      el.dataset.held = '1'; // swallow the click that follows the release
+      el.classList.add('holding');
+      navigator.vibrate?.(30);
+    }, ms);
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (start && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 10) reset(); // scrolling
+  });
+  el.addEventListener('pointerup', () => {
+    const wasHeld = held;
+    reset();
+    if (wasHeld) {
+      setTimeout(fn, 60);
+      setTimeout(() => { delete el.dataset.held; }, 500);
+    }
+  });
+  for (const ev of ['pointercancel', 'pointerleave']) el.addEventListener(ev, () => { reset(); delete el.dataset.held; });
+}
 
 /** Pick a feature to add: suggestions not already present, or your own name. */
 function pickFeature(kind, present) {
@@ -200,31 +233,60 @@ export function featureList({ job, room, kind, library, onChange = () => {} }) {
       }
     }
 
+    // Press and hold a defect (about a second) to edit its wording for this survey only.
+    const editWording = async (opt) => {
+      const current = chosen.get(opt.c)?.d || opt.d;
+      const box = h('textarea', { value: current, rows: 3, autocapitalize: 'sentences', 'aria-label': 'Defect wording' });
+      setTimeout(() => { box.focus(); box.setSelectionRange(box.value.length, box.value.length); }, 50);
+      const ok = await choose({
+        title: 'Edit wording',
+        message: 'For this survey only – the standard list is not changed.',
+        content: box,
+        buttons: [
+          { label: 'Save', value: true, class: 'btn-primary' },
+          ...(current !== opt.d ? [{ label: 'Reset to standard wording', value: 'reset' }] : []),
+          { label: 'Cancel', value: false },
+        ],
+      });
+      if (!ok) return;
+      const text = ok === 'reset' ? opt.d : box.value.trim() || opt.d;
+      const entry = chosen.get(opt.c) || { qty: defaultQty(opt.u), u: opt.u };
+      chosen.set(opt.c, { ...entry, d: text }); // editing also ticks it
+      renderSheet();
+    };
+
     const row = (opt, { removable = false, pinnable = false } = {}) => {
       const on = chosen.has(opt.c);
       const alsoOn = elsewhere.get(opt.c);
       const unit = UNITS[opt.u] || UNITS.nr;
       const lib = library ? libraryItem(library, opt.c) : null;
       const info = h('div', { class: 'defect-info', hidden: true }, lib?.l || '');
-      return h('div', { class: 'defect-row', dataset: { on: String(on) } },
-        h('button', {
-          type: 'button',
-          class: 'defect-toggle',
-          'aria-pressed': String(on),
-          onclick: () => {
-            if (on) chosen.delete(opt.c);
-            else chosen.set(opt.c, { qty: defaultQty(opt.u), d: opt.d, u: opt.u });
-            renderSheet();
-          },
+      const label = chosen.get(opt.c)?.d || opt.d; // wording may be edited for this survey
+      const toggle = h('button', {
+        type: 'button',
+        class: 'defect-toggle',
+        'aria-pressed': String(on),
+        title: 'Tap to select · press and hold to edit the wording',
+        onclick: () => {
+          if (toggle.dataset.held) { delete toggle.dataset.held; return; } // long press handled it
+          if (on) chosen.delete(opt.c);
+          else chosen.set(opt.c, { qty: defaultQty(opt.u), d: opt.d, u: opt.u });
+          renderSheet();
         },
-        h('span', { class: 'works-tick', 'aria-hidden': 'true' }, on ? '✓' : ''),
-        h('span', { class: 'defect-text' },
-          h('span', { class: 'defect-label' }, opt.d),
+        oncontextmenu: (e) => e.preventDefault(),
+      },
+      h('span', { class: 'works-tick', 'aria-hidden': 'true' }, on ? '✓' : ''),
+      h('span', { class: 'defect-text' },
+        h('span', { class: 'defect-label' }, label),
           opt.custom
             ? h('span', { class: 'defect-code' }, `✎ your own · ${unit.label}`)
             : library && lib ? h('span', { class: 'defect-code' }, `${opt.c} · ${unit.label}${opt.note ? ` · ${opt.note}` : ''}${opt.pinned ? ' · 📌 added by you' : ''}`)
               : h('span', { class: 'defect-code' }, unit.label),
-          alsoOn ? h('span', { class: 'defect-also' }, `⚠ already on ${alsoOn.join(' & ')} here`) : null)),
+          label !== opt.d ? h('span', { class: 'defect-also' }, '✎ wording edited for this survey') : null,
+          alsoOn ? h('span', { class: 'defect-also' }, `⚠ already on ${alsoOn.join(' & ')} here`) : null));
+      onLongPress(toggle, () => editWording(opt));
+      return h('div', { class: 'defect-row', dataset: { on: String(on) } },
+        toggle,
         on
           ? h('label', { class: 'defect-qty' },
             h('input', {
@@ -354,23 +416,37 @@ export function featureList({ job, room, kind, library, onChange = () => {} }) {
     };
     renderSheet();
 
+    let untrack = () => {};
     const close = () => {
       sheet.remove();
       document.body.classList.remove('no-scroll');
       document.removeEventListener('keydown', onKey);
+      untrack();
     };
-    const onKey = (e) => { if (e.key === 'Escape' && !document.querySelector('dialog[open], .camera, .lightbox')) close(); };
+    // Save the working copy into the room (used by Save, ✕ and the phone's back button).
+    const saveAndClose = () => {
+      p.defects = [...chosen].map(([code, v]) => ({ id: code, qty: String(v.qty ?? '').trim(), d: v.d, u: v.u }));
+      p.notes = notes;
+      if (p.defects.length) p.state = 'works';
+      else if (p.state === 'works') p.state = '';
+      save();
+      render();
+      close();
+      if (p.defects.length) toast(`${part.label}: ${p.defects.length} defect${p.defects.length === 1 ? '' : 's'} saved`);
+    };
+    const onKey = (e) => { if (e.key === 'Escape' && !document.querySelector('dialog[open], .camera, .lightbox')) saveAndClose(); };
 
     const sheet = h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': `${part.label} defects` },
       h('header', { class: 'sheet-head' },
         h('h2', null, `${room.name} – ${part.label}`),
-        h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Close', onclick: close }, '✕')),
+        h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Save and close', onclick: saveAndClose }, '✕')),
       h('div', { class: 'sheet-body' },
         library ? h('div', { class: 'sor-search-wrap' }, searchBox) : null,
         results,
         h('p', { class: 'hint' }, prefill
-          ? `m² / m are pre-filled from the room size (${prefill}) – change them as needed.`
-          : 'Tick each defect and enter the quantity.'),
+          ? `m² / m are pre-filled from the room size (${prefill}) – change them as needed. `
+          : 'Tick each defect and enter the quantity. ',
+        'Press and hold a defect to edit its wording.'),
         listEl,
         textField('Notes', notes, (v) => { notes = v; }, { multiline: true, autocapitalize: 'sentences', placeholder: 'Anything the contractor should know' }),
         h('span', { class: 'field-label' }, 'Photos'),
@@ -379,20 +455,13 @@ export function featureList({ job, room, kind, library, onChange = () => {} }) {
         h('button', {
           type: 'button',
           class: 'btn-primary btn-big',
-          onclick: () => {
-            p.defects = [...chosen].map(([code, v]) => ({ id: code, qty: String(v.qty ?? '').trim(), d: v.d, u: v.u }));
-            p.notes = notes;
-            if (p.defects.length) p.state = 'works';
-            else if (p.state === 'works') p.state = '';
-            save();
-            render();
-            close();
-            if (p.defects.length) toast(`${part.label}: ${p.defects.length} defect${p.defects.length === 1 ? '' : 's'} saved`);
-          },
+          onclick: saveAndClose,
         }, 'Save'),
         h('button', { type: 'button', class: 'btn-big', onclick: close }, 'Cancel')));
     document.addEventListener('keydown', onKey);
     document.body.append(sheet);
+    // Phone back button = save and close (never lose what was entered).
+    untrack = trackOverlay(() => { untrack = () => {}; saveAndClose(); });
     document.body.classList.add('no-scroll');
   }
 

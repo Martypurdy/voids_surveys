@@ -3,6 +3,7 @@ import { addressLines, jobTitle, fmtDate, fmtDateTime, slug, todayLocal, allPhot
 import { UNITS, defectInfo, isSorCode, qtyText as unitQty } from '../data/parts.js';
 import { FEATURES, featuresOf } from '../data/features.js';
 import { loadPhotos, resizeImage } from '../photos.js';
+import { getLibrary } from '../sor.js';
 
 // Photos are re-encoded smaller for the PDF so reports stay emailable.
 const PDF_PHOTO_MAX = 1024;
@@ -45,6 +46,8 @@ const BRAND = [31, 95, 139];
 /** Build the report. Returns a PDF Blob. */
 export async function buildPdf(job, { includeCode = false, onProgress = () => {} } = {}) {
   const { jsPDF } = await loadJsPDF();
+  // SOR codes are printed only while an SOR library is loaded on this device.
+  const showCodes = Boolean(await getLibrary());
   const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
 
   const W = 210, H = 297, M = 15, CW = W - 2 * M, BOTTOM = H - M - 6;
@@ -175,7 +178,7 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
       para(`${part.label}:`, { size: 10, style: 'bold' });
       for (const d of p.defects) {
         const def = defectInfo(FEATURES[part.key] ? part : null, d);
-        para(`-  ${def.label}${d.qty ? `  ${qtyText(d.qty, def.unit)}` : ''}${isSorCode(d.id) ? `   [${d.id}]` : ''}`, { size: 10, x: M + 4, width: CW - 4 });
+        para(`-  ${def.label}${d.qty ? `  ${qtyText(d.qty, def.unit)}` : ''}${showCodes && isSorCode(d.id) ? `   [${d.id}]` : ''}`, { size: 10, x: M + 4, width: CW - 4 });
         const key = `${part.label}|${d.id}`;
         const row = schedule.get(key) || { part: part.label, label: def.label, unit: def.unit, id: d.id, total: 0, rooms: new Set() };
         row.total += parseFloat(String(d.qty).replace(',', '.')) || (UNITS[def.unit]?.count ? 1 : 0);
@@ -209,18 +212,53 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
     }
   };
 
+  // ----- Must-action alerts (e.g. communal key / fob) – shown in a red box -----
+  const alerts = [];
+  const fobInLocks = job.works.cylinders?.includes('Communal key / fob');
+  const fobDefect = [...job.rooms, ...job.externals, job.security].filter(Boolean)
+    .some((r) => Object.values(r.parts || {}).some((p) => (p.defects || []).some((d) => d.id === 'CDR-13' || /fob/i.test(d.d || ''))));
+  if (fobInLocks || fobDefect) {
+    alerts.push('COMMUNAL KEY / FOB REQUIRED - must be arranged with the fob team before the property is handed over.');
+  }
+  const alertBox = (text) => {
+    font(10.5, 'bold');
+    const lines = doc.splitTextToSize(clean(text), CW - 12);
+    const hgt = lines.length * lineH(10.5) + 10;
+    ensure(hgt + 4);
+    doc.setFillColor(253, 227, 225);
+    doc.setDrawColor(198, 40, 40);
+    doc.setLineWidth(1);
+    doc.roundedRect(M, y, CW, hgt, 2, 2, 'FD');
+    font(9, 'bold', [198, 40, 40]);
+    doc.text('ACTION REQUIRED', M + 6, y + 5.5);
+    font(10.5, 'bold', [140, 29, 22]);
+    lines.forEach((l, i) => doc.text(l, M + 6, y + 10 + i * lineH(10.5)));
+    y += hgt + 4;
+  };
+
   const scheduleSection = () => {
-    if (!schedule.size) return;
+    const secWorksList = worksSummary(job.works, 'security');
+    if (!schedule.size && !alerts.length && !secWorksList.length) return;
     heading('Schedule of works');
-    para('All defects recorded in this survey, totalled by feature.', { size: 9, rgb: [90, 98, 106] });
+    alerts.forEach(alertBox);
+    para('All works recorded in this survey, totalled by feature.', { size: 9, rgb: [90, 98, 106] });
     y += 1;
+    if (secWorksList.length) {
+      ensure(14);
+      para('Security & access', { size: 10.5, style: 'bold' });
+      for (const [label, detail] of secWorksList) {
+        para(`-  ${label}${detail ? `: ${detail}` : ''}`, { size: 10, x: M + 4, width: CW - 4 });
+      }
+      y += 1.5;
+    }
     const groups = [...new Set([...schedule.values()].map((r) => r.part))];
     for (const label of groups) {
       ensure(14);
       para(label, { size: 10.5, style: 'bold' });
       for (const r of [...schedule.values()].filter((x) => x.part === label)) {
         const total = Math.round(r.total * 10) / 10;
-        para(`-  ${r.label}:  ${qtyText(total, r.unit)}${isSorCode(r.id) ? `   [${r.id}]` : ''}   (${[...r.rooms].join(', ')})`, { size: 10, x: M + 4, width: CW - 4 });
+        const q = qtyText(total, r.unit);
+        para(`-  ${r.label}${q ? `:  ${q}` : ''}${showCodes && isSorCode(r.id) ? `   [${r.id}]` : ''}   (${[...r.rooms].join(', ')})`, { size: 10, x: M + 4, width: CW - 4 });
       }
       y += 1.5;
     }
@@ -269,6 +307,10 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
   };
   summarise('Rooms', job.rooms, 'rooms');
   summarise('Outside areas', job.externals, 'externals');
+  if (alerts.length) {
+    y += 3;
+    alerts.forEach(alertBox);
+  }
 
   // ---------- sections ----------
   // Same order as the app's tabs: property, security, services, rooms, externals.
@@ -359,6 +401,15 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
 
   await roomsSection('Rooms', job.rooms, 'rooms');
   await roomsSection('Externals', job.externals, 'externals');
+
+  // ----- Gifted items (left for the incoming tenant) -----
+  const gifts = Object.entries(job.gifted?.selected || {}).filter(([, rooms]) => rooms.length);
+  if (gifts.length) {
+    heading('Gifted items');
+    para('Items left for the incoming tenant.', { size: 9, rgb: [90, 98, 106] });
+    y += 1;
+    kv(gifts.map(([item, rooms]) => [item, rooms.join(', ')]), { labelW: 48 });
+  }
   scheduleSection();
 
   // ---------- footers ----------
