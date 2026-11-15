@@ -735,8 +735,9 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
           return [r.name, `${metres(r.w)} x ${metres(r.h)}`, sqm(fg.floor), fg.height ? `${fg.height.toFixed(2)} m` : '', fg.walls ? sqm(fg.walls) : ''];
         }),
         f.rooms.length > 1 ? [[`${f.name} total`, '', sqm(floorArea(f)), '', '']] : []);
-      const fixtures = [...new Set(f.items.filter((i) => ITEMS[i.type].kind === 'fixture').map((i) => ITEMS[i.type].label))];
-      const counts = (t) => f.items.filter((i) => i.type === t).length;
+      const placed = f.items.filter((i) => f.rooms.some((r) => r.id === i.roomId));
+      const fixtures = [...new Set(placed.filter((i) => ITEMS[i.type].kind === 'fixture').map((i) => ITEMS[i.type].label))];
+      const counts = (t) => placed.filter((i) => i.type === t).length;
       const fittings = [
         counts('door') ? `${counts('door')} door${counts('door') === 1 ? '' : 's'}` : '',
         counts('window') ? `${counts('window')} window${counts('window') === 1 ? '' : 's'}` : '',
@@ -759,7 +760,7 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
 
   /** Drawing size for a floor: scaled to fit the page width (at most 1:50). */
   function floorSize(f) {
-    const b = bounds(f);
+    const b = bounds(f) || { minX: 0, minY: 0, maxX: 100, maxY: 100 };
     const pad = 30; // cm round the edge for labels
     const bw = b.maxX - b.minX + pad * 2, bh = b.maxY - b.minY + pad * 2;
     const k = Math.min(CW / bw, 150 / bh, 0.2); // mm per cm (0.2 = 1:50)

@@ -203,6 +203,7 @@ export default async function planEditor(root, { id }) {
     svg.setPointerCapture(e.pointerId);
     pointers.set(e.pointerId, pt(e));
     if (pointers.size === 2) {
+      finishDrag();
       const [a, b] = [...pointers.values()];
       drag = { kind: 'pinch', d0: Math.hypot(a.x - b.x, a.y - b.y), m0: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, v0: { ...view } };
       return;
@@ -220,7 +221,8 @@ export default async function planEditor(root, { id }) {
     const hit = hitTest(p);
     const snapshot = JSON.stringify(plan.floors);
     if (hit?.kind === 'handle') {
-      drag = { kind: 'resize', room: hit.room, corner: hit.corner, o: { ...hit.room }, w0: w, p0: p, snapshot };
+      const start = floor().items.filter((it) => it.roomId === hit.room.id).map((it) => ({ it, dx: it.dx, dy: it.dy, at: it.at }));
+      drag = { kind: 'resize', room: hit.room, corner: hit.corner, o: { ...hit.room }, start, w0: w, p0: p, snapshot };
     } else if (hit?.kind === 'item') {
       sel = { type: 'item', id: hit.item.id };
       const r = roomById(hit.item.roomId);
@@ -271,38 +273,44 @@ export default async function planEditor(root, { id }) {
       if (drag.corner.includes('e')) x2 = Math.max(snap(o.x + o.w + dx), x1 + MIN_ROOM);
       if (drag.corner.includes('n')) y1 = Math.min(snap(o.y + dy), y2 - MIN_ROOM);
       if (drag.corner.includes('s')) y2 = Math.max(snap(o.y + o.h + dy), y1 + MIN_ROOM);
-      // Keep fittings where they are on the plan while the room's corner moves.
-      for (const it of floor().items) {
-        if (it.roomId !== r.id) continue;
+      // Keep fittings where they are on the plan while the room's corner moves. Always work
+      // from where they were when the drag began, so dragging out and back puts them home.
+      Object.assign(r, { x: x1, y: y1, w: x2 - x1, h: y2 - y1 });
+      for (const s0 of drag.start) {
+        const it = s0.it;
         if (ITEMS[it.type].kind === 'wall') {
-          it.at = Math.max(0, it.at + (it.wall === 'n' || it.wall === 's' ? r.x - x1 : r.y - y1));
+          it.at = Math.max(0, s0.at + (it.wall === 'n' || it.wall === 's' ? o.x - x1 : o.y - y1));
           continue;
         }
-        it.dx += r.x - x1;
-        it.dy += r.y - y1;
+        it.dx = s0.dx + (o.x - x1);
+        it.dy = s0.dy + (o.y - y1);
+        settleItem(r, it);
       }
-      Object.assign(r, { x: x1, y: y1, w: x2 - x1, h: y2 - y1 });
-      for (const it of floor().items) if (it.roomId === r.id && ITEMS[it.type].kind !== 'wall') settleItem(r, it);
     } else if (drag.kind === 'item') {
       moveItem(drag.item, drag.o, w, dx, dy);
     }
     renderCanvas();
   });
 
-  const endPointer = (e) => {
-    pointers.delete(e.pointerId);
-    if (!drag) return;
-    if (drag.kind === 'pinch') {
-      if (pointers.size === 0) drag = null;
-      return;
-    }
-    if (drag.moved && drag.snapshot) {
+  /** Commit a drag in progress (undo step + save). */
+  const finishDrag = () => {
+    if (drag?.moved && drag.snapshot) {
       remember(drag.snapshot);
       save();
       renderPanel();
       renderSummary();
     }
     drag = null;
+  };
+  const endPointer = (e) => {
+    pointers.delete(e.pointerId);
+    if (!drag) return;
+    if (drag.kind === 'pinch') {
+      if (pointers.size === 0) drag = null;
+      else if (pointers.size === 1) drag = { kind: 'pan', p0: [...pointers.values()][0], v0: { ...view } }; // one finger left: keep panning
+      return;
+    }
+    finishDrag();
   };
   svg.addEventListener('pointerup', endPointer);
   svg.addEventListener('pointercancel', endPointer);
@@ -455,7 +463,8 @@ export default async function planEditor(root, { id }) {
   // ----- panel for the selected room / item -----
   const panel = h('div', { class: 'plan-panel card card-body' });
   const field = (label, value, oninput, opts = {}) => {
-    const input = h('input', { type: 'text', value, inputmode: opts.inputmode, list: opts.list, autocapitalize: opts.cap, 'aria-label': label, onfocus: () => remember(), oninput: (e) => { oninput(e.target.value); renderCanvas(); renderSummary(); save(); } });
+    let edited = false; // the first change after tapping in is one undo step
+    const input = h('input', { type: 'text', value, inputmode: opts.inputmode, list: opts.list, autocapitalize: opts.cap, 'aria-label': label, onfocus: () => { opts.onfocus?.(); edited = false; }, oninput: (e) => { if (!edited) { edited = true; remember(); } oninput(e.target.value); renderCanvas(); renderSummary(); save(); } });
     return h('label', { class: 'field' }, h('span', { class: 'field-label' }, label), input);
   };
   const delBtn = (label, fn) => h('button', { type: 'button', class: 'btn-danger btn-small', onclick: fn }, label);
@@ -469,12 +478,13 @@ export default async function planEditor(root, { id }) {
         const fg = roomFigures(r);
         figures.textContent = [`Floor ${sqm(fg.floor)}`, `Perimeter ${fg.perimeter.toFixed(2)} m`, fg.walls ? `Walls ${sqm(fg.walls)}` : 'Add the ceiling height for the wall area'].join(' · ');
       };
+      let start = [];
       const metresField = (label, key) => field(label, (r[key] / 100).toFixed(2), (v) => {
         const n = num(v);
         if (n > 0) r[key] = Math.max(MIN_ROOM, Math.round(n * 100));
-        for (const it of f.items) if (it.roomId === r.id && ITEMS[it.type].kind !== 'wall') settleItem(r, it);
+        for (const s0 of start) { s0.it.dx = s0.dx; s0.it.dy = s0.dy; settleItem(r, s0.it); } // from the original spots, so typing "2.5" via "2" doesn't drift
         showFigures();
-      }, { inputmode: 'decimal' });
+      }, { inputmode: 'decimal', onfocus: () => { start = f.items.filter((it) => it.roomId === r.id && ITEMS[it.type].kind !== 'wall').map((it) => ({ it, dx: it.dx, dy: it.dy })); } });
       panel.replaceChildren(
         h('strong', null, 'Room'),
         h('datalist', { id: 'plan-room-names-2' }, ROOM_NAMES.map((n) => h('option', { value: n }))),
