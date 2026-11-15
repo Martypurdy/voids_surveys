@@ -41,7 +41,7 @@ export default async function jobList(root) {
 
   const importInput = h('input', {
     type: 'file',
-    accept: '.json,application/json',
+    accept: '.json,.txt,application/json,text/plain', // backups shared from a phone arrive as .txt
     hidden: true,
     onchange: async (e) => {
       const file = e.target.files[0];

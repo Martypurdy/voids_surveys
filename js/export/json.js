@@ -1,6 +1,6 @@
 // .json job file: full backup / transfer, photos embedded as base64.
 import { getJob, saveJob, deleteJob, putPhotos } from '../db.js';
-import { SCHEMA, allPhotoIds, remapPhotoIds, uid, nowISO, slug, jobTitle, todayLocal, newKeySafe, upgradeJob, photoLists } from '../model.js';
+import { SCHEMA, formOf, allPhotoIds, remapPhotoIds, uid, nowISO, slug, jobTitle, todayLocal, newKeySafe, upgradeJob, photoLists } from '../model.js';
 import { loadPhotos, makeThumb } from '../photos.js';
 import { choose, toast, busy } from '../ui.js';
 
@@ -23,7 +23,7 @@ function base64ToBlob(b64, type) {
 }
 
 export function jsonFilename(job) {
-  return `void-survey-${slug(jobTitle(job))}-${todayLocal()}.json`;
+  return `PropertyPad backup - ${formOf(job).file} - ${slug(jobTitle(job))} - ${todayLocal()}.json`;
 }
 
 /** Build the backup file. The key safe code is blanked unless includeCode. */
@@ -69,7 +69,7 @@ export async function importJobFile(file) {
   try {
     data = validate(JSON.parse(await file.text()));
   } catch (e) {
-    toast(e instanceof SyntaxError ? 'That file isn’t valid JSON' : e.message);
+    toast(e instanceof SyntaxError ? 'That isn’t a PropertyPad backup file' : e.message);
     return null;
   }
   const job = data.job;
