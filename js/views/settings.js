@@ -1,4 +1,4 @@
-// Screen: settings, in three tabs (SOR library and Sync & sharing are proposed add-ons) –
+// Screen: settings, in tabs (Development: AI and automation proposals) – (SOR library and Sync & sharing are proposed add-ons) –
 //   Sync & sharing  how data is stored today, and how connected storage would work (with a demo sign-in)
 //   Defect lists    this device's defect list for each room type and feature
 //   SOR library     load / remove the private SOR library on this device
@@ -18,6 +18,7 @@ const TABS = [
   ['sync', 'Sync & sharing', true],
   ['branding', 'Company branding', true],
   ['rollout', 'Company roll-out', true],
+  ['development', 'Development', true],
 ];
 const LAST_TAB = 'voids.settingsTab';
 
@@ -36,7 +37,7 @@ export default async function settings(root, { tab } = {}) {
       'aria-current': k === tab ? 'page' : null,
     }, label, addOn ? h('span', { class: 'addon-pill' }, 'Add-on') : null)));
 
-  const body = tab === 'defects' ? defectsTab(lib) : tab === 'sor' ? sorTab(lib) : tab === 'rollout' ? rolloutTab() : tab === 'branding' ? brandingTab() : syncTab();
+  const body = tab === 'defects' ? defectsTab(lib) : tab === 'sor' ? sorTab(lib) : tab === 'rollout' ? rolloutTab() : tab === 'development' ? developmentTab() : tab === 'branding' ? brandingTab() : syncTab();
   root.append(pageHeader('Settings', { back: '#/' }), appearance(), scrollTabs(nav), h('div', { class: 'content' }, body));
 }
 
@@ -216,6 +217,71 @@ function brandingTab() {
 }
 
 // ---------- Company roll-out ----------
+/** Development: AI and automation through the company's Microsoft 365 / Azure. */
+function developmentTab() {
+  const benefit = (emoji, title, text) => h('li', { class: 'intro-benefit' },
+    h('span', { class: 'intro-benefit-icon', 'aria-hidden': 'true' }, emoji),
+    h('span', null, h('strong', null, title), h('br'), text));
+  return [
+    proposal('Development: AI and automatic emails with Microsoft Azure',
+      'What could be added by connecting the app to the company’s Microsoft services – and what each route needs.'),
+
+    h('h2', null, 'Copilot and Azure – the difference'),
+    h('div', { class: 'card card-body intro-card' },
+      h('p', null, h('strong', null, 'Microsoft 365 Copilot'), ' is the AI assistant staff use inside Teams, Outlook, Word and Excel. It is a chat assistant – other apps can’t connect to it or send it work.'),
+      h('p', null, h('strong', null, 'Microsoft Azure'), ' is Microsoft’s cloud, usually part of the same company agreement. Through Azure, IT can let an approved app use AI models (including Anthropic’s Claude, through Microsoft Foundry) and send emails or save files automatically. Company data stays under the company’s existing Microsoft agreements, and IT controls who can use it and how much it can spend.'),
+      h('p', { class: 'hint' }, 'Rule of thumb: AI is for reading and writing (quotes, photos, voice, summaries). Automatic emails are automation – they don’t need AI.')),
+
+    h('h2', null, 'Route 1 – Automatic emails & workflows'),
+    h('p', { class: 'hint' }, 'Microsoft Power Automate (or Azure Logic Apps). No AI needed.'),
+    h('ul', { class: 'intro-benefits' },
+      benefit('📧', 'Emails as sections are completed', 'For example: when the decorating voucher is completed, its details and photos are emailed to the right people from a company mailbox – no typing, no attaching.'),
+      benefit('🗂️', 'Reports filed automatically', 'Finished PDF reports saved to the right SharePoint / OneDrive folder for each property.'),
+      benefit('💬', 'Teams alerts', 'A message in a Teams channel when something needs action – communal keys or fobs, legionella not recorded, meter box door damaged.'),
+      benefit('📋', 'Trackers kept up to date', 'Completed inspections and costings added to a SharePoint list or Excel tracker.'),
+      benefit('👥', 'Set by the team, not the app', 'Who gets which email is set in the company’s flow, so it can change without updating the app.'),
+      benefit('📴', 'Works with no signal', 'Emails queue on the phone and send when signal returns.')),
+
+    h('h2', null, 'Route 2 – AI features'),
+    h('p', { class: 'hint' }, 'Azure AI (Microsoft Foundry). Each feature fills the form in for you to check – nothing is saved or sent unchecked.'),
+    h('ul', { class: 'intro-benefits' },
+      benefit('🧾', 'Read supplier quotes', 'Photo, screenshot or emailed PDF of a quote – the materials lines and delivery charges fill themselves in. Works for any supplier, including Screwfix.'),
+      benefit('🎙️', 'Voice notes to survey', 'Say “Kitchen – two wall unit doors hanging off, hob missing” and the right features and defects are ticked.'),
+      benefit('🧮', 'Materials from a job description', '“Board and skim a 4 × 3 m bedroom ceiling” – a suggested materials list with quantities, priced by the link look-up.'),
+      benefit('📷', 'Photo to suggested defects', 'Suggests likely defects from a photo for the surveyor to confirm.'),
+      benefit('✅', 'Check before sending', 'Flags missing photos, unfinished rooms or a key safe with no code before a report goes out.'),
+      benefit('✍️', 'Write-ups', 'A short summary for the PDF, or the wording for the automatic emails.')),
+
+    h('h2', null, 'Suggested order'),
+    h('ol', { class: 'intro-steps' },
+      guideStep(1, 'Pilot', 'The app as it is today, with a few surveyors (see Company roll-out).'),
+      guideStep(2, 'Automatic emails', 'The biggest everyday time saving and the lowest risk – no AI involved.'),
+      guideStep(3, 'Read supplier quotes', 'The most reliable AI feature and the cheapest to run.'),
+      guideStep(4, 'Voice notes and photo suggestions', 'Once the team is happy with how AI features work.')),
+
+    h('h2', null, 'What IT would need'),
+    h('div', { class: 'card card-body intro-card' },
+      h('ul', { class: 'intro-list' },
+        h('li', null, h('strong', null, 'Company sign-in'), ' (Microsoft Entra ID) so only staff can use the connected features.'),
+        h('li', null, h('strong', null, 'For emails: '), 'a Power Automate flow the app can send to, and a shared mailbox to send from. Some connectors need a Power Automate premium licence.'),
+        h('li', null, h('strong', null, 'For AI: '), 'an Azure AI (Microsoft Foundry) model deployment with a monthly spending limit.'),
+        h('li', null, h('strong', null, 'A data protection check'), ' – addresses, tenant details and photos would be processed in the company’s Microsoft cloud.'))),
+
+    h('h2', null, 'Costs (rough)'),
+    h('div', { class: 'card card-body' },
+      h('ul', { class: 'intro-list' },
+        h('li', null, h('strong', null, 'Automatic emails: '), 'usually covered by existing Microsoft 365 licences; premium connectors cost extra per user.'),
+        h('li', null, h('strong', null, 'AI: '), 'charged per use – reading a quote costs pennies or less. Billed to the company’s Azure account with a spending cap.'))),
+
+    h('h2', null, 'Good to know'),
+    h('div', { class: 'card card-body' },
+      h('ul', { class: 'intro-list' },
+        h('li', null, 'Everything the app does today keeps working offline, without any of this.'),
+        h('li', null, 'The licensed SOR library is never sent to AI or automation services.'),
+        h('li', null, 'Prices from product links already work today, through a small free look-up service.'))),
+  ];
+}
+
 function rolloutTab() {
   const benefit = (emoji, title, text) => h('li', { class: 'intro-benefit' },
     h('span', { class: 'intro-benefit-icon', 'aria-hidden': 'true' }, emoji),
