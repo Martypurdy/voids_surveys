@@ -24,7 +24,11 @@ export function emailText(job) {
     body.push('', 'Decorating card: No.');
   }
   body.push('', 'Kind regards,', job.surveyor || '');
-  return { subject: `${form} – ${first}`, body: body.join('\n').trim() };
+  // Postcode: the postcode box, else a postcode found in the address lines.
+  const postcode = (job.address.postcode || '').trim()
+    || lines.map((l) => l.match(/\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/i)?.[0]).filter(Boolean).pop() || '';
+  const firstHasPostcode = postcode && first.replace(/\s/g, '').toUpperCase().includes(postcode.replace(/\s/g, '').toUpperCase());
+  return { subject: `${form} – ${first}${postcode && !firstHasPostcode ? `, ${postcode.toUpperCase()}` : ''}`, body: body.join('\n').trim() };
 }
 
 export async function emailReport(job) {
