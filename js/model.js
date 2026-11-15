@@ -36,6 +36,7 @@ export const SECTIONS = [
   ['externals', 'Externals', 'externals'],
   ['gifted', 'Gifted items', 'gifted'],
   ['materials', 'Materials', 'materials'],
+  ['signoff', 'Sign off', 'signoff'],
 ];
 
 // ----- Forms -----
@@ -46,7 +47,9 @@ export const FORMS = {
   void: { title: 'Empty home inspection', pdfTitle: 'Empty Home Inspection', file: 'Empty home inspection' },
   rtl: { title: 'Ready to let', pdfTitle: 'Ready to Let Inspection', file: 'Ready to let' },
 };
-const RTL_SECTIONS = [...SECTIONS.slice(0, 7), ['signoff', 'Sign off', 'signoff']];
+const RTL_SECTIONS = SECTIONS.filter(([k]) => k !== 'materials');
+/** Sign off signature (both forms). image: PNG data URL; date: ISO time signed. */
+export const newSignature = () => ({ name: '', image: '', date: '' });
 export const isRtl = (job) => job.form === 'rtl';
 /** The tabs for this job's form. */
 export const sectionsOf = (job) => (isRtl(job) ? RTL_SECTIONS : SECTIONS);
@@ -64,7 +67,6 @@ export function newRtl() {
     cleaning: { done: false, notes: '' },
     voucher: { required: '', value: '', photos: [] }, // required: '' | 'yes' | 'no'
     appliances: { any: '', list: [], notes: '', photos: [] }, // any: '' | 'yes' | 'no'
-    signature: { name: '', image: '', date: '' }, // image: PNG data URL; date: ISO time signed
   };
 }
 
@@ -122,6 +124,15 @@ export function upgradeJob(job) {
     job.rtl = { ...d, ...(job.rtl || {}) };
     for (const k of Object.keys(d)) job.rtl[k] = { ...d[k], ...(job.rtl[k] || {}) };
   }
+  // The signature used to live under job.rtl (Ready to let only); now both forms have one.
+  if (!job.signature && job.rtl?.signature) job.signature = job.rtl.signature;
+  if (job.rtl) delete job.rtl.signature;
+  job.signature = { ...newSignature(), ...(job.signature || {}) };
+  // Empty home inspections finished before Sign off was added stay complete.
+  if (!isRtl(job) && !job.progress?.signoff && job.progress?.materials === 'complete'
+    && SECTIONS.every(([k]) => k === 'signoff' || job.progress[k] === 'complete')) {
+    job.progress.signoff = 'complete';
+  }
   normalizeAddress(job.address);
   job.progress ??= {};
   job.property = { ...newProperty(), ...(job.property || {}) };
@@ -178,6 +189,7 @@ export function newJob({ surveyor = '', form = 'void' } = {}) {
     schema: SCHEMA,
     form,
     ...(form === 'rtl' ? { rtl: newRtl() } : {}),
+    signature: newSignature(),
     id: uid(),
     created: t,
     updated: t,

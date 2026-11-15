@@ -544,10 +544,14 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
     y += 1;
     kv(gifts.map(([item, rooms]) => [item, rooms.join(', ')]), { labelW: 48 });
   }
-  if (rtl) {
-    // ----- Sign off: appliances to be maintained -----
-    const ap = job.rtl.appliances;
-    const sg = job.rtl.signature || {};
+  // ----- Sign off: appliances (Ready to let) and signature (both forms) -----
+  const sg = job.signature || {};
+  if (!rtl) {
+    scheduleSection();
+    materialsSection();
+  }
+  const ap = rtl ? job.rtl.appliances : { any: '', notes: '', photos: [], list: [] };
+  {
     if (ap.any || ap.notes || ap.photos.length || sg.image || sg.name) {
       heading('Sign off');
       kv([
@@ -573,9 +577,6 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
         kv([['Name', sg.name], ['Signed', sg.date ? fmtDateTime(sg.date) : 'Not signed']]);
       }
     }
-  } else {
-    scheduleSection();
-    materialsSection();
   }
 
   // ---------- footers ----------

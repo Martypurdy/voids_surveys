@@ -1,7 +1,7 @@
-// Ready to let › Sign off: are there any appliances to be maintained? Yes pops up the
-// appliance list; then photos and notes.
+// Sign off (both forms): Ready to let asks about appliances to be maintained (Yes pops
+// up the appliance list, then photos and notes). Both forms end with a signature.
 import { scheduleSave } from '../db.js';
-import { APPLIANCES, fmtDateTime, nowISO } from '../model.js';
+import { APPLIANCES, fmtDateTime, nowISO, isRtl } from '../model.js';
 import { h, multiSelect, worksButton, textField, yesNo, confirmDialog } from '../ui.js';
 import { captureSignature } from '../signature.js';
 import { photoField } from '../photos.js';
@@ -9,7 +9,8 @@ import { loadJobOr404, jobChrome, completeFooter } from './chrome.js';
 
 export default async function signoff(root, { id }) {
   const job = await loadJobOr404(id);
-  const a = job.rtl.appliances;
+  const rtl = isRtl(job);
+  const a = rtl ? job.rtl.appliances : { any: '', list: [], notes: '', photos: [] };
   const save = () => scheduleSave(job);
 
   const pick = async () => {
@@ -48,7 +49,9 @@ export default async function signoff(root, { id }) {
   render();
 
   // ----- Signature: tap to sign full screen in landscape -----
-  const sig = job.rtl.signature;
+  const sig = job.signature;
+  // Empty home inspection: the surveyor signs, so start with their name.
+  if (!rtl && !sig.name && job.surveyor) sig.name = job.surveyor;
   const sigBox = h('div');
   const sign = async () => {
     const image = await captureSignature({ title: sig.name ? `Sign below – ${sig.name}` : 'Sign below' });
@@ -81,12 +84,14 @@ export default async function signoff(root, { id }) {
   root.append(
     ...jobChrome(job, 'signoff'),
     h('div', { class: 'content' },
-      h('h2', null, 'Appliances'),
-      h('div', { class: 'card card-body' },
-        h('span', { class: 'field-label' }, 'Are there any appliances to be maintained?'),
-        question),
-      listSlot,
-      more,
+      rtl ? [
+        h('h2', null, 'Appliances'),
+        h('div', { class: 'card card-body' },
+          h('span', { class: 'field-label' }, 'Are there any appliances to be maintained?'),
+          question),
+        listSlot,
+        more,
+      ] : h('p', { class: 'hint' }, 'Sign to confirm the survey is complete and accurate. The signature appears at the end of the PDF report.'),
       h('h2', null, 'Signature'),
       h('div', { class: 'card card-body' },
         textField('Name', sig.name, (v) => { sig.name = v; save(); }, { autocapitalize: 'words', placeholder: 'Name of the person signing' }),
