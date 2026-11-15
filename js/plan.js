@@ -10,7 +10,13 @@ export const PLAN_KINDS = {
   bathroom: { title: 'Bathroom plan', pdfTitle: 'Bathroom Plan', file: 'Bathroom plan', emoji: '🛁' },
 };
 
+// Standard unit widths (cm) offered in the size drop-down.
+const BASE_SIZES = [30, 40, 45, 50, 60, 80, 90, 100, 120];
+const WALL_SIZES = [30, 40, 50, 60, 80, 90, 100];
+
 /**
+ * run: fixtures in the same run (base-level or wall-level) snap flush against each other.
+ * corner: an L-shaped unit in a square of side w; this is the depth of its two arms.
  * kind: 'wall' (an opening in a wall: size = width), 'point' (a symbol with a short code),
  * 'fixture' (a box: w × h in cm; Rotate swaps them).
  */
@@ -25,14 +31,16 @@ export const ITEMS = {
   smoke: { kind: 'point', label: 'Smoke alarm', emoji: '🔔', code: 'SA' },
   co: { kind: 'point', label: 'CO alarm', emoji: '⚠️', code: 'CO' },
   radiator: { kind: 'fixture', label: 'Radiator', emoji: '▬', w: 100, h: 12 },
-  base: { kind: 'fixture', label: 'Base unit', emoji: '▢', w: 60, h: 60 },
-  wallunit: { kind: 'fixture', label: 'Wall unit', emoji: '▭', w: 60, h: 33, dashed: true },
-  sink: { kind: 'fixture', label: 'Sink', emoji: '🚰', w: 100, h: 55 },
-  hob: { kind: 'fixture', label: 'Hob', emoji: '🍳', w: 60, h: 55 },
-  oven: { kind: 'fixture', label: 'Oven', emoji: '♨️', w: 60, h: 60 },
-  fridge: { kind: 'fixture', label: 'Fridge', emoji: '🧊', w: 60, h: 65 },
-  washer: { kind: 'fixture', label: 'Washing machine', emoji: '🫧', w: 60, h: 60 },
-  dishwasher: { kind: 'fixture', label: 'Dishwasher', emoji: '🍽️', w: 60, h: 60 },
+  base: { kind: 'fixture', label: 'Base unit', emoji: '▢', w: 60, h: 60, run: 'base', sizes: BASE_SIZES },
+  wallunit: { kind: 'fixture', label: 'Wall unit', emoji: '▭', w: 60, h: 33, dashed: true, run: 'wall', sizes: WALL_SIZES },
+  cornerbase: { kind: 'fixture', label: 'Corner base unit', emoji: '◣', w: 90, h: 90, corner: 60, run: 'base', sizes: [90, 100] },
+  cornerwall: { kind: 'fixture', label: 'Corner wall unit', emoji: '◤', w: 60, h: 60, corner: 33, dashed: true, run: 'wall', sizes: [60, 65] },
+  sink: { kind: 'fixture', label: 'Sink', emoji: '🚰', w: 100, h: 55, run: 'base' },
+  hob: { kind: 'fixture', label: 'Hob', emoji: '🍳', w: 60, h: 55, run: 'base' },
+  oven: { kind: 'fixture', label: 'Oven', emoji: '♨️', w: 60, h: 60, run: 'base' },
+  fridge: { kind: 'fixture', label: 'Fridge', emoji: '🧊', w: 60, h: 65, run: 'base' },
+  washer: { kind: 'fixture', label: 'Washing machine', emoji: '🫧', w: 60, h: 60, run: 'base' },
+  dishwasher: { kind: 'fixture', label: 'Dishwasher', emoji: '🍽️', w: 60, h: 60, run: 'base' },
   bath: { kind: 'fixture', label: 'Bath', emoji: '🛁', w: 170, h: 70 },
   shower: { kind: 'fixture', label: 'Shower', emoji: '🚿', w: 90, h: 90 },
   wc: { kind: 'fixture', label: 'WC', emoji: '🚽', w: 40, h: 65 },
@@ -42,7 +50,7 @@ export const ITEMS = {
 /** Buttons offered for each kind of plan, in order. */
 export const PALETTE = {
   property: ['door', 'window', 'fuse', 'water', 'gas', 'elec', 'boiler', 'smoke', 'co', 'radiator'],
-  kitchen: ['door', 'window', 'base', 'wallunit', 'sink', 'hob', 'oven', 'fridge', 'washer', 'dishwasher', 'boiler', 'radiator', 'fuse', 'water', 'gas', 'elec'],
+  kitchen: ['door', 'window', 'base', 'cornerbase', 'wallunit', 'cornerwall', 'sink', 'hob', 'oven', 'fridge', 'washer', 'dishwasher', 'boiler', 'radiator', 'fuse', 'water', 'gas', 'elec'],
   bathroom: ['door', 'window', 'bath', 'shower', 'wc', 'basin', 'radiator', 'water'],
 };
 
@@ -64,7 +72,7 @@ export function newPlan(kind = 'property') {
 export function newPlanItem(type, props = {}) {
   const d = ITEMS[type];
   const base = d.kind === 'wall' ? { size: d.size, flip: false, wall: 'n', at: 0 }
-    : d.kind === 'fixture' ? { w: d.w, h: d.h, dx: 0, dy: 0 } : { dx: 0, dy: 0 };
+    : d.kind === 'fixture' ? { w: d.w, h: d.h, dx: 0, dy: 0, ...(d.corner ? { rot: 0 } : {}) } : { dx: 0, dy: 0 };
   return { id: newId(), type, ...base, ...props };
 }
 
@@ -167,4 +175,48 @@ export function settleItem(room, item) {
 export function legend(floors) {
   const used = new Set(floors.flatMap((f) => f.items.map((i) => i.type)));
   return Object.entries(ITEMS).filter(([k, d]) => d.kind === 'point' && used.has(k)).map(([, d]) => [d.code, d.label]);
+}
+
+/** Corner units are L-shaped: the outline (cm, relative to the unit's box) turned by item.rot (0/90/180/270). */
+export function cornerPoints(item) {
+  const S = item.w, a = Math.min(ITEMS[item.type].corner, S);
+  let pts = [[0, 0], [S, 0], [S, a], [a, a], [a, S], [0, S]];
+  for (let i = 0; i < ((item.rot || 0) / 90) % 4; i++) pts = pts.map(([x, y]) => [S - y, x]);
+  return pts;
+}
+
+/** Keep a fixture inside its room (no wall-flush snapping). */
+export function clampItem(room, item) {
+  item.dx = Math.max(0, Math.min(item.dx, room.w - (item.w || 0)));
+  item.dy = Math.max(0, Math.min(item.dy, room.h - (item.h || 0)));
+}
+
+/**
+ * Units in the same run (base or wall level) snap flush against each other: the edge you bring
+ * near another unit (within tol cm) closes up, and the fronts / backs line up too.
+ */
+export function snapToUnits(room, items, item, tol = 15) {
+  const run = ITEMS[item.type].run;
+  if (!run) return;
+  const others = items.filter((o) => o !== item && o.roomId === item.roomId && ITEMS[o.type].run === run && ITEMS[o.type].kind === 'fixture');
+  const best = (cands) => cands.filter((c) => Math.abs(c.d) <= tol).sort((a, b) => Math.abs(a.d) - Math.abs(b.d))[0];
+  const overlaps = (a0, a1, b0, b1) => a0 < b1 + tol && a1 > b0 - tol;
+  const align = (lo, len, olo, olen) => (Math.abs(lo - olo) <= tol ? olo : Math.abs(lo + len - (olo + olen)) <= tol ? olo + olen - len : lo);
+  // side by side (moves dx, then lines up dy)
+  let hs = [];
+  for (const o of others) {
+    if (!overlaps(item.dy, item.dy + item.h, o.dy, o.dy + o.h)) continue;
+    hs.push({ o, d: o.dx + o.w - item.dx }, { o, d: o.dx - item.w - item.dx });
+  }
+  const h = best(hs);
+  if (h) { item.dx += h.d; item.dy = align(item.dy, item.h, h.o.dy, h.o.h); }
+  // front to back (moves dy, then lines up dx)
+  const vs = [];
+  for (const o of others) {
+    if (!overlaps(item.dx, item.dx + item.w, o.dx, o.dx + o.w)) continue;
+    vs.push({ o, d: o.dy + o.h - item.dy }, { o, d: o.dy - item.h - item.dy });
+  }
+  const v = best(vs);
+  if (v) { item.dy += v.d; item.dx = align(item.dx, item.w, v.o.dx, v.o.w); }
+  clampItem(room, item);
 }

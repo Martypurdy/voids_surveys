@@ -1,6 +1,6 @@
 // PDF report (jsPDF, loaded on demand from /vendor).
 import { addressLines, jobTitle, fmtDate, fmtDateTime, slug, todayLocal, allPhotoIds, worksSummary, roomStatus, roomAreas, serviceTitle, hasMeterDoor, isRtl, isPrice, isPlan, formOf } from '../model.js';
-import { ITEMS, roomFigures, floorArea, planArea, metres, sqm, openingGeometry, bounds, legend } from '../plan.js';
+import { ITEMS, roomFigures, floorArea, planArea, metres, sqm, openingGeometry, bounds, legend, cornerPoints } from '../plan.js';
 import { sheetTotals, lineTotals, isBlankLine, gbp, money, LABOUR_BASIS } from '../pricing.js';
 import { UNITS, defectInfo, isSorCode, qtyText as unitQty } from '../data/parts.js';
 import { FEATURES, featuresOf } from '../data/features.js';
@@ -788,6 +788,12 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
       doc.setDrawColor(70, 80, 90);
       if (d.dashed) doc.setLineDashPattern([1, 0.8], 0);
       doc.setFillColor(236, 241, 246);
+      if (d.corner) {
+        const pts = cornerPoints(it).map(([ux, uy]) => [px(r.x + it.dx + ux), py(r.y + it.dy + uy)]);
+        doc.lines(pts.slice(1).concat([pts[0]]).map((p, i) => [p[0] - pts[i][0], p[1] - pts[i][1]]), pts[0][0], pts[0][1], [1, 1], d.dashed ? 'S' : 'FD', true);
+        doc.setLineDashPattern([], 0);
+        continue;
+      }
       doc.rect(px(r.x + it.dx), py(r.y + it.dy), it.w * k, it.h * k, d.dashed ? 'S' : 'FD');
       doc.setLineDashPattern([], 0);
       const w = it.w * k, hh = it.h * k;

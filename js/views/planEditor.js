@@ -3,11 +3,11 @@
 // inside a room to add the fuse board, water main, meters, units, sink, bath and so on.
 // Measurements and areas show automatically. One finger drags, two fingers zoom.
 import { scheduleSave } from '../db.js';
-import { h, toast, choose, confirmDialog } from '../ui.js';
+import { h, toast, choose, confirmDialog, selectField } from '../ui.js';
 import { loadJobOr404, jobChrome, completeFooter } from './chrome.js';
 import {
   ITEMS, PALETTE, ROOM_NAMES, FLOOR_NAMES, newPlanRoom, newFloor, newPlanItem, roomFigures, floorArea, planArea,
-  metres, sqm, openingGeometry, nearestWall, roomAt, bounds, settleItem, legend,
+  metres, sqm, openingGeometry, nearestWall, roomAt, bounds, settleItem, legend, cornerPoints, snapToUnits,
 } from '../plan.js';
 
 const SNAP = 5; // cm
@@ -96,7 +96,12 @@ export default async function planEditor(root, { id }) {
       const d = ITEMS[it.type];
       if (!r || d.kind !== 'fixture') continue;
       const x = X(r.x + it.dx), y = Y(r.y + it.dy), w = it.w * s, hh = it.h * s;
-      out.push(`<rect class="fx${d.dashed ? ' dashed' : ''}${isSel(it) ? ' sel' : ''}" x="${x}" y="${y}" width="${w}" height="${hh}"/>`);
+      const cls = `fx${d.dashed ? ' dashed' : ''}${isSel(it) ? ' sel' : ''}`;
+      if (d.corner) {
+        out.push(`<polygon class="${cls}" points="${cornerPoints(it).map(([px, py]) => `${x + px * s},${y + py * s}`).join(' ')}"/>`);
+        continue;
+      }
+      out.push(`<rect class="${cls}" x="${x}" y="${y}" width="${w}" height="${hh}"/>`);
       if (w > 34 && hh > 13) out.push(`<text class="fx-t" x="${x + w / 2}" y="${y + hh / 2}" font-size="${Math.min(11, hh * 0.45, w / d.label.length * 1.9)}">${esc(d.label)}</text>`);
     }
     for (const it of f.items) {
@@ -129,15 +134,21 @@ export default async function planEditor(root, { id }) {
       if (w > 50) out.push(`<text class="dim" x="${x + w / 2}" y="${y + 13}">${metres(r.w)}</text>`);
       if (hh > 50) out.push(`<text class="dim" transform="translate(${x + 12} ${y + hh / 2}) rotate(-90)">${metres(r.h)}</text>`);
     }
-    // Corner handles on the selected room.
+    // Corner handles (drag both ways) and edge-middle handles (one way only) on the selected room.
     if (sel?.type === 'room') {
       const r = roomById(sel.id);
-      if (r) for (const [cx, cy] of corners(r)) out.push(`<circle class="handle" cx="${X(cx)}" cy="${Y(cy)}" r="9"/>`);
+      if (r) for (const [cx, cy, id] of handles(r)) out.push(id.length === 2 ? `<circle class="handle" cx="${X(cx)}" cy="${Y(cy)}" r="9"/>` : `<rect class="handle mid" x="${X(cx) - 6}" y="${Y(cy) - 6}" width="12" height="12" rx="3"/>`);
     }
     if (!f.rooms.length) out.push(`<text class="empty-t" x="${W / 2}" y="${H / 2}">Tap “+ Room” to start</text>`);
     svg.innerHTML = out.join('');
   };
   const corners = (r) => [[r.x, r.y, 'nw'], [r.x + r.w, r.y, 'ne'], [r.x, r.y + r.h, 'sw'], [r.x + r.w, r.y + r.h, 'se']];
+  // Corners, plus the middle of each edge (n, e, s, w) when the room is big enough on screen not to crowd them.
+  const handles = (r) => [
+    ...corners(r),
+    ...(r.w * view.s > 70 ? [[r.x + r.w / 2, r.y, 'n'], [r.x + r.w / 2, r.y + r.h, 's']] : []),
+    ...(r.h * view.s > 70 ? [[r.x, r.y + r.h / 2, 'w'], [r.x + r.w, r.y + r.h / 2, 'e']] : []),
+  ];
 
   // ----- hit testing (screen point -> what's there) -----
   const hitTest = (p) => {
@@ -146,7 +157,7 @@ export default async function planEditor(root, { id }) {
     const f = floor();
     if (sel?.type === 'room') {
       const r = roomById(sel.id);
-      const c = r && corners(r).find(([cx, cy]) => Math.hypot(w.x - cx, w.y - cy) < 20 / view.s);
+      const c = r && handles(r).find(([cx, cy]) => Math.hypot(w.x - cx, w.y - cy) < 20 / view.s); // corners come first, so they win at a tie
       if (c) return { kind: 'handle', room: r, corner: c[2] };
     }
     for (const it of [...f.items].reverse()) {
@@ -187,6 +198,7 @@ export default async function planEditor(root, { id }) {
       it.dx = snap(w.x - r.x - (it.w || 0) / 2);
       it.dy = snap(w.y - r.y - (it.h || 0) / 2);
       settleItem(r, it);
+      snapToUnits(r, f.items, it);
       f.items.push(it);
       sel = { type: 'item', id: it.id };
     }
@@ -355,6 +367,7 @@ export default async function planEditor(root, { id }) {
     it.dx = snap(ax - r.x);
     it.dy = snap(ay - r.y);
     settleItem(r, it);
+    snapToUnits(r, f.items, it); // closes up against the unit next to it
   };
 
   // ----- floors (whole property plans) -----
@@ -520,11 +533,42 @@ export default async function planEditor(root, { id }) {
         parts.push(h('p', { class: 'hint' }, 'Drag it along the wall, or onto another wall.'));
       } else if (d.kind === 'fixture') {
         const r = roomById(it.roomId);
-        parts.push(h('div', { class: 'grid-2' },
-          field('Width (cm)', String(it.w), (v) => { const n = num(v); if (n > 5) { it.w = Math.round(n); settleItem(r, it); } }, { inputmode: 'decimal' }),
-          field('Depth (cm)', String(it.h), (v) => { const n = num(v); if (n > 5) { it.h = Math.round(n); settleItem(r, it); } }, { inputmode: 'decimal' })));
+        if (d.sizes) {
+          // Units: pick a standard size (the length along the wall). "Other" lets you type one.
+          const alongKey = !d.corner && it.turn ? 'h' : 'w';
+          const cur = it[alongKey];
+          const opts = d.sizes.includes(cur) ? d.sizes : [...d.sizes, cur].sort((a, b) => a - b);
+          const apply = (n) => {
+            remember();
+            if (d.corner) { it.w = n; it.h = n; } else it[alongKey] = n;
+            settleItem(r, it);
+            snapToUnits(r, f.items, it);
+            save();
+            renderAll();
+          };
+          parts.push(selectField('Unit size', String(cur), [...opts.map((n) => [String(n), `${n} cm`]), ['other', 'Other…']], (v) => {
+            if (v !== 'other') return apply(Number(v));
+            custom.hidden = false;
+            custom.querySelector('input').focus();
+          }, { placeholder: null }));
+          const custom = field(d.corner ? 'Size (cm)' : 'Width (cm)', String(cur), (v) => { const n = num(v); if (n > 5) { it[alongKey] = Math.round(n); if (d.corner) it.h = it.w; settleItem(r, it); } }, { inputmode: 'decimal' });
+          custom.hidden = true;
+          parts.push(custom);
+          if (!d.corner) parts.push(field('Depth (cm)', String(it[alongKey === 'w' ? 'h' : 'w']), (v) => { const n = num(v); if (n > 5) { it[alongKey === 'w' ? 'h' : 'w'] = Math.round(n); settleItem(r, it); } }, { inputmode: 'decimal' }));
+        } else {
+          parts.push(h('div', { class: 'grid-2' },
+            field('Width (cm)', String(it.w), (v) => { const n = num(v); if (n > 5) { it.w = Math.round(n); settleItem(r, it); } }, { inputmode: 'decimal' }),
+            field('Depth (cm)', String(it.h), (v) => { const n = num(v); if (n > 5) { it.h = Math.round(n); settleItem(r, it); } }, { inputmode: 'decimal' })));
+        }
         parts.push(h('div', { class: 'btn-row' },
-          h('button', { type: 'button', class: 'btn-small', onclick: () => { remember(); [it.w, it.h] = [it.h, it.w]; settleItem(r, it); save(); renderAll(); } }, '⟳ Turn'),
+          h('button', { type: 'button', class: 'btn-small', onclick: () => {
+            remember();
+            if (d.corner) it.rot = ((it.rot || 0) + 90) % 360; // the L turns to the next corner
+            else { [it.w, it.h] = [it.h, it.w]; it.turn = !it.turn; }
+            settleItem(r, it);
+            save();
+            renderAll();
+          } }, '⟳ Turn'),
           removeIt));
       } else {
         parts.push(h('p', { class: 'hint' }, `Shown as “${d.code}” on the plan. Drag it to where it is.`), h('div', { class: 'btn-row' }, removeIt));

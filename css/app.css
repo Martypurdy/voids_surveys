@@ -1220,6 +1220,7 @@ body.no-scroll { overflow: hidden; }
 .plan-svg .ra { fill: var(--plan-dim); font-size: 11px; text-anchor: middle; pointer-events: none; }
 .plan-svg .dim { fill: var(--plan-dim); font-size: 10.5px; font-weight: 600; text-anchor: middle; pointer-events: none; }
 .plan-svg .handle { fill: var(--primary); stroke: #fff; stroke-width: 2; }
+.plan-svg .handle.mid { fill: #fff; stroke: var(--primary); }
 .plan-svg .empty-t { fill: var(--plan-dim); font-size: 15px; text-anchor: middle; }
 .plan-zoom { display: flex; gap: 6px; margin: 8px 0; }
 .plan-zoom .btn-small { flex: 1; }
