@@ -5,7 +5,7 @@ export const SCHEMA = 1;
 export const CONDITIONS = ['Good', 'Fair', 'Poor', 'N/A'];
 
 import { AREA_PRESETS, defaultFeatures } from './data/features.js';
-import { newPlan, PLAN_KINDS, upgradePlanItem } from './plan.js';
+import { newPlan, PLAN_KINDS, upgradePlanItem, refreshDepths, DEFAULT_SETTINGS } from './plan.js';
 
 export const ROOM_PRESETS = AREA_PRESETS.rooms;
 export const EXTERNAL_PRESETS = AREA_PRESETS.externals;
@@ -198,6 +198,8 @@ export function upgradeJob(job) {
   if (isPlan(job)) {
     job.plan = { ...newPlan(job.plan?.kind), ...(job.plan || {}) };
     for (const f of job.plan.floors) { f.rooms ??= []; f.items ??= []; f.items.forEach(upgradePlanItem); }
+    job.plan.settings = { ...DEFAULT_SETTINGS, ...(job.plan.settings || {}) };
+    refreshDepths(job.plan); // units follow the door / board thickness settings
     // Plans finished before the Room dimensions tab existed stay complete.
     if (job.progress?.plan === 'complete' && !job.progress.dimensions) job.progress.dimensions = 'complete';
   }

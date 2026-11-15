@@ -1242,3 +1242,5 @@ body.no-scroll { overflow: hidden; }
 .plan-svg .post { fill: var(--primary); stroke: none; pointer-events: none; }
 .plan-svg .endp { fill: var(--plan-wall); stroke: none; pointer-events: none; }
 .plan-extras li::before { content: "▪"; color: var(--primary); }
+.plan-settings { margin: 0 0 10px; }
+.plan-settings strong { display: block; margin-bottom: 4px; }

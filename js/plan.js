@@ -31,17 +31,17 @@ export const ITEMS = {
   smoke: { kind: 'point', label: 'Smoke alarm', emoji: '🔔', code: 'SA' },
   co: { kind: 'point', label: 'CO alarm', emoji: '⚠️', code: 'CO' },
   radiator: { kind: 'fixture', label: 'Radiator', emoji: '▬', w: 100, h: 12 },
-  base: { kind: 'fixture', cab: true, styles: true, label: 'Base unit', emoji: '▢', w: 60, h: 60, run: 'base', sizes: BASE_SIZES },
-  wallunit: { kind: 'fixture', cab: true, label: 'Wall unit', emoji: '▭', w: 60, h: 33, dashed: true, run: 'wall', sizes: WALL_SIZES },
+  base: { kind: 'fixture', cab: true, styles: true, label: 'Base unit', emoji: '▢', w: 60, h: 59.5, fronted: true, cd: 57.5, run: 'base', sizes: BASE_SIZES },
+  wallunit: { kind: 'fixture', cab: true, label: 'Wall unit', emoji: '▭', w: 60, h: 33, fronted: true, cd: 31, dashed: true, run: 'wall', sizes: WALL_SIZES },
   cornerbase: { kind: 'fixture', cab: true, label: 'Corner base unit', emoji: '◣', w: 90, h: 90, corner: 60, run: 'base', sizes: [90, 100] },
   cornerwall: { kind: 'fixture', cab: true, label: 'Corner wall unit', emoji: '◤', w: 60, h: 60, corner: 33, dashed: true, run: 'wall', sizes: [60, 65] },
-  blindcorner: { kind: 'fixture', cab: true, blind: true, label: 'Blind corner base unit', emoji: '◧', w: 100, h: 57, run: 'base', sizes: [80, 100] },
-  appspace: { kind: 'fixture', cab: true, space: true, dashed: true, label: 'Appliance space', emoji: '⬚', w: 60, h: 60, run: 'base', sizes: [45, 50, 55, 60, 70, 90, 100] },
-  fillerbase: { kind: 'fixture', filler: true, label: 'Filler panel (base)', emoji: '▮', w: 5, h: 60, run: 'base', sizes: [3, 5, 7.5, 10, 15, 20, 30] },
-  fillerwall: { kind: 'fixture', filler: true, dashed: true, label: 'Filler panel (wall)', emoji: '▯', w: 5, h: 33, run: 'wall', sizes: [3, 5, 7.5, 10, 15, 20, 30] },
-  larder: { kind: 'fixture', cab: true, patterns: true, label: 'Larder unit', emoji: '🗄️', w: 60, h: 60, run: 'base', sizes: [30, 40, 45, 50, 60, 80, 100] },
-  ovenhousing: { kind: 'fixture', cab: true, patterns: true, label: 'Oven housing', emoji: '♨️', w: 60, h: 60, run: 'base', sizes: [60] },
-  fridgefreezer: { kind: 'fixture', cab: true, patterns: true, label: 'Fridge / freezer housing', emoji: '🧊', w: 60, h: 60, run: 'base', sizes: [55, 60, 70] },
+  blindcorner: { kind: 'fixture', cab: true, blind: true, label: 'Blind corner base unit', emoji: '◧', w: 100, h: 59.5, fronted: true, cd: 57.5, run: 'base', sizes: [80, 100] },
+  appspace: { kind: 'fixture', cab: true, space: true, dashed: true, label: 'Appliance space', emoji: '⬚', w: 62, h: 59.5, fronted: true, cd: 57.5, run: 'base', sizes: [45, 50, 55, 60, 62, 70, 90, 100] },
+  fillerbase: { kind: 'fixture', filler: true, label: 'Filler panel (base)', emoji: '▮', w: 5, h: 59.5, fronted: true, cd: 57.5, run: 'base', sizes: [3, 5, 7.5, 10, 15, 20, 30] },
+  fillerwall: { kind: 'fixture', filler: true, dashed: true, label: 'Filler panel (wall)', emoji: '▯', w: 5, h: 33, fronted: true, cd: 31, run: 'wall', sizes: [3, 5, 7.5, 10, 15, 20, 30] },
+  larder: { kind: 'fixture', cab: true, patterns: true, label: 'Larder unit', emoji: '🗄️', w: 60, h: 59.5, fronted: true, cd: 57.5, run: 'base', sizes: [30, 40, 45, 50, 60, 80, 100] },
+  ovenhousing: { kind: 'fixture', cab: true, patterns: true, label: 'Oven housing', emoji: '♨️', w: 60, h: 59.5, fronted: true, cd: 57.5, run: 'base', sizes: [60] },
+  fridgefreezer: { kind: 'fixture', cab: true, patterns: true, label: 'Fridge / freezer housing', emoji: '🧊', w: 60, h: 59.5, fronted: true, cd: 57.5, run: 'base', sizes: [55, 60, 70] },
   sink: { kind: 'fixture', label: 'Sink', emoji: '🚰', w: 100, h: 55, run: 'base' },
   hob: { kind: 'fixture', label: 'Hob', emoji: '🍳', w: 60, h: 55, run: 'base' },
   oven: { kind: 'fixture', label: 'Oven', emoji: '♨️', w: 60, h: 60, run: 'base' },
@@ -60,7 +60,10 @@ for (const [k, d] of Object.entries(ITEMS)) if (d.kind === 'fixture' && k !== 'r
 /** Blind corner units: the door widths that go with each unit width (cm). */
 export const DOOR_OPTIONS = { 100: [50, 60], 80: [30, 35, 40] };
 export const APPLIANCES = ['Oven / cooker', 'Dishwasher', 'Washing machine', 'Fridge / freezer', 'Other'];
-export const END_PANEL = 1.8; // cm thick
+export const GAP = 0.2; // cm between the carcass and its door / drawer front
+export const DEFAULT_SETTINGS = { front: 18, board: 18 }; // mm: door / drawer fronts; end panels and fillers
+const frontCm = (st) => (st?.front ?? DEFAULT_SETTINGS.front) / 10;
+const boardCm = (st) => (st?.board ?? DEFAULT_SETTINGS.board) / 10;
 
 /** Buttons offered for each kind of plan, in order. */
 export const PALETTE = {
@@ -90,7 +93,7 @@ export function newPlan(kind = 'property') {
   const floor = newFloor(k === 'property' ? 'Ground floor' : PLAN_KINDS[k].title);
   if (k === 'kitchen') floor.rooms.push(newPlanRoom({ name: 'Kitchen', w: 300, h: 350 }));
   if (k === 'bathroom') floor.rooms.push(newPlanRoom({ name: 'Bathroom', w: 200, h: 250 }));
-  return { kind: k, floors: [floor], notes: '' };
+  return { kind: k, floors: [floor], notes: '', settings: { ...DEFAULT_SETTINGS } };
 }
 
 /** A new item of this type in a room. */
@@ -100,6 +103,7 @@ export function newPlanItem(type, props = {}) {
     : d.facing ? {
       w: d.w, h: d.h, uw: d.w, ud: d.h, rot: 0, manual: false, dx: 0, dy: 0,
       ...(d.cab && !d.corner && !d.space ? { endL: false, endR: false } : {}),
+      ...(d.fronted ? { cd: d.cd, ew: 0 } : {}),
       ...(d.styles ? { style: 'door' } : {}),
       ...(d.patterns ? { pattern: '50/50' } : {}),
       ...(d.blind ? { door: 60, hand: 'right', post: 7 } : {}),
@@ -264,8 +268,9 @@ export function snapToUnits(room, items, item, tol = 15) {
 export function applyRot(it) {
   if (ITEMS[it.type].corner) { it.w = it.uw; it.h = it.uw; return; }
   const sideways = (it.rot || 0) % 180 !== 0;
-  it.w = sideways ? it.ud : it.uw;
-  it.h = sideways ? it.uw : it.ud;
+  const across = it.uw + (it.ew || 0); // an appliance space includes its two end panels
+  it.w = sideways ? it.ud : across;
+  it.h = sideways ? across : it.ud;
 }
 
 /** Turn a cabinet to face a new way, keeping its centre where it is. */
@@ -280,6 +285,7 @@ export function rotateAbout(it, rot) {
 /** Older base / wall units had only w, h and a "turned" flag: give them a size and a facing. */
 export function upgradePlanItem(it) {
   const d = ITEMS[it.type];
+  if (d?.fronted) it.cd ??= d.cd;
   if (!d?.facing || it.uw != null) return;
   if (d.corner) { it.uw = it.ud = it.w; it.rot ??= 0; } else {
     const turned = Boolean(it.turn);
@@ -381,13 +387,17 @@ export function refreshPosts(floor) {
  * End panels (thin panels closing the end of a run): any unit with endL / endR set, and both
  * sides of every appliance space. Returns rectangles in room coordinates.
  */
-export function endPanels(floor) {
+export function endPanels(floor, st) {
+  const t = boardCm(st);
   const out = [];
   for (const it of floor.items) {
     const d = ITEMS[it.type];
     if (!d?.cab || d.corner) continue;
-    const left = d.space || it.endL, right = d.space || it.endR;
-    for (const [on, u0, u1, side] of [[left, -END_PANEL, 0, 'left'], [right, it.uw, it.uw + END_PANEL, 'right']]) {
+    // an appliance space has its panels inside its box; other units have them outside the end
+    const sets = d.space
+      ? [[true, 0, t, 'left'], [true, it.uw + t, it.uw + 2 * t, 'right']]
+      : [[it.endL, -t, 0, 'left'], [it.endR, it.uw, it.uw + t, 'right']];
+    for (const [on, u0, u1, side] of sets) {
       if (!on) continue;
       const [x1, y1] = boxPoint(it, u0, 0), [x2, y2] = boxPoint(it, u1, it.ud);
       out.push({ ownerId: it.id, roomId: it.roomId, side, level: d.run === 'wall' ? 'wall' : 'base', depth: it.ud, x: it.dx + Math.min(x1, x2), y: it.dy + Math.min(y1, y2), w: Math.abs(x2 - x1), h: Math.abs(y2 - y1) });
@@ -397,16 +407,17 @@ export function endPanels(floor) {
 }
 
 /** Key lines for the things that are not numbered units: end panels and fillers. */
-export function panelLines(floor) {
+export function panelLines(floor, st) {
   const lines = [];
+  const mm = Math.round(boardCm(st) * 10);
   const groups = new Map();
-  for (const p of endPanels(floor)) {
+  for (const p of endPanels(floor, st)) {
     const k = `${p.level}|${p.depth}`;
     groups.set(k, (groups.get(k) || 0) + 1);
   }
   for (const [k, n] of groups) {
     const [level, depth] = k.split('|');
-    lines.push(`${n} x end panel, ${level} level, ${Math.round(depth * 10)} mm deep`);
+    lines.push(`${n} x end panel, ${level} level, ${Math.round(depth * 10)} mm deep, ${mm} mm board`);
   }
   const fillers = new Map();
   for (const it of floor.items) {
@@ -416,9 +427,44 @@ export function panelLines(floor) {
   }
   for (const [k, n] of fillers) {
     const [level, w] = k.split('|');
-    lines.push(`${n} x filler panel, ${Math.round(w * 10)} mm wide, ${level} level`);
+    lines.push(`${n} x filler panel, ${Math.round(w * 10)} mm wide, ${level} level, ${mm} mm board`);
   }
   return lines;
+}
+
+/** One line for the key: how the depths are made up. */
+export const settingsLine = (st) => `Units: carcass + ${Math.round(GAP * 10)} mm gap + ${Math.round(frontCm(st) * 10)} mm door / drawer front. End panels and fillers: ${Math.round(boardCm(st) * 10)} mm board.`;
+
+/**
+ * Depth of a unit on the plan = carcass depth + 2 mm gap + the door / drawer front (appliance spaces and
+ * fillers line up with the fronts beside them). An appliance space also carries its two end panels.
+ * Returns true when anything changed; the back of the unit stays where it was.
+ */
+export function setDepth(it, st) {
+  const d = ITEMS[it.type];
+  if (!d?.fronted) return false;
+  it.cd ??= d.cd;
+  const ud = Math.round((it.cd + GAP + frontCm(st)) * 100) / 100;
+  const ew = d.space ? Math.round(2 * boardCm(st) * 100) / 100 : 0;
+  if (it.ud === ud && (it.ew || 0) === ew) return false;
+  const delta = ud - (it.ud ?? ud);
+  const rot = (it.rot || 0) % 360;
+  if (rot === 90) it.dx -= delta; // back to the east wall: the front moves, not the back
+  if (rot === 180) it.dy -= delta; // back to the south wall
+  it.ud = ud;
+  it.ew = ew;
+  applyRot(it);
+  return true;
+}
+/** Bring every unit on the plan up to the current thickness settings. */
+export function refreshDepths(plan) {
+  for (const f of plan.floors) {
+    for (const it of f.items) {
+      if (!setDepth(it, plan.settings)) continue;
+      const room = f.rooms.find((r) => r.id === it.roomId);
+      if (room) settleItem(room, it);
+    }
+  }
 }
 
 /** Where to put the number on a corner unit (inside one of its arms). */

@@ -10,7 +10,7 @@ import {
   ITEMS, PALETTE, ROOM_NAMES, FLOOR_NAMES, newPlanRoom, newFloor, newPlanItem, roomFigures, floorArea, planArea,
   metres, sqm, openingGeometry, nearestWall, roomAt, bounds, settleItem, legend, cornerPoints, snapToUnits, isStructure,
   STYLES, PATTERNS, DOOR_OPTIONS, APPLIANCES, applyRot, rotateAbout, cabinetNumbers, cabinetText, frontEdge, cornerLabelPoint, autoRotate, clearSpot,
-  blindGeometry, refreshPosts, endPanels, panelLines,
+  blindGeometry, refreshPosts, endPanels, panelLines, setDepth, refreshDepths,
 } from '../plan.js';
 
 const SNAP = 5; // cm
@@ -29,7 +29,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
   const dims = mode === 'dimensions';
   const section = dims ? 'dimensions' : 'plan';
   const editable = (type) => (dims ? isStructure(type) : !isStructure(type)); // else it is locked on this tab
-  const save = () => { refreshPosts(floor()); scheduleSave(job); }; // corner posts always fit the cabinets beside them
+  const save = () => { refreshDepths(plan); refreshPosts(floor()); scheduleSave(job); }; // units follow the thickness settings; posts fit their neighbours // corner posts always fit the cabinets beside them
   let fi = 0;
   const floor = () => plan.floors[fi];
   const roomById = (rid) => floor().rooms.find((r) => r.id === rid);
@@ -130,7 +130,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       }
     }
     // end panels (thin, drawn at least 3 px so they show when zoomed out)
-    for (const p of endPanels(f)) {
+    for (const p of endPanels(f, plan.settings)) {
       const r = roomById(p.roomId);
       if (!r) continue;
       const pw = Math.max(p.w * s, 3), ph = Math.max(p.h * s, 3);
@@ -412,7 +412,17 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     const doorOptions = (n) => doorsFor(n).map((m) => h('option', { value: String(m) }, `${m * 10} mm`));
     const parts = [];
     let doorField = null;
-    const widthField = selectField('Width', String(width), d.sizes.map((n) => [String(n), `${n * 10} mm`]), (v) => {
+    let useOther = false;
+    const customInput = h('input', { type: 'text', inputmode: 'decimal', 'aria-label': 'Width in cm' });
+    const customLabel = h('label', { class: 'field' }, h('span', { class: 'field-label' }, 'Width (cm)'), customInput);
+    customLabel.hidden = true;
+    const widthField = selectField('Width', String(width), [...d.sizes.map((n) => [String(n), `${n * 10} mm`]), ['other', 'Other…']], (v) => {
+      useOther = v === 'other';
+      customLabel.hidden = !useOther;
+      if (useOther) {
+        customInput.focus();
+        return;
+      }
       width = Number(v);
       if (d.blind) {
         const sel = doorField.querySelector('select');
@@ -421,7 +431,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
         sel.value = String(door);
       }
     }, { placeholder: null });
-    parts.push(widthField);
+    parts.push(widthField, customLabel);
     if (d.blind) {
       door = doorsFor(width).slice(-1)[0];
       doorField = selectField('Door width', String(door), doorsFor(width).map((m) => [String(m), `${m * 10} mm`]), (v) => { door = Number(v); }, { placeholder: null });
@@ -441,7 +451,10 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       content: h('div', null, ...parts),
       buttons: [...choices.map((c) => ({ ...c, class: 'btn-primary btn-big' })), { label: 'Cancel', value: null }],
     });
-    return v ? { width, choice: v, door, hand } : null;
+    if (!v) return null;
+    const typed = useOther ? num(customInput.value) : NaN;
+    const finalWidth = typed > 0.5 ? Math.round(typed * 10) / 10 : width;
+    return { width: finalWidth, choice: v, door: d.blind ? Math.min(door, finalWidth - 20) : door, hand };
   };
   const addCabinet = async (type) => {
     const d = ITEMS[type];
@@ -461,6 +474,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     if (d.patterns) it.pattern = pick.choice;
     if (d.space) it.appliance = pick.choice;
     if (d.blind) { it.door = pick.door; it.hand = pick.hand; }
+    setDepth(it, plan.settings); // carcass + gap + door front (and the end panels of an appliance space)
     applyRot(it);
     clearSpot(r, f.items, it); // the middle of the room, or the nearest clear space
     autoRotate(r, it);
@@ -661,7 +675,11 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
               refit();
               renderAll();
             }, { placeholder: null }), custom);
-            if (!d.corner) parts.push(field('Depth (cm)', String(it.ud), (v) => { const n = num(v); if (n > 5) { it.ud = Math.round(n); refit(); } }, { inputmode: 'decimal' }));
+            if (!d.corner) {
+              parts.push(d.fronted
+                ? field('Carcass depth (cm)', String(it.cd), (v) => { const n = num(v); if (n > 5) { it.cd = Math.round(n * 10) / 10; setDepth(it, plan.settings); refit(); } }, { inputmode: 'decimal' })
+                : field('Depth (cm)', String(it.ud), (v) => { const n = num(v); if (n > 5) { it.ud = Math.round(n); refit(); } }, { inputmode: 'decimal' }));
+            }
           } else {
             parts.push(h('div', { class: 'grid-2' },
               field('Width (cm)', String(it.uw), (v) => { const n = num(v); if (n > 5) { it.uw = Math.round(n); refit(); } }, { inputmode: 'decimal' }),
@@ -687,6 +705,11 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
               save();
               renderAll();
             }, { placeholder: null }));
+          }
+          if (d.fronted) {
+            parts.push(h('p', { class: 'hint' }, d.space
+              ? `Clear space ${Math.round(it.uw * 10)} mm between two ${plan.settings.board} mm end panels (${Math.round((it.uw + it.ew) * 10)} mm in all).`
+              : `Depth on the plan: ${Math.round(it.ud * 10)} mm = ${Math.round(it.cd * 10)} mm carcass + 2 mm gap + ${plan.settings.front} mm front.`));
           }
           const n = cabinetNumbers(f).get(it.id);
           parts.push(h('p', { class: 'hint' }, `${n ? `No. ${n} on the key. ` : d.filler ? 'Listed under the key. ' : ''}It turns its back to the nearest wall by itself – use Turn for a special detail.${d.space ? ' End panels are added either side automatically.' : ''}`));
@@ -734,7 +757,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     const key = legend([floor()]);
     const nums = cabinetNumbers(floor());
     const cabs = floor().items.filter((it) => nums.has(it.id));
-    const extras = panelLines(floor());
+    const extras = panelLines(floor(), plan.settings);
     summary.replaceChildren(...[
       h('span', null, kind === 'property' ? `${floor().name}: ` : 'Floor area: ', h('b', null, sqm(floorArea(floor())))),
       kind === 'property' && plan.floors.length > 1 ? h('span', null, 'Whole property: ', h('b', null, sqm(planArea(plan)))) : null,
@@ -743,8 +766,28 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       extras.length ? h('ul', { class: 'plan-cabs plan-extras' }, extras.map((t) => h('li', null, t))) : null].filter(Boolean));
   };
 
+  // Door / drawer front and end panel / filler board thickness: 18 mm as standard, 22 mm if you prefer.
+  const settingsCard = h('div', { class: 'plan-settings' });
+  const renderSettings = () => {
+    const st = plan.settings;
+    settingsCard.hidden = dims || !PALETTE[kind].some((t) => ITEMS[t].fronted);
+    const options = (v) => [...new Set([18, 22, v])].sort((a, b) => a - b).map((n) => [String(n), `${n} mm`]);
+    const change = (key, v) => {
+      remember();
+      st[key] = Number(v);
+      save();
+      renderAll();
+    };
+    settingsCard.replaceChildren(
+      h('strong', null, 'Board thickness'),
+      h('div', { class: 'grid-2' },
+        selectField('Doors and drawer fronts', String(st.front), options(st.front), (v) => change('front', v), { placeholder: null }),
+        selectField('End panels and fillers', String(st.board), options(st.board), (v) => change('board', v), { placeholder: null })));
+  };
+
   const renderAll = () => {
     renderFloors();
+    renderSettings();
     renderToolbar();
     renderPanel();
     renderSummary();
@@ -777,6 +820,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       canvas,
       zoomBtns,
       summary,
+      settingsCard,
       panel,
       dims ? null : h('label', { class: 'field', style: 'margin-top:14px' }, h('span', { class: 'field-label' }, 'Notes'),
         h('textarea', { placeholder: 'Anything to note about the plan', oninput: (e) => { plan.notes = e.target.value; save(); } }, plan.notes || '')),

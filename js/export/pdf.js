@@ -1,6 +1,6 @@
 // PDF report (jsPDF, loaded on demand from /vendor).
 import { addressLines, jobTitle, fmtDate, fmtDateTime, slug, todayLocal, allPhotoIds, worksSummary, roomStatus, roomAreas, serviceTitle, hasMeterDoor, isRtl, isPrice, isPlan, formOf } from '../model.js';
-import { ITEMS, roomFigures, floorArea, planArea, metres, sqm, openingGeometry, bounds, legend, cornerPoints, cabinetNumbers, cabinetText, frontEdge, cornerLabelPoint, blindGeometry, endPanels, panelLines, refreshPosts } from '../plan.js';
+import { ITEMS, roomFigures, floorArea, planArea, metres, sqm, openingGeometry, bounds, legend, cornerPoints, cabinetNumbers, cabinetText, frontEdge, cornerLabelPoint, blindGeometry, endPanels, panelLines, refreshPosts, refreshDepths, settingsLine } from '../plan.js';
 import { sheetTotals, lineTotals, isBlankLine, gbp, money, LABOUR_BASIS } from '../pricing.js';
 import { UNITS, defectInfo, isSorCode, qtyText as unitQty } from '../data/parts.js';
 import { FEATURES, featuresOf } from '../data/features.js';
@@ -717,6 +717,7 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
   // room schedule; the plan itself is drawn to scale on the right.
   function planReport() {
     const plan = job.plan;
+    refreshDepths(plan); // sizes follow the thickness settings
     const KEYW = 76;
     const AX = M + KEYW + 8, AW = W - M - AX; // the drawing area
     let ly = y;
@@ -807,11 +808,12 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
       }
 
       // End panels and fillers
-      const extras = panelLines(f);
+      const extras = panelLines(f, plan.settings);
       if (extras.length) {
         lheading('Panels and fillers');
         for (const t of extras) ltext(t, { gap: 0.3 });
       }
+      if (cabs.length || extras.length) ltext(settingsLine(plan.settings), { size: 8, rgb: [110, 118, 126], gap: 1 });
 
       // Services and other fittings
       const key = legend([f]);
@@ -934,7 +936,7 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
     }
     // end panels
     doc.setFillColor(40, 48, 56);
-    for (const p of endPanels(f)) {
+    for (const p of endPanels(f, job.plan.settings)) {
       const r = room(p.roomId);
       if (r) doc.rect(px(r.x + p.x), py(r.y + p.y), Math.max(p.w * k, 0.4), Math.max(p.h * k, 0.4), 'F');
     }
