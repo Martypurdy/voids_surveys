@@ -7,9 +7,10 @@ import { loadPhotos, resizeImage } from '../photos.js';
 import { getLibrary } from '../sor.js';
 import { materialGroups, materialTotals, matQty } from '../materials.js';
 
-// Photos are re-encoded smaller for the PDF so reports stay emailable.
-const PDF_PHOTO_MAX = 1024;
-const PDF_PHOTO_QUALITY = 0.72;
+// Photos are re-encoded for the PDF so reports stay emailable. Each photo is stored once
+// and drawn twice: small in its section and large (about A5) on the Photos pages at the end.
+const PDF_PHOTO_MAX = 1400;
+const PDF_PHOTO_QUALITY = 0.7;
 
 let jsPdfPromise = null;
 function loadJsPDF() {
@@ -127,6 +128,16 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
   // ---------- photos ----------
   let photoCount = 0;
   const totalPhotos = allPhotoIds(job).length;
+  const imgCache = new Map(); // photo id -> { bytes, w, h }
+  /** The photo, resized once for this report. */
+  const pdfImage = async (rec) => {
+    if (!imgCache.has(rec.id)) {
+      onProgress(`Adding photo ${++photoCount} of ${totalPhotos}…`);
+      const small = await resizeImage(rec.blob, PDF_PHOTO_MAX, PDF_PHOTO_QUALITY);
+      imgCache.set(rec.id, { bytes: new Uint8Array(await small.blob.arrayBuffer()), w: small.w, h: small.h });
+    }
+    return imgCache.get(rec.id);
+  };
   const photoGrid = async (ids) => {
     if (!ids?.length) return;
     const recs = await loadPhotos(ids);
@@ -137,17 +148,15 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
     for (let i = 0; i < recs.length; i += cols) {
       const row = [];
       for (const rec of recs.slice(i, i + cols)) {
-        onProgress(`Adding photo ${++photoCount} of ${totalPhotos}…`);
-        const small = await resizeImage(rec.blob, PDF_PHOTO_MAX, PDF_PHOTO_QUALITY);
-        const bytes = new Uint8Array(await small.blob.arrayBuffer());
-        const s = Math.min(cellW / small.w, maxH / small.h);
-        row.push({ bytes, w: small.w * s, h: small.h * s });
+        const img = await pdfImage(rec);
+        const s = Math.min(cellW / img.w, maxH / img.h);
+        row.push({ bytes: img.bytes, id: rec.id, w: img.w * s, h: img.h * s });
       }
       const rowH = Math.max(...row.map((r) => r.h));
       ensure(rowH + gap);
       row.forEach((r, j) => {
         const x = M + j * (cellW + gap) + (cellW - r.w) / 2;
-        doc.addImage(r.bytes, 'JPEG', x, y, r.w, r.h, undefined, 'NONE');
+        doc.addImage(r.bytes, 'JPEG', x, y, r.w, r.h, `photo-${r.id}`, 'NONE');
       });
       y += rowH + gap;
     }
@@ -586,7 +595,67 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
     }
   }
 
+  await photoPages();
   return finish();
+
+  // ---------- Photos: every photo, large and labelled, two to a page (hoisted) ----------
+  function photoList() {
+    const items = [];
+    const add = (ids, label) => (ids || []).forEach((id) => items.push({ id, label }));
+    const area = (room, kind, name) => {
+      add(room.photos, name);
+      for (const part of featuresOf(room, kind)) {
+        const p = room.parts?.[part.key];
+        if (!p?.photos?.length) continue;
+        const defects = (p.defects || []).map((d) => defectInfo(FEATURES[part.key] ? part : null, d).label);
+        add(p.photos, [name, part.label, defects.join(', ')].filter(Boolean).join(' - '));
+      }
+    };
+    // First the ones that get read closely: decorating card and the legionella form.
+    if (rtl && job.rtl.voucher.required === 'yes') add(job.rtl.voucher.photos, 'Decorating card');
+    add(job.legionella?.photos, 'Legionella flush form');
+    add(job.property.photos, 'Property');
+    for (const k of job.keys) add(k.photos, `Keys - ${k.keySet || 'key set'}`);
+    add(job.keySafe.photos, 'Key safe');
+    if (job.security) area(job.security, 'security', 'Security - doors & windows');
+    for (const m of job.meters) add(m.photos, serviceTitle(m.utility));
+    for (const r of job.rooms) area(r, 'rooms', r.name || 'Room');
+    for (const r of job.externals) area(r, 'externals', r.name || 'Outside');
+    if (rtl) add(job.rtl.appliances.photos, 'Appliances');
+    const seen = new Set();
+    return items.filter((it) => !seen.has(it.id) && seen.add(it.id));
+  }
+
+  async function photoPages() {
+    const items = photoList();
+    if (!items.length) return;
+    const recs = new Map((await loadPhotos(items.map((it) => it.id))).map((r) => [r.id, r]));
+    const list = items.filter((it) => recs.has(it.id));
+    if (!list.length) return;
+    doc.addPage();
+    y = M;
+    heading('Photos');
+    let slotH = (BOTTOM - y) / 2;
+    let slot = 0;
+    for (const [i, it] of list.entries()) {
+      if (slot === 2) {
+        doc.addPage();
+        y = M;
+        slotH = (BOTTOM - y) / 2;
+        slot = 0;
+      }
+      const top = y;
+      font(10.5, 'bold', BRAND);
+      doc.text(doc.splitTextToSize(clean(`${i + 1}.  ${it.label}`), CW)[0], M, top + 4.5);
+      const img = await pdfImage(recs.get(it.id));
+      const boxH = slotH - 12;
+      const s = Math.min(CW / img.w, boxH / img.h);
+      const w = img.w * s, hgt = img.h * s;
+      doc.addImage(img.bytes, 'JPEG', M + (CW - w) / 2, top + 7, w, hgt, `photo-${it.id}`, 'NONE');
+      y = top + slotH;
+      slot++;
+    }
+  }
 
   // ---------- footers, then the finished file (hoisted) ----------
   function finish() {

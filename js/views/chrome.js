@@ -2,7 +2,7 @@
 // and the "Mark complete" footer. Opening a section marks it started (amber);
 // the footer button marks it complete (green) and moves to the next section.
 import { getJob, scheduleSave, flushSave } from '../db.js';
-import { sectionsOf, jobTitle, sectionState } from '../model.js';
+import { sectionsOf, jobTitle, sectionState, isPrice } from '../model.js';
 import { h, icon, ICONS, pageHeader, toast, scrollTabs, choose } from '../ui.js';
 import { jobActions } from './jobActions.js';
 import { go } from '../router.js';
@@ -98,12 +98,17 @@ export function completeFooter(job, section, { check } = {}) {
             title: '✓ All sections complete',
             message: 'Everything on this form is complete. Do you want to close the form now?',
             buttons: [
-              { label: 'Close form', value: 'close', class: 'btn-primary btn-big' },
+              isPrice(job) ? null : { label: '📧 Email report', value: 'email', class: 'btn-primary btn-big' },
+              { label: 'Close form', value: 'close', class: isPrice(job) ? 'btn-primary btn-big' : 'btn-big' },
               { label: 'Export / share report', value: 'export', class: 'btn-big' },
               { label: 'Stay on this page', value: null },
-            ],
+            ].filter(Boolean),
           });
           if (v === 'close') return go('/');
+          if (v === 'email') {
+            const { emailReport } = await import('../export/email.js');
+            await emailReport(job);
+          }
           if (v === 'export' && (await jobActions(job)) === 'deleted') return go('/');
           document.querySelector('.tabs')?.refresh?.();
           render();

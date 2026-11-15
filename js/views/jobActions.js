@@ -27,12 +27,18 @@ export async function jobActions(job) {
     content,
     buttons: [
       { label: '👁 Preview report', value: 'preview', class: 'btn-primary' },
+      isPrice(job) ? null : { label: '📧 Email report', value: 'email', class: 'btn-primary' },
       { label: 'Export PDF report', value: 'pdf', class: 'btn-primary' },
       { label: 'Backup file (.json)', value: 'json', class: 'btn-primary' },
       { label: isPrice(job) ? 'Delete costing' : 'Delete survey', value: 'delete', class: 'btn-danger' },
       { label: 'Cancel', value: null },
-    ],
+    ].filter(Boolean),
   });
+  if (action === 'email') {
+    const { emailReport } = await import('../export/email.js');
+    await emailReport(job);
+    return null;
+  }
   const includeCode = hasCode && codeBox.checked;
 
   if (action === 'preview') {
