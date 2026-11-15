@@ -9,6 +9,7 @@ import { loadJobOr404, jobChrome, completeFooter } from './chrome.js';
 import {
   ITEMS, PALETTE, ROOM_NAMES, FLOOR_NAMES, newPlanRoom, newFloor, newPlanItem, roomFigures, floorArea, planArea,
   metres, sqm, openingGeometry, nearestWall, roomAt, bounds, settleItem, legend, cornerPoints, snapToUnits, isStructure,
+  STYLES, PATTERNS, applyRot, rotateAbout, cabinetNumbers, cabinetText, frontEdge, cornerLabelPoint, autoRotate, clearSpot,
 } from '../plan.js';
 
 const SNAP = 5; // cm
@@ -96,6 +97,8 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       out.push(`<rect class="room${sel?.type === 'room' && sel.id === r.id ? ' sel' : ''}" x="${X(r.x)}" y="${Y(r.y)}" width="${r.w * s}" height="${r.h * s}"/>`);
     }
     const isSel = (it) => sel?.type === 'item' && sel.id === it.id;
+    const nums = cabinetNumbers(f);
+    const badge = (cx, cy, n) => out.push(`<circle class="cab-dot" cx="${cx}" cy="${cy}" r="8"/><text class="cab-n" x="${cx}" y="${cy}">${n}</text>`);
     // fixtures, then openings, then symbols
     for (const it of f.items) {
       const r = roomById(it.roomId);
@@ -105,10 +108,16 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       const cls = `fx${d.dashed ? ' dashed' : ''}${isSel(it) ? ' sel' : ''}`;
       if (d.corner) {
         out.push(`<polygon class="${cls}" points="${cornerPoints(it).map(([px, py]) => `${x + px * s},${y + py * s}`).join(' ')}"/>`);
+        const [lx, ly] = cornerLabelPoint(it);
+        if (nums.has(it.id) && w > 30) badge(x + lx * s, y + ly * s, nums.get(it.id));
         continue;
       }
       out.push(`<rect class="${cls}" x="${x}" y="${y}" width="${w}" height="${hh}"/>`);
-      if (w > 34 && hh > 13) out.push(`<text class="fx-t" x="${x + w / 2}" y="${y + hh / 2}" font-size="${Math.min(11, hh * 0.45, w / d.label.length * 1.9)}">${esc(d.label)}</text>`);
+      if (d.cab) {
+        const [fx1, fy1, fx2, fy2] = frontEdge(it);
+        out.push(`<line class="front" x1="${x + fx1 * s}" y1="${y + fy1 * s}" x2="${x + fx2 * s}" y2="${y + fy2 * s}"/>`);
+        if (Math.min(w, hh) > 14) badge(x + w / 2, y + hh / 2, nums.get(it.id));
+      } else if (w > 34 && hh > 13) out.push(`<text class="fx-t" x="${x + w / 2}" y="${y + hh / 2}" font-size="${Math.min(11, hh * 0.45, w / d.label.length * 1.9)}">${esc(d.label)}</text>`);
     }
     for (const it of f.items) {
       const r = roomById(it.roomId);
@@ -366,27 +375,70 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       Object.assign(it, { roomId: hit.room.id, wall: hit.wall, at: Math.max(0, snap(hit.at - it.size / 2)) });
       return;
     }
-    const ax = o.ax + dx, ay = o.ay + dy;
-    const cx = ax + (it.w || 0) / 2, cy = ay + (it.h || 0) / 2;
+    const cx = o.ax + (o.w || 0) / 2 + dx, cy = o.ay + (o.h || 0) / 2 + dy; // work from the centre, so turning mid-drag doesn't jump
     const r = roomAt(f.rooms, cx, cy) || roomById(it.roomId);
     it.roomId = r.id;
-    it.dx = snap(ax - r.x);
-    it.dy = snap(ay - r.y);
+    it.dx = snap(cx - r.x - (it.w || 0) / 2);
+    it.dy = snap(cy - r.y - (it.h || 0) / 2);
+    autoRotate(r, it); // a cabinet brought up to a wall turns its back to it
     settleItem(r, it);
     snapToUnits(r, f.items, it); // closes up against the unit next to it
+  };
+
+  // ----- cabinets: choose the width and type, then the unit lands in the room ready to drag -----
+  const cabinetDialog = async (type) => {
+    const d = ITEMS[type];
+    let width = d.sizes.includes(d.w) ? d.w : d.sizes[0];
+    const widthField = selectField('Width', String(width), d.sizes.map((n) => [String(n), `${n * 10} mm`]), (v) => { width = Number(v); }, { placeholder: null });
+    const choices = d.styles ? Object.entries(STYLES).map(([value, label]) => ({ value, label }))
+      : d.patterns ? PATTERNS.map((p) => ({ value: p, label: `Doors ${p}` }))
+        : [{ value: 'add', label: 'Add' }];
+    const v = await choose({
+      title: d.label,
+      message: d.styles ? 'Pick the width, then the type of unit.' : d.patterns ? 'Pick the width, then the door pattern (upper door / lower door).' : 'Pick the width.',
+      content: widthField,
+      buttons: [...choices.map((c) => ({ ...c, class: 'btn-primary btn-big' })), { label: 'Cancel', value: null }],
+    });
+    return v ? { width, choice: v } : null;
+  };
+  const addCabinet = async (type) => {
+    const d = ITEMS[type];
+    const f = floor();
+    if (!f.rooms.length) return toast('Add the rooms on the Room dimensions tab first');
+    const centre = toWorld({ x: (canvas.clientWidth || 360) / 2, y: (canvas.clientHeight || 400) / 2 });
+    const r = roomAt(f.rooms, centre.x, centre.y) || f.rooms[0]; // the room in view
+    placing = null;
+    renderToolbar();
+    const pick = await cabinetDialog(type);
+    if (!pick) return;
+    remember();
+    const it = newPlanItem(type, { roomId: r.id });
+    it.uw = pick.width;
+    if (d.corner) it.ud = pick.width;
+    if (d.styles) it.style = pick.choice;
+    if (d.patterns) it.pattern = pick.choice;
+    applyRot(it);
+    clearSpot(r, f.items, it); // the middle of the room, or the nearest clear space
+    autoRotate(r, it);
+    settleItem(r, it);
+    f.items.push(it);
+    sel = { type: 'item', id: it.id };
+    save();
+    renderAll();
+    toast(`No. ${cabinetNumbers(f).get(it.id)} added – drag it into place`);
   };
 
   // ----- floors (whole property plans) -----
   const floorsBar = h('div', { class: 'chips plan-floors' });
   const renderFloors = () => {
     floorsBar.hidden = kind !== 'property';
-    floorsBar.replaceChildren(
+    floorsBar.replaceChildren(...[
       ...plan.floors.map((f, i) => h('button', {
         type: 'button',
         'aria-pressed': String(i === fi),
         onclick: () => (i === fi ? (dims && floorMenu()) : (fi = i, sel = null, fitted = false, renderAll())),
       }, f.name)),
-      dims ? h('button', { type: 'button', class: 'add-floor', onclick: addFloor }, '+ Floor') : null);
+      dims ? h('button', { type: 'button', class: 'add-floor', onclick: addFloor }, '+ Floor') : null].filter(Boolean));
   };
   const addFloor = async () => {
     const used = new Set(plan.floors.map((f) => f.name));
@@ -427,17 +479,18 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
   // ----- toolbar -----
   const toolbar = h('div', { class: 'plan-tools' });
   const renderToolbar = () => {
-    toolbar.replaceChildren(
+    toolbar.replaceChildren(...[
       dims ? h('button', { type: 'button', class: 'btn-primary btn-small', onclick: addRoom }, '+ Room') : null,
       ...PALETTE[kind].filter(editable).map((t) => h('button', {
         type: 'button',
         class: 'btn-small plan-tool',
         'aria-pressed': String(placing === t),
         onclick: () => {
+          if (ITEMS[t].cab) return addCabinet(t); // cabinets ask their size, then land in the room
           placing = placing === t ? null : t;
           renderToolbar();
         },
-      }, `${ITEMS[t].emoji} ${ITEMS[t].label}`)));
+      }, `${ITEMS[t].emoji} ${ITEMS[t].label}`))].filter(Boolean));
     if (placing) {
       const d = ITEMS[placing];
       banner.hidden = false;
@@ -539,43 +592,48 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
         parts.push(h('p', { class: 'hint' }, 'Drag it along the wall, or onto another wall.'));
       } else if (d.kind === 'fixture') {
         const r = roomById(it.roomId);
-        if (d.sizes) {
-          // Units: pick a standard size (the length along the wall). "Other" lets you type one.
-          const alongKey = !d.corner && it.turn ? 'h' : 'w';
-          const cur = it[alongKey];
-          const opts = d.sizes.includes(cur) ? d.sizes : [...d.sizes, cur].sort((a, b) => a - b);
-          const apply = (n) => {
+        if (d.cab) {
+          const refit = () => { applyRot(it); settleItem(r, it); snapToUnits(r, f.items, it); };
+          const widthNow = it.uw;
+          const opts = d.sizes.includes(widthNow) ? d.sizes : [...d.sizes, widthNow].sort((x, y) => x - y);
+          const custom = field(d.corner ? 'Size (cm)' : 'Width (cm)', String(widthNow), (v) => { const n = num(v); if (n > 5) { it.uw = Math.round(n); if (d.corner) it.ud = it.uw; refit(); } }, { inputmode: 'decimal' });
+          custom.hidden = true;
+          parts.push(selectField('Unit width', String(widthNow), [...opts.map((n) => [String(n), `${n * 10} mm`]), ['other', 'Other…']], (v) => {
+            if (v === 'other') {
+              custom.hidden = false;
+              custom.querySelector('input').focus();
+              return;
+            }
             remember();
-            if (d.corner) { it.w = n; it.h = n; } else it[alongKey] = n;
-            settleItem(r, it);
-            snapToUnits(r, f.items, it);
+            it.uw = Number(v);
+            if (d.corner) it.ud = it.uw;
+            refit();
             save();
             renderAll();
-          };
-          parts.push(selectField('Unit size', String(cur), [...opts.map((n) => [String(n), `${n} cm`]), ['other', 'Other…']], (v) => {
-            if (v !== 'other') return apply(Number(v));
-            custom.hidden = false;
-            custom.querySelector('input').focus();
-          }, { placeholder: null }));
-          const custom = field(d.corner ? 'Size (cm)' : 'Width (cm)', String(cur), (v) => { const n = num(v); if (n > 5) { it[alongKey] = Math.round(n); if (d.corner) it.h = it.w; settleItem(r, it); } }, { inputmode: 'decimal' });
-          custom.hidden = true;
-          parts.push(custom);
-          if (!d.corner) parts.push(field('Depth (cm)', String(it[alongKey === 'w' ? 'h' : 'w']), (v) => { const n = num(v); if (n > 5) { it[alongKey === 'w' ? 'h' : 'w'] = Math.round(n); settleItem(r, it); } }, { inputmode: 'decimal' }));
+          }, { placeholder: null }), custom);
+          if (!d.corner) parts.push(field('Depth (cm)', String(it.ud), (v) => { const n = num(v); if (n > 5) { it.ud = Math.round(n); refit(); } }, { inputmode: 'decimal' }));
+          if (d.styles) parts.push(selectField('Type', it.style || 'door', Object.entries(STYLES), (v) => { remember(); it.style = v; save(); renderAll(); }, { placeholder: null }));
+          if (d.patterns) parts.push(selectField('Door pattern', it.pattern || PATTERNS[0], PATTERNS, (v) => { remember(); it.pattern = v; save(); renderAll(); }, { placeholder: null }));
+          parts.push(h('p', { class: 'hint' }, `No. ${cabinetNumbers(f).get(it.id)} on the key. It turns its back to the nearest wall by itself – use Turn for a special detail.`));
+          parts.push(h('div', { class: 'btn-row' },
+            h('button', { type: 'button', class: 'btn-small', onclick: () => {
+              remember();
+              rotateAbout(it, ((it.rot || 0) + 90) % 360);
+              it.manual = true; // you chose this way round, so it stays put
+              settleItem(r, it);
+              save();
+              renderAll();
+            } }, '⟳ Turn'),
+            it.manual ? h('button', { type: 'button', class: 'btn-small', onclick: () => { remember(); it.manual = false; autoRotate(r, it); settleItem(r, it); save(); renderAll(); } }, '↺ Face the wall') : null,
+            removeIt));
         } else {
           parts.push(h('div', { class: 'grid-2' },
             field('Width (cm)', String(it.w), (v) => { const n = num(v); if (n > 5) { it.w = Math.round(n); settleItem(r, it); } }, { inputmode: 'decimal' }),
             field('Depth (cm)', String(it.h), (v) => { const n = num(v); if (n > 5) { it.h = Math.round(n); settleItem(r, it); } }, { inputmode: 'decimal' })));
+          parts.push(h('div', { class: 'btn-row' },
+            h('button', { type: 'button', class: 'btn-small', onclick: () => { remember(); [it.w, it.h] = [it.h, it.w]; settleItem(r, it); save(); renderAll(); } }, '⟳ Turn'),
+            removeIt));
         }
-        parts.push(h('div', { class: 'btn-row' },
-          h('button', { type: 'button', class: 'btn-small', onclick: () => {
-            remember();
-            if (d.corner) it.rot = ((it.rot || 0) + 90) % 360; // the L turns to the next corner
-            else { [it.w, it.h] = [it.h, it.w]; it.turn = !it.turn; }
-            settleItem(r, it);
-            save();
-            renderAll();
-          } }, '⟳ Turn'),
-          removeIt));
       } else {
         parts.push(h('p', { class: 'hint' }, `Shown as “${d.code}” on the plan. Drag it to where it is.`), h('div', { class: 'btn-row' }, removeIt));
       }
@@ -599,10 +657,13 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
   const summary = h('div', { class: 'plan-summary' });
   const renderSummary = () => {
     const key = legend([floor()]);
+    const nums = cabinetNumbers(floor());
+    const cabs = floor().items.filter((it) => nums.has(it.id));
     summary.replaceChildren(...[
       h('span', null, kind === 'property' ? `${floor().name}: ` : 'Floor area: ', h('b', null, sqm(floorArea(floor())))),
       kind === 'property' && plan.floors.length > 1 ? h('span', null, 'Whole property: ', h('b', null, sqm(planArea(plan)))) : null,
-      key.length ? h('span', { class: 'plan-key' }, key.map(([c, l]) => `${c} = ${l}`).join(' · ')) : null].filter(Boolean));
+      key.length ? h('span', { class: 'plan-key' }, key.map(([c, l]) => `${c} = ${l}`).join(' · ')) : null,
+      cabs.length ? h('ol', { class: 'plan-cabs' }, cabs.map((it) => h('li', null, h('b', null, String(nums.get(it.id))), cabinetText(it)))) : null].filter(Boolean));
   };
 
   const renderAll = () => {

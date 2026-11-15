@@ -1,6 +1,6 @@
 // PDF report (jsPDF, loaded on demand from /vendor).
 import { addressLines, jobTitle, fmtDate, fmtDateTime, slug, todayLocal, allPhotoIds, worksSummary, roomStatus, roomAreas, serviceTitle, hasMeterDoor, isRtl, isPrice, isPlan, formOf } from '../model.js';
-import { ITEMS, roomFigures, floorArea, planArea, metres, sqm, openingGeometry, bounds, legend, cornerPoints } from '../plan.js';
+import { ITEMS, roomFigures, floorArea, planArea, metres, sqm, openingGeometry, bounds, legend, cornerPoints, cabinetNumbers, cabinetText, frontEdge, cornerLabelPoint } from '../plan.js';
 import { sheetTotals, lineTotals, isBlankLine, gbp, money, LABOUR_BASIS } from '../pricing.js';
 import { UNITS, defectInfo, isSorCode, qtyText as unitQty } from '../data/parts.js';
 import { FEATURES, featuresOf } from '../data/features.js';
@@ -53,10 +53,11 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
   const { jsPDF } = await loadJsPDF();
   // SOR codes are printed only while an SOR library is loaded on this device.
   const showCodes = Boolean(await getLibrary());
-  const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
+  const land = isPlan(job); // floor plans print landscape: key on the left, plan on the right
+  const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: land ? 'landscape' : 'portrait', compress: true });
   const rtl = isRtl(job); // Ready to let form
 
-  const W = 210, H = 297, M = 15, CW = W - 2 * M, BOTTOM = H - M - 6;
+  const W = land ? 297 : 210, H = land ? 210 : 297, M = 15, CW = W - 2 * M, BOTTOM = H - M - 6;
   let y = M;
 
   // ---------- primitives ----------
@@ -712,75 +713,169 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
   }
 
   // ---------- Designer floor plan (hoisted) ----------
+  // Landscape: the left column carries the address, the numbered cabinet key, the services and the
+  // room schedule; the plan itself is drawn to scale on the right.
   function planReport() {
     const plan = job.plan;
-    const addr = addressLines(job.address);
-    if (addr.length) para(addr.join('\n'), { size: 12, style: 'bold' });
-    y += 3;
-    kv([
-      ['Drawn by', job.surveyor],
-      ['Created', fmtDateTime(job.created)],
-      ['Report generated', fmtDateTime(new Date().toISOString())],
-      ['Total floor area', plan.floors.some((f) => f.rooms.length) ? sqm(planArea(plan)) : ''],
-    ]);
-    for (const f of plan.floors) {
-      if (!f.rooms.length) continue;
-      ensure(floorSize(f).hgt + 34); // keep the heading with its plan
-      heading(plan.kind === 'property' ? f.name : 'Plan');
-      drawFloor(f);
-      gridTable(
-        [['Room', 52], ['Size', 40], ['Floor area', 28, 'right'], ['Ceiling', 24, 'right'], ['Wall area', 36, 'right']],
-        f.rooms.map((r) => {
-          const fg = roomFigures(r);
-          return [r.name, `${metres(r.w)} x ${metres(r.h)}`, sqm(fg.floor), fg.height ? `${fg.height.toFixed(2)} m` : '', fg.walls ? sqm(fg.walls) : ''];
-        }),
-        f.rooms.length > 1 ? [[`${f.name} total`, '', sqm(floorArea(f)), '', '']] : []);
-      const placed = f.items.filter((i) => f.rooms.some((r) => r.id === i.roomId));
-      const fixtures = [...new Set(placed.filter((i) => ITEMS[i.type].kind === 'fixture').map((i) => ITEMS[i.type].label))];
-      const counts = (t) => placed.filter((i) => i.type === t).length;
+    const KEYW = 76;
+    const AX = M + KEYW + 8, AW = W - M - AX; // the drawing area
+    let ly = y;
+    const lensure = (need) => {
+      if (ly + need > BOTTOM) {
+        doc.addPage();
+        ly = M;
+      }
+    };
+    const ltext = (text, { size = 9, style = 'normal', rgb = [0, 0, 0], indent = 0, gap = 0.8 } = {}) => {
+      font(size, style, rgb);
+      const lh = lineH(size);
+      for (const line of doc.splitTextToSize(clean(text), KEYW - indent)) {
+        lensure(lh);
+        doc.text(line, M + indent, ly + lh * 0.75);
+        ly += lh;
+      }
+      ly += gap;
+    };
+    const lheading = (text) => {
+      lensure(14);
+      ly += 2;
+      font(11, 'bold', BRAND);
+      doc.text(text, M, ly + 4);
+      ly += 5.5;
+      doc.setDrawColor(...BRAND);
+      doc.setLineWidth(0.4);
+      doc.line(M, ly, M + KEYW, ly);
+      ly += 3;
+    };
+    const lrow = (label, value) => {
+      font(9, 'bold', [80, 88, 96]);
+      lensure(lineH(9));
+      doc.text(label, M, ly + lineH(9) * 0.75);
+      font(9, 'normal');
+      const lines = doc.splitTextToSize(clean(value), KEYW - 26);
+      for (const line of lines) {
+        doc.text(line, M + 26, ly + lineH(9) * 0.75);
+        ly += lineH(9);
+      }
+      ly += 0.6;
+    };
+
+    const floors = plan.floors.filter((f) => f.rooms.length);
+    const first = floors.length ? floors : [null];
+    first.forEach((f, i) => {
+      if (i > 0) {
+        doc.addPage();
+        y = M;
+      }
+      const top = y;
+      ly = top;
+      if (f) drawFloor(f, { x: AX, y: top, w: AW, h: BOTTOM - top - 8 });
+
+      if (i === 0) {
+        const addr = addressLines(job.address);
+        if (addr.length) ltext(addr.join('\n'), { size: 11, style: 'bold', gap: 1.5 });
+        lrow('Drawn by', job.surveyor || '');
+        lrow('Created', fmtDateTime(job.created));
+        lrow('Generated', fmtDateTime(new Date().toISOString()));
+        if (floors.length) lrow('Floor area', sqm(planArea(plan)));
+      }
+      if (!f) {
+        ltext('No rooms have been drawn yet.', { gap: 1 });
+        return;
+      }
+      if (plan.kind === 'property') lheading(f.name);
+
+      // Numbered cabinet key
+      const nums = cabinetNumbers(f);
+      const cabs = f.items.filter((it) => nums.has(it.id) && f.rooms.some((r) => r.id === it.roomId));
+      if (cabs.length) {
+        lheading('Key to units');
+        for (const it of cabs) {
+          const lh = lineH(9);
+          font(9, 'normal');
+          const lines = doc.splitTextToSize(clean(cabinetText(it)), KEYW - 8);
+          const rowH = Math.max(5.4, lines.length * lh) + 0.8;
+          lensure(rowH);
+          doc.setFillColor(...BRAND);
+          doc.circle(M + 2.6, ly + 2.7, 2.6, 'F');
+          font(7, 'bold', [255, 255, 255]);
+          doc.text(String(nums.get(it.id)), M + 2.6, ly + 3.6, { align: 'center' });
+          font(9, 'normal');
+          lines.forEach((line, n) => doc.text(line, M + 8, ly + lh * 0.75 + n * lh + 0.3));
+          ly += rowH;
+        }
+      }
+
+      // Services and other fittings
+      const key = legend([f]);
+      if (key.length) {
+        lheading('Services');
+        for (const [code, label] of key) ltext(`${code}  ${label}`, { gap: 0.2 });
+      }
+      const placed = f.items.filter((it) => f.rooms.some((r) => r.id === it.roomId));
+      const counts = (t) => placed.filter((it) => it.type === t).length;
+      const others = [...new Set(placed.filter((it) => ITEMS[it.type].kind === 'fixture' && !ITEMS[it.type].cab).map((it) => ITEMS[it.type].label))];
       const fittings = [
         counts('door') ? `${counts('door')} door${counts('door') === 1 ? '' : 's'}` : '',
         counts('window') ? `${counts('window')} window${counts('window') === 1 ? '' : 's'}` : '',
-        ...fixtures,
+        ...others,
       ].filter(Boolean);
-      if (fittings.length) kv([['Fittings', fittings.join(', ')]], { labelW: 24 });
-    }
-    const key = legend(plan.floors);
-    if (key.length) {
-      y += 2;
-      kv([['Key', key.map(([c, l]) => `${c} = ${l}`).join('   ')]], { labelW: 24 });
-    }
-    y += 2;
-    para('Drawn to scale from the measurements entered on site (see the 1 m scale bar). Check measurements before ordering or building.', { size: 8.5, rgb: [110, 118, 126] });
-    if (plan.notes) {
-      heading('Notes');
-      para(plan.notes);
-    }
+      if (fittings.length) {
+        lheading('Fittings');
+        ltext(fittings.join(', '));
+      }
+
+      // Room schedule
+      lheading('Rooms');
+      for (const r of f.rooms) {
+        const fg = roomFigures(r);
+        ltext(r.name, { style: 'bold', gap: 0 });
+        ltext(`${metres(r.w)} x ${metres(r.h)} - ${sqm(fg.floor)}${fg.height ? `, ceiling ${fg.height.toFixed(2)} m, walls ${sqm(fg.walls)}` : ''}`, { size: 8.5, rgb: [70, 78, 86], gap: 1.2 });
+      }
+      if (f.rooms.length > 1) ltext(`${plan.kind === 'property' ? f.name : 'Total'}: ${sqm(floorArea(f))}`, { style: 'bold' });
+
+      if (i === first.length - 1) {
+        ltext('Drawn to scale from the measurements entered on site (see the 1 m scale bar). Check measurements before ordering or building.', { size: 8, rgb: [110, 118, 126], gap: 1.5 });
+        if (plan.notes) {
+          lheading('Notes');
+          ltext(plan.notes);
+        }
+      }
+    });
+    y = ly;
   }
 
-  /** Drawing size for a floor: scaled to fit the page width (at most 1:50). */
-  function floorSize(f) {
+  /** Drawing size for a floor: scaled to fit the area (at most 1:25). */
+  function floorSize(f, aw, ah) {
     const b = bounds(f) || { minX: 0, minY: 0, maxX: 100, maxY: 100 };
     const pad = 30; // cm round the edge for labels
     const bw = b.maxX - b.minX + pad * 2, bh = b.maxY - b.minY + pad * 2;
-    const k = Math.min(CW / bw, 150 / bh, 0.2); // mm per cm (0.2 = 1:50)
+    const k = Math.min(aw / bw, ah / bh, 0.4); // mm per cm (0.4 = 1:25)
     return { b, pad, bw, bh, k, hgt: bh * k };
   }
 
-  /** One floor, drawn to scale. */
-  function drawFloor(f) {
-    const { b, pad, bw, k, hgt } = floorSize(f);
-    ensure(hgt + 12);
-    const ox = M + (CW - bw * k) / 2 - (b.minX - pad) * k;
-    const oy = y - (b.minY - pad) * k;
+  /** One floor, drawn to scale inside area { x, y, w, h } (mm). */
+  function drawFloor(f, area) {
+    const { b, pad, bw, k, hgt } = floorSize(f, area.w, area.h);
+    const ox = area.x + (area.w - bw * k) / 2 - (b.minX - pad) * k;
+    const oy = area.y - (b.minY - pad) * k;
     const px = (x) => ox + x * k, py = (yy) => oy + yy * k;
     const room = (id) => f.rooms.find((r) => r.id === id);
+    const nums = cabinetNumbers(f);
     // rooms
     doc.setFillColor(250, 251, 252);
     doc.setDrawColor(40, 48, 56);
     doc.setLineWidth(0.8);
     for (const r of f.rooms) doc.rect(px(r.x), py(r.y), r.w * k, r.h * k, 'FD');
-    // fixtures
+    // fixtures and cabinets
+    const badge = (cx, cy, n) => {
+      doc.setFillColor(...BRAND);
+      doc.setDrawColor(255, 255, 255);
+      doc.setLineWidth(0.2);
+      doc.circle(cx, cy, 2.2, 'FD');
+      font(6.5, 'bold', [255, 255, 255]);
+      doc.text(String(n), cx, cy + 0.9, { align: 'center' });
+    };
     for (const it of f.items) {
       const r = room(it.roomId), d = ITEMS[it.type];
       if (!r || d.kind !== 'fixture') continue;
@@ -792,12 +887,20 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
         const pts = cornerPoints(it).map(([ux, uy]) => [px(r.x + it.dx + ux), py(r.y + it.dy + uy)]);
         doc.lines(pts.slice(1).concat([pts[0]]).map((p, i) => [p[0] - pts[i][0], p[1] - pts[i][1]]), pts[0][0], pts[0][1], [1, 1], d.dashed ? 'S' : 'FD', true);
         doc.setLineDashPattern([], 0);
+        const [lx, ly2] = cornerLabelPoint(it);
+        badge(px(r.x + it.dx + lx), py(r.y + it.dy + ly2), nums.get(it.id));
         continue;
       }
       doc.rect(px(r.x + it.dx), py(r.y + it.dy), it.w * k, it.h * k, d.dashed ? 'S' : 'FD');
       doc.setLineDashPattern([], 0);
       const w = it.w * k, hh = it.h * k;
-      if (w > 7 && hh > 2.5) {
+      if (d.cab) {
+        const [x1, y1, x2, y2] = frontEdge(it);
+        doc.setDrawColor(...BRAND);
+        doc.setLineWidth(0.7);
+        doc.line(px(r.x + it.dx + x1), py(r.y + it.dy + y1), px(r.x + it.dx + x2), py(r.y + it.dy + y2));
+        badge(px(r.x + it.dx) + w / 2, py(r.y + it.dy) + hh / 2, nums.get(it.id));
+      } else if (w > 7 && hh > 2.5) {
         font(Math.min(6.5, hh * 2), 'normal', [40, 48, 56]);
         const label = doc.splitTextToSize(clean(d.label), w - 1)[0];
         doc.text(label, px(r.x + it.dx) + w / 2, py(r.y + it.dy) + hh / 2 + 0.8, { align: 'center' });
@@ -851,17 +954,15 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
       doc.text(metres(r.w), x + w / 2, yy + 3, { align: 'center' });
       if (hh > 10) doc.text(metres(r.h), x + 3, yy + hh / 2, { align: 'center', angle: 90 });
     }
-    y += hgt + 2;
     // 1 m scale bar
-    const bar = 100 * k;
+    const by = area.y + hgt + 4, bx = area.x + (area.w - bw * k) / 2 + pad * k, bar = 100 * k; // under the plan, lined up with its left edge
     doc.setDrawColor(40, 48, 56);
     doc.setLineWidth(0.4);
-    doc.line(M, y, M + bar, y);
-    doc.line(M, y - 1, M, y + 1);
-    doc.line(M + bar, y - 1, M + bar, y + 1);
+    doc.line(bx, by, bx + bar, by);
+    doc.line(bx, by - 1, bx, by + 1);
+    doc.line(bx + bar, by - 1, bx + bar, by + 1);
     font(7, 'normal', [90, 98, 106]);
-    doc.text(`1 m  (scale 1:${Math.round(10 / k)})`, M + bar + 2, y + 1);
-    y += 6;
+    doc.text(`1 m  (scale 1:${Math.round(10 / k)})`, bx + bar + 2, by + 1);
   }
 
   function priceReport() {

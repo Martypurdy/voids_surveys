@@ -31,10 +31,13 @@ export const ITEMS = {
   smoke: { kind: 'point', label: 'Smoke alarm', emoji: '🔔', code: 'SA' },
   co: { kind: 'point', label: 'CO alarm', emoji: '⚠️', code: 'CO' },
   radiator: { kind: 'fixture', label: 'Radiator', emoji: '▬', w: 100, h: 12 },
-  base: { kind: 'fixture', label: 'Base unit', emoji: '▢', w: 60, h: 60, run: 'base', sizes: BASE_SIZES },
-  wallunit: { kind: 'fixture', label: 'Wall unit', emoji: '▭', w: 60, h: 33, dashed: true, run: 'wall', sizes: WALL_SIZES },
-  cornerbase: { kind: 'fixture', label: 'Corner base unit', emoji: '◣', w: 90, h: 90, corner: 60, run: 'base', sizes: [90, 100] },
-  cornerwall: { kind: 'fixture', label: 'Corner wall unit', emoji: '◤', w: 60, h: 60, corner: 33, dashed: true, run: 'wall', sizes: [60, 65] },
+  base: { kind: 'fixture', cab: true, styles: true, label: 'Base unit', emoji: '▢', w: 60, h: 60, run: 'base', sizes: BASE_SIZES },
+  wallunit: { kind: 'fixture', cab: true, label: 'Wall unit', emoji: '▭', w: 60, h: 33, dashed: true, run: 'wall', sizes: WALL_SIZES },
+  cornerbase: { kind: 'fixture', cab: true, label: 'Corner base unit', emoji: '◣', w: 90, h: 90, corner: 60, run: 'base', sizes: [90, 100] },
+  cornerwall: { kind: 'fixture', cab: true, label: 'Corner wall unit', emoji: '◤', w: 60, h: 60, corner: 33, dashed: true, run: 'wall', sizes: [60, 65] },
+  larder: { kind: 'fixture', cab: true, patterns: true, label: 'Larder unit', emoji: '🗄️', w: 60, h: 60, run: 'base', sizes: [30, 40, 45, 50, 60, 80, 100] },
+  ovenhousing: { kind: 'fixture', cab: true, patterns: true, label: 'Oven housing', emoji: '♨️', w: 60, h: 60, run: 'base', sizes: [60] },
+  fridgefreezer: { kind: 'fixture', cab: true, patterns: true, label: 'Fridge / freezer housing', emoji: '🧊', w: 60, h: 60, run: 'base', sizes: [55, 60, 70] },
   sink: { kind: 'fixture', label: 'Sink', emoji: '🚰', w: 100, h: 55, run: 'base' },
   hob: { kind: 'fixture', label: 'Hob', emoji: '🍳', w: 60, h: 55, run: 'base' },
   oven: { kind: 'fixture', label: 'Oven', emoji: '♨️', w: 60, h: 60, run: 'base' },
@@ -49,8 +52,8 @@ export const ITEMS = {
 
 /** Buttons offered for each kind of plan, in order. */
 export const PALETTE = {
-  property: ['door', 'window', 'fuse', 'water', 'gas', 'elec', 'boiler', 'smoke', 'co', 'radiator', 'base', 'cornerbase', 'wallunit', 'cornerwall', 'sink', 'hob', 'oven', 'fridge', 'washer', 'dishwasher', 'bath', 'shower', 'wc', 'basin'],
-  kitchen: ['door', 'window', 'base', 'cornerbase', 'wallunit', 'cornerwall', 'sink', 'hob', 'oven', 'fridge', 'washer', 'dishwasher', 'boiler', 'radiator', 'fuse', 'water', 'gas', 'elec'],
+  property: ['door', 'window', 'fuse', 'water', 'gas', 'elec', 'boiler', 'smoke', 'co', 'radiator', 'base', 'cornerbase', 'larder', 'ovenhousing', 'fridgefreezer', 'wallunit', 'cornerwall', 'sink', 'hob', 'oven', 'fridge', 'washer', 'dishwasher', 'bath', 'shower', 'wc', 'basin'],
+  kitchen: ['door', 'window', 'base', 'cornerbase', 'larder', 'ovenhousing', 'fridgefreezer', 'wallunit', 'cornerwall', 'sink', 'hob', 'oven', 'fridge', 'washer', 'dishwasher', 'boiler', 'radiator', 'fuse', 'water', 'gas', 'elec'],
   bathroom: ['door', 'window', 'bath', 'shower', 'wc', 'basin', 'radiator', 'water'],
 };
 
@@ -59,6 +62,10 @@ export const PALETTE = {
  * tab; the units and bathroom fittings are laid out on the Floor plan tab.
  */
 export const isStructure = (type) => ITEMS[type].kind !== 'fixture' || type === 'radiator';
+
+/** What a base unit can be, and the door splits for tall units (upper / lower door). */
+export const STYLES = { door: 'Full height door', drawerline: 'Drawer-line unit', drawers: 'Full drawer cabinet' };
+export const PATTERNS = ['50/50', '60/40', '70/30'];
 
 export const ROOM_NAMES = ['Living room', 'Kitchen', 'Kitchen / diner', 'Dining room', 'Bedroom 1', 'Bedroom 2', 'Bedroom 3', 'Box room', 'Bathroom', 'Shower room', 'En-suite', 'WC', 'Hallway', 'Landing', 'Stairs', 'Utility', 'Conservatory', 'Store', 'Garage'];
 export const FLOOR_NAMES = ['Ground floor', 'First floor', 'Second floor', 'Loft', 'Basement'];
@@ -78,7 +85,8 @@ export function newPlan(kind = 'property') {
 export function newPlanItem(type, props = {}) {
   const d = ITEMS[type];
   const base = d.kind === 'wall' ? { size: d.size, flip: false, wall: 'n', at: 0 }
-    : d.kind === 'fixture' ? { w: d.w, h: d.h, dx: 0, dy: 0, ...(d.corner ? { rot: 0 } : {}) } : { dx: 0, dy: 0 };
+    : d.cab ? { w: d.w, h: d.h, uw: d.w, ud: d.h, rot: 0, manual: false, dx: 0, dy: 0, ...(d.styles ? { style: 'door' } : {}), ...(d.patterns ? { pattern: '50/50' } : {}) }
+      : d.kind === 'fixture' ? { w: d.w, h: d.h, dx: 0, dy: 0 } : { dx: 0, dy: 0 };
   return { id: newId(), type, ...base, ...props };
 }
 
@@ -225,4 +233,121 @@ export function snapToUnits(room, items, item, tol = 15) {
   const v = best(vs);
   if (v) { item.dy += v.d; item.dx = align(item.dx, item.w, v.o.dx, v.o.w); }
   clampItem(room, item);
+}
+
+// ---------- cabinets ----------
+// A cabinet keeps its true size (uw wide along its front, ud deep) and which way it faces (rot):
+// 0 = back to the north wall, 90 = back to the east wall, 180 = south, 270 = west. For corner units
+// rot 0/90/180/270 = the corner at the NW / NE / SE / SW corner. w / h are the box on the plan.
+// manual: the user turned it by hand, so it stops turning itself to face the wall.
+
+/** Set the plan box (w × h) from the unit's size and facing. */
+export function applyRot(it) {
+  if (ITEMS[it.type].corner) { it.w = it.uw; it.h = it.uw; return; }
+  const sideways = (it.rot || 0) % 180 !== 0;
+  it.w = sideways ? it.ud : it.uw;
+  it.h = sideways ? it.uw : it.ud;
+}
+
+/** Turn a cabinet to face a new way, keeping its centre where it is. */
+export function rotateAbout(it, rot) {
+  const cx = it.dx + it.w / 2, cy = it.dy + it.h / 2;
+  it.rot = rot;
+  applyRot(it);
+  it.dx = cx - it.w / 2;
+  it.dy = cy - it.h / 2;
+}
+
+/** Older base / wall units had only w, h and a "turned" flag: give them a size and a facing. */
+export function upgradePlanItem(it) {
+  const d = ITEMS[it.type];
+  if (!d?.cab || it.uw != null) return;
+  if (d.corner) { it.uw = it.ud = it.w; it.rot ??= 0; } else {
+    const turned = Boolean(it.turn);
+    it.uw = turned ? it.h : it.w;
+    it.ud = turned ? it.w : it.h;
+    it.rot = turned ? 90 : 0;
+  }
+  it.manual = Boolean(it.turn);
+  if (d.styles) it.style ??= 'door';
+  if (d.patterns) it.pattern ??= '50/50';
+}
+
+/** Cabinet numbers for the key, in the order they were added: Map(id → 1, 2, 3 …). */
+export function cabinetNumbers(floor) {
+  const m = new Map();
+  for (const it of floor.items) if (ITEMS[it.type]?.cab) m.set(it.id, m.size + 1);
+  return m;
+}
+
+/** One line for the key: "Base unit, 600 mm wide - Full height door". */
+export function cabinetText(it) {
+  const d = ITEMS[it.type];
+  const parts = [`${d.label}, ${Math.round((it.uw ?? it.w) * 10)} mm wide`];
+  if (d.styles) parts.push(STYLES[it.style] || STYLES.door);
+  if (d.patterns) parts.push(`doors ${it.pattern || PATTERNS[0]}`);
+  return parts.join(' - ');
+}
+
+/** The front edge of a straight cabinet, as [x1, y1, x2, y2] in cm inside its box. */
+export function frontEdge(it) {
+  const { w, h } = it;
+  switch ((it.rot || 0) % 360) {
+    case 90: return [0, 0, 0, h]; // back east, front west
+    case 180: return [0, 0, w, 0]; // back south, front north
+    case 270: return [w, 0, w, h]; // back west, front east
+    default: return [0, h, w, h]; // back north, front south
+  }
+}
+
+/** Where to put the number on a corner unit (inside one of its arms). */
+export function cornerLabelPoint(it) {
+  const a = Math.min(ITEMS[it.type].corner, it.w);
+  let p = [a / 2, a / 2];
+  for (let i = 0; i < ((it.rot || 0) / 90) % 4; i++) p = [it.w - p[1], p[0]];
+  return p;
+}
+
+const NEAR_WALL = 25; // cm: a unit this close to a wall turns its back to it
+
+/** The facing a cabinet should take for where it sits, or null when it is out in the room. */
+export function autoFacing(room, it) {
+  const d = ITEMS[it.type];
+  const cx = it.dx + it.w / 2, cy = it.dy + it.h / 2;
+  if (d.corner) {
+    const corners = [[0, 0, 0], [room.w, 0, 90], [room.w, room.h, 180], [0, room.h, 270]];
+    const best = corners.map(([x, y, rot]) => ({ rot, dist: Math.hypot(cx - x, cy - y) })).sort((a, b) => a.dist - b.dist)[0];
+    return best.dist <= (it.w / 2) * 1.42 + NEAR_WALL ? best.rot : null;
+  }
+  const ud = it.ud;
+  const gaps = [
+    { rot: 0, gap: cy - ud / 2 },
+    { rot: 90, gap: room.w - cx - ud / 2 },
+    { rot: 180, gap: room.h - cy - ud / 2 },
+    { rot: 270, gap: cx - ud / 2 },
+  ];
+  const min = Math.min(...gaps.map((g) => g.gap));
+  if (min > NEAR_WALL) return null;
+  const ties = gaps.filter((g) => g.gap <= min + 5);
+  return (ties.find((g) => g.rot === it.rot) || ties[0]).rot;
+}
+
+/** Turn a cabinet to face its wall (unless the user turned it by hand). */
+export function autoRotate(room, it) {
+  if (!ITEMS[it.type]?.cab || it.manual) return;
+  const rot = autoFacing(room, it);
+  if (rot != null && rot !== it.rot) rotateAbout(it, rot);
+}
+
+/** Put a new cabinet in the middle of the room, or the nearest clear spot when something stands there. */
+export function clearSpot(room, items, it) {
+  const level = (t) => (ITEMS[t].run === 'wall' ? 'wall' : 'base');
+  const others = items.filter((o) => o !== it && o.roomId === room.id && ITEMS[o.type].kind === 'fixture' && o.type !== 'radiator' && level(o.type) === level(it.type));
+  const free = (x, y) => others.every((o) => x >= o.dx + o.w || x + it.w <= o.dx || y >= o.dy + o.h || y + it.h <= o.dy);
+  const cx = Math.max(0, (room.w - it.w) / 2), cy = Math.max(0, (room.h - it.h) / 2);
+  const spots = [{ x: cx, y: cy, d: 0 }];
+  for (let x = 0; x <= room.w - it.w; x += 10) for (let y = 0; y <= room.h - it.h; y += 10) spots.push({ x, y, d: Math.hypot(x - cx, y - cy) });
+  const pick = spots.sort((a, b) => a.d - b.d).find((s) => free(s.x, s.y)) || spots[0];
+  it.dx = Math.round(pick.x);
+  it.dy = Math.round(pick.y);
 }
