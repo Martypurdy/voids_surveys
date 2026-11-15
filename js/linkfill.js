@@ -4,7 +4,7 @@
 import { money } from './pricing.js';
 
 /** The deployed look-up service. Empty = link-only (no prices). Testing: localStorage 'voids.lookupUrl'. */
-const LOOKUP_DEFAULT = '';
+const LOOKUP_DEFAULT = 'https://propertypad-lookup.propertypad-tools.workers.dev';
 export const LOOKUP_URL = (() => { try { return localStorage.getItem('voids.lookupUrl'); } catch { return null; } })() || LOOKUP_DEFAULT;
 
 const SUPPLIERS = {
