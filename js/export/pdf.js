@@ -1,6 +1,6 @@
 // PDF report (jsPDF, loaded on demand from /vendor).
 import { addressLines, jobTitle, fmtDate, fmtDateTime, slug, todayLocal, allPhotoIds, worksSummary, roomStatus, roomAreas, serviceTitle, hasMeterDoor, isRtl, isPrice, isPlan, formOf } from '../model.js';
-import { ITEMS, roomFigures, floorArea, planArea, metres, sqm, openingGeometry, bounds, legend, cornerPoints, cabinetNumbers, cabinetText, frontEdge, cornerLabelPoint } from '../plan.js';
+import { ITEMS, roomFigures, floorArea, planArea, metres, sqm, openingGeometry, bounds, legend, cornerPoints, cabinetNumbers, cabinetText, frontEdge, cornerLabelPoint, blindGeometry, endPanels, panelLines, refreshPosts } from '../plan.js';
 import { sheetTotals, lineTotals, isBlankLine, gbp, money, LABOUR_BASIS } from '../pricing.js';
 import { UNITS, defectInfo, isSorCode, qtyText as unitQty } from '../data/parts.js';
 import { FEATURES, featuresOf } from '../data/features.js';
@@ -806,6 +806,13 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
         }
       }
 
+      // End panels and fillers
+      const extras = panelLines(f);
+      if (extras.length) {
+        lheading('Panels and fillers');
+        for (const t of extras) ltext(t, { gap: 0.3 });
+      }
+
       // Services and other fittings
       const key = legend([f]);
       if (key.length) {
@@ -814,7 +821,7 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
       }
       const placed = f.items.filter((it) => f.rooms.some((r) => r.id === it.roomId));
       const counts = (t) => placed.filter((it) => it.type === t).length;
-      const others = [...new Set(placed.filter((it) => ITEMS[it.type].kind === 'fixture' && !ITEMS[it.type].cab).map((it) => ITEMS[it.type].label))];
+      const others = [...new Set(placed.filter((it) => ITEMS[it.type].kind === 'fixture' && !ITEMS[it.type].cab && !ITEMS[it.type].filler).map((it) => ITEMS[it.type].label))];
       const fittings = [
         counts('door') ? `${counts('door')} door${counts('door') === 1 ? '' : 's'}` : '',
         counts('window') ? `${counts('window')} window${counts('window') === 1 ? '' : 's'}` : '',
@@ -861,6 +868,7 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
     const oy = area.y - (b.minY - pad) * k;
     const px = (x) => ox + x * k, py = (yy) => oy + yy * k;
     const room = (id) => f.rooms.find((r) => r.id === id);
+    refreshPosts(f); // corner posts fit the cabinets beside them
     const nums = cabinetNumbers(f);
     // rooms
     doc.setFillColor(250, 251, 252);
@@ -894,17 +902,41 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
       doc.rect(px(r.x + it.dx), py(r.y + it.dy), it.w * k, it.h * k, d.dashed ? 'S' : 'FD');
       doc.setLineDashPattern([], 0);
       const w = it.w * k, hh = it.h * k;
-      if (d.cab) {
-        const [x1, y1, x2, y2] = frontEdge(it);
-        doc.setDrawColor(...BRAND);
+      const at = (a, b) => [px(r.x + it.dx + a), py(r.y + it.dy + b)];
+      const seg = (a) => { const [x1, y1] = at(a[0], a[1]), [x2, y2] = at(a[2], a[3]); doc.line(x1, y1, x2, y2); };
+      doc.setDrawColor(...BRAND);
+      if (d.blind) {
+        const g = blindGeometry(it);
         doc.setLineWidth(0.7);
-        doc.line(px(r.x + it.dx + x1), py(r.y + it.dy + y1), px(r.x + it.dx + x2), py(r.y + it.dy + y2));
-        badge(px(r.x + it.dx) + w / 2, py(r.y + it.dy) + hh / 2, nums.get(it.id));
-      } else if (w > 7 && hh > 2.5) {
+        seg(g.door);
+        doc.setLineWidth(0.3);
+        doc.setLineDashPattern([0.8, 0.6], 0);
+        seg(g.open);
+        doc.setLineDashPattern([], 0);
+        const pts = g.post.map(([a, b]) => at(a, b));
+        doc.setFillColor(...BRAND);
+        doc.lines(pts.slice(1).concat([pts[0]]).map((p, i) => [p[0] - pts[i][0], p[1] - pts[i][1]]), pts[0][0], pts[0][1], [1, 1], 'F', true);
+      } else if (d.facing && !d.space) {
+        doc.setLineWidth(d.cab ? 0.7 : 0.4);
+        seg(frontEdge(it));
+      }
+      if (d.cab) {
+        badge(px(r.x + it.dx) + w / 2, py(r.y + it.dy) + hh / 2 - (d.space && hh > 8 ? 1.5 : 0), nums.get(it.id));
+        if (d.space && w > 14 && hh > 8) {
+          font(6, 'normal', [60, 68, 76]);
+          doc.text(clean(it.appliance || ''), px(r.x + it.dx) + w / 2, py(r.y + it.dy) + hh / 2 + 4, { align: 'center' });
+        }
+      } else if (!d.filler && w > 7 && hh > 2.5) {
         font(Math.min(6.5, hh * 2), 'normal', [40, 48, 56]);
         const label = doc.splitTextToSize(clean(d.label), w - 1)[0];
         doc.text(label, px(r.x + it.dx) + w / 2, py(r.y + it.dy) + hh / 2 + 0.8, { align: 'center' });
       }
+    }
+    // end panels
+    doc.setFillColor(40, 48, 56);
+    for (const p of endPanels(f)) {
+      const r = room(p.roomId);
+      if (r) doc.rect(px(r.x + p.x), py(r.y + p.y), Math.max(p.w * k, 0.4), Math.max(p.h * k, 0.4), 'F');
     }
     // doors and windows
     for (const it of f.items) {

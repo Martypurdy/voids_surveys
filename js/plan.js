@@ -35,6 +35,10 @@ export const ITEMS = {
   wallunit: { kind: 'fixture', cab: true, label: 'Wall unit', emoji: '▭', w: 60, h: 33, dashed: true, run: 'wall', sizes: WALL_SIZES },
   cornerbase: { kind: 'fixture', cab: true, label: 'Corner base unit', emoji: '◣', w: 90, h: 90, corner: 60, run: 'base', sizes: [90, 100] },
   cornerwall: { kind: 'fixture', cab: true, label: 'Corner wall unit', emoji: '◤', w: 60, h: 60, corner: 33, dashed: true, run: 'wall', sizes: [60, 65] },
+  blindcorner: { kind: 'fixture', cab: true, blind: true, label: 'Blind corner base unit', emoji: '◧', w: 100, h: 57, run: 'base', sizes: [80, 100] },
+  appspace: { kind: 'fixture', cab: true, space: true, dashed: true, label: 'Appliance space', emoji: '⬚', w: 60, h: 60, run: 'base', sizes: [45, 50, 55, 60, 70, 90, 100] },
+  fillerbase: { kind: 'fixture', filler: true, label: 'Filler panel (base)', emoji: '▮', w: 5, h: 60, run: 'base', sizes: [3, 5, 7.5, 10, 15, 20, 30] },
+  fillerwall: { kind: 'fixture', filler: true, dashed: true, label: 'Filler panel (wall)', emoji: '▯', w: 5, h: 33, run: 'wall', sizes: [3, 5, 7.5, 10, 15, 20, 30] },
   larder: { kind: 'fixture', cab: true, patterns: true, label: 'Larder unit', emoji: '🗄️', w: 60, h: 60, run: 'base', sizes: [30, 40, 45, 50, 60, 80, 100] },
   ovenhousing: { kind: 'fixture', cab: true, patterns: true, label: 'Oven housing', emoji: '♨️', w: 60, h: 60, run: 'base', sizes: [60] },
   fridgefreezer: { kind: 'fixture', cab: true, patterns: true, label: 'Fridge / freezer housing', emoji: '🧊', w: 60, h: 60, run: 'base', sizes: [55, 60, 70] },
@@ -50,10 +54,18 @@ export const ITEMS = {
   basin: { kind: 'fixture', label: 'Basin', emoji: '🪥', w: 55, h: 45 },
 };
 
+// Everything laid out on the Floor plan tab can be turned to face a wall (radiators are fixed structure).
+for (const [k, d] of Object.entries(ITEMS)) if (d.kind === 'fixture' && k !== 'radiator') d.facing = true;
+
+/** Blind corner units: the door widths that go with each unit width (cm). */
+export const DOOR_OPTIONS = { 100: [50, 60], 80: [30, 35, 40] };
+export const APPLIANCES = ['Oven / cooker', 'Dishwasher', 'Washing machine', 'Fridge / freezer', 'Other'];
+export const END_PANEL = 1.8; // cm thick
+
 /** Buttons offered for each kind of plan, in order. */
 export const PALETTE = {
-  property: ['door', 'window', 'fuse', 'water', 'gas', 'elec', 'boiler', 'smoke', 'co', 'radiator', 'base', 'cornerbase', 'larder', 'ovenhousing', 'fridgefreezer', 'wallunit', 'cornerwall', 'sink', 'hob', 'oven', 'fridge', 'washer', 'dishwasher', 'bath', 'shower', 'wc', 'basin'],
-  kitchen: ['door', 'window', 'base', 'cornerbase', 'larder', 'ovenhousing', 'fridgefreezer', 'wallunit', 'cornerwall', 'sink', 'hob', 'oven', 'fridge', 'washer', 'dishwasher', 'boiler', 'radiator', 'fuse', 'water', 'gas', 'elec'],
+  property: ['door', 'window', 'fuse', 'water', 'gas', 'elec', 'boiler', 'smoke', 'co', 'radiator', 'base', 'cornerbase', 'blindcorner', 'larder', 'ovenhousing', 'fridgefreezer', 'appspace', 'fillerbase', 'wallunit', 'cornerwall', 'fillerwall', 'sink', 'hob', 'oven', 'fridge', 'washer', 'dishwasher', 'bath', 'shower', 'wc', 'basin'],
+  kitchen: ['door', 'window', 'base', 'cornerbase', 'blindcorner', 'larder', 'ovenhousing', 'fridgefreezer', 'appspace', 'fillerbase', 'wallunit', 'cornerwall', 'fillerwall', 'sink', 'hob', 'oven', 'fridge', 'washer', 'dishwasher', 'boiler', 'radiator', 'fuse', 'water', 'gas', 'elec'],
   bathroom: ['door', 'window', 'bath', 'shower', 'wc', 'basin', 'radiator', 'water'],
 };
 
@@ -85,7 +97,14 @@ export function newPlan(kind = 'property') {
 export function newPlanItem(type, props = {}) {
   const d = ITEMS[type];
   const base = d.kind === 'wall' ? { size: d.size, flip: false, wall: 'n', at: 0 }
-    : d.cab ? { w: d.w, h: d.h, uw: d.w, ud: d.h, rot: 0, manual: false, dx: 0, dy: 0, ...(d.styles ? { style: 'door' } : {}), ...(d.patterns ? { pattern: '50/50' } : {}) }
+    : d.facing ? {
+      w: d.w, h: d.h, uw: d.w, ud: d.h, rot: 0, manual: false, dx: 0, dy: 0,
+      ...(d.cab && !d.corner && !d.space ? { endL: false, endR: false } : {}),
+      ...(d.styles ? { style: 'door' } : {}),
+      ...(d.patterns ? { pattern: '50/50' } : {}),
+      ...(d.blind ? { door: 60, hand: 'right', post: 7 } : {}),
+      ...(d.space ? { appliance: APPLIANCES[0] } : {}),
+    }
       : d.kind === 'fixture' ? { w: d.w, h: d.h, dx: 0, dy: 0 } : { dx: 0, dy: 0 };
   return { id: newId(), type, ...base, ...props };
 }
@@ -261,7 +280,7 @@ export function rotateAbout(it, rot) {
 /** Older base / wall units had only w, h and a "turned" flag: give them a size and a facing. */
 export function upgradePlanItem(it) {
   const d = ITEMS[it.type];
-  if (!d?.cab || it.uw != null) return;
+  if (!d?.facing || it.uw != null) return;
   if (d.corner) { it.uw = it.ud = it.w; it.rot ??= 0; } else {
     const turned = Boolean(it.turn);
     it.uw = turned ? it.h : it.w;
@@ -286,18 +305,120 @@ export function cabinetText(it) {
   const parts = [`${d.label}, ${Math.round((it.uw ?? it.w) * 10)} mm wide`];
   if (d.styles) parts.push(STYLES[it.style] || STYLES.door);
   if (d.patterns) parts.push(`doors ${it.pattern || PATTERNS[0]}`);
+  if (d.blind) parts.push(`${Math.round(it.door * 10)} mm door, corner post ${Math.round((it.post ?? 7) * 10)} mm, blind end ${it.hand || 'right'}`);
+  if (d.space) parts.push(`for ${(it.appliance || APPLIANCES[0]).toLowerCase()}, end panels both sides`);
+  else if (it.endL && it.endR) parts.push('end panels both sides');
+  else if (it.endL || it.endR) parts.push(`end panel ${it.endL ? 'left' : 'right'}`);
   return parts.join(' - ');
 }
 
+// Cabinet-local axes: u runs along the front from the viewer's left to right, v from the back (0) to the front (ud).
+/** A cabinet-local point (u, v) → position inside the unit's box on the plan (cm). */
+export function boxPoint(it, u, v) {
+  switch ((it.rot || 0) % 360) {
+    case 90: return [it.w - v, u];
+    case 180: return [it.w - u, it.h - v];
+    case 270: return [v, it.h - u];
+    default: return [u, v];
+  }
+}
+/** A point in room coordinates → the cabinet's local (u, v). */
+export function localPoint(it, x, y) {
+  const bx = x - it.dx, by = y - it.dy;
+  switch ((it.rot || 0) % 360) {
+    case 90: return [by, it.w - bx];
+    case 180: return [it.w - bx, it.h - by];
+    case 270: return [it.h - by, bx];
+    default: return [bx, by];
+  }
+}
+const seg = (it, u1, v1, u2, v2) => [...boxPoint(it, u1, v1), ...boxPoint(it, u2, v2)];
+
 /** The front edge of a straight cabinet, as [x1, y1, x2, y2] in cm inside its box. */
 export function frontEdge(it) {
-  const { w, h } = it;
-  switch ((it.rot || 0) % 360) {
-    case 90: return [0, 0, 0, h]; // back east, front west
-    case 180: return [0, 0, w, 0]; // back south, front north
-    case 270: return [w, 0, w, h]; // back west, front east
-    default: return [0, h, w, h]; // back north, front south
+  return seg(it, 0, it.ud, it.uw, it.ud);
+}
+
+/**
+ * A blind corner unit: a door, a corner post beside it, then the open blind end that runs back
+ * into the corner. Returns { door, open } front segments and the post as 4 points, all inside the box.
+ */
+export function blindGeometry(it) {
+  const uw = it.uw, ud = it.ud, door = Math.min(it.door, uw - 10), post = Math.min(it.post ?? 7, uw - door - 3);
+  const right = (it.hand || 'right') === 'right'; // the blind end is on the viewer's right
+  const d0 = right ? 0 : uw - door, d1 = right ? door : uw;
+  const p0 = right ? door : uw - door - post, p1 = p0 + post;
+  const o0 = right ? p1 : 0, o1 = right ? uw : p0;
+  return {
+    door: seg(it, d0, ud, d1, ud),
+    open: seg(it, o0, ud, o1, ud),
+    post: [[p0, ud - 3], [p1, ud - 3], [p1, ud], [p0, ud]].map(([u, v]) => boxPoint(it, u, v)),
+  };
+}
+
+/** The corner post takes up the gap between the door and the cabinet that adjoins the blind end. */
+export function blindPost(it, items) {
+  const uw = it.uw, blind = uw - Math.min(it.door, uw - 10);
+  const right = (it.hand || 'right') === 'right';
+  let reach = 0; // how far the adjoining cabinet comes in along the blind end
+  for (const o of items) {
+    if (o === it || o.roomId !== it.roomId || ITEMS[o.type].kind !== 'fixture' || ITEMS[o.type].run !== 'base') continue;
+    const [ua, va] = localPoint(it, o.dx, o.dy), [ub, vb] = localPoint(it, o.dx + o.w, o.dy + o.h);
+    const u0 = Math.min(ua, ub), u1 = Math.max(ua, ub), v0 = Math.min(va, vb);
+    if (v0 < it.ud - 5 || v0 > it.ud + 25) continue; // not standing against the front
+    const d = right ? (u1 >= uw - 5 && u0 < uw - 1 ? uw - u0 : 0) : (u0 <= 5 && u1 > 1 ? u1 : 0);
+    reach = Math.max(reach, d);
   }
+  const post = reach ? reach - blind : 7;
+  return Math.round(Math.max(5, Math.min(post, blind - 5)) * 2) / 2;
+}
+/** Re-fit every blind corner's post to the cabinets beside it. */
+export function refreshPosts(floor) {
+  for (const it of floor.items) if (ITEMS[it.type]?.blind) it.post = blindPost(it, floor.items);
+}
+
+/**
+ * End panels (thin panels closing the end of a run): any unit with endL / endR set, and both
+ * sides of every appliance space. Returns rectangles in room coordinates.
+ */
+export function endPanels(floor) {
+  const out = [];
+  for (const it of floor.items) {
+    const d = ITEMS[it.type];
+    if (!d?.cab || d.corner) continue;
+    const left = d.space || it.endL, right = d.space || it.endR;
+    for (const [on, u0, u1, side] of [[left, -END_PANEL, 0, 'left'], [right, it.uw, it.uw + END_PANEL, 'right']]) {
+      if (!on) continue;
+      const [x1, y1] = boxPoint(it, u0, 0), [x2, y2] = boxPoint(it, u1, it.ud);
+      out.push({ ownerId: it.id, roomId: it.roomId, side, level: d.run === 'wall' ? 'wall' : 'base', depth: it.ud, x: it.dx + Math.min(x1, x2), y: it.dy + Math.min(y1, y2), w: Math.abs(x2 - x1), h: Math.abs(y2 - y1) });
+    }
+  }
+  return out;
+}
+
+/** Key lines for the things that are not numbered units: end panels and fillers. */
+export function panelLines(floor) {
+  const lines = [];
+  const groups = new Map();
+  for (const p of endPanels(floor)) {
+    const k = `${p.level}|${p.depth}`;
+    groups.set(k, (groups.get(k) || 0) + 1);
+  }
+  for (const [k, n] of groups) {
+    const [level, depth] = k.split('|');
+    lines.push(`${n} x end panel, ${level} level, ${Math.round(depth * 10)} mm deep`);
+  }
+  const fillers = new Map();
+  for (const it of floor.items) {
+    if (!ITEMS[it.type]?.filler) continue;
+    const k = `${ITEMS[it.type].run === 'wall' ? 'wall' : 'base'}|${it.uw}`;
+    fillers.set(k, (fillers.get(k) || 0) + 1);
+  }
+  for (const [k, n] of fillers) {
+    const [level, w] = k.split('|');
+    lines.push(`${n} x filler panel, ${Math.round(w * 10)} mm wide, ${level} level`);
+  }
+  return lines;
 }
 
 /** Where to put the number on a corner unit (inside one of its arms). */
@@ -332,11 +453,28 @@ export function autoFacing(room, it) {
   return (ties.find((g) => g.rot === it.rot) || ties[0]).rot;
 }
 
-/** Turn a cabinet to face its wall (unless the user turned it by hand). */
+/** Gaps (cm) between each end of a cabinet and the wall beyond it, seen from the front. */
+function endGaps(room, it) {
+  const east = room.w - (it.dx + it.w), south = room.h - (it.dy + it.h);
+  switch ((it.rot || 0) % 360) {
+    case 90: return { left: it.dy, right: south };
+    case 180: return { left: east, right: it.dx };
+    case 270: return { left: south, right: it.dy };
+    default: return { left: it.dx, right: east };
+  }
+}
+
+/** Turn a unit to face its wall (unless the user turned it by hand); a blind corner points its blind end into the nearest corner. */
 export function autoRotate(room, it) {
-  if (!ITEMS[it.type]?.cab || it.manual) return;
+  const d = ITEMS[it.type];
+  if (!d?.facing || it.manual) return;
   const rot = autoFacing(room, it);
   if (rot != null && rot !== it.rot) rotateAbout(it, rot);
+  if (d.blind && !it.handLock) {
+    const g = endGaps(room, it);
+    if (g.right < g.left && g.right <= 60) it.hand = 'right';
+    else if (g.left < g.right && g.left <= 60) it.hand = 'left';
+  }
 }
 
 /** Put a new cabinet in the middle of the room, or the nearest clear spot when something stands there. */

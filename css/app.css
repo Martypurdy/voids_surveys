@@ -1238,3 +1238,7 @@ body.no-scroll { overflow: hidden; }
 .plan-cabs { flex-basis: 100%; list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 4px; font-size: .85rem; }
 .plan-cabs li { display: flex; align-items: center; gap: 8px; }
 .plan-cabs b { flex: none; display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--primary); color: var(--primary-ink); font-size: .75rem; }
+.plan-svg .front.open { stroke-dasharray: 4 3; stroke-width: 2; opacity: .75; }
+.plan-svg .post { fill: var(--primary); stroke: none; pointer-events: none; }
+.plan-svg .endp { fill: var(--plan-wall); stroke: none; pointer-events: none; }
+.plan-extras li::before { content: "▪"; color: var(--primary); }

@@ -9,7 +9,8 @@ import { loadJobOr404, jobChrome, completeFooter } from './chrome.js';
 import {
   ITEMS, PALETTE, ROOM_NAMES, FLOOR_NAMES, newPlanRoom, newFloor, newPlanItem, roomFigures, floorArea, planArea,
   metres, sqm, openingGeometry, nearestWall, roomAt, bounds, settleItem, legend, cornerPoints, snapToUnits, isStructure,
-  STYLES, PATTERNS, applyRot, rotateAbout, cabinetNumbers, cabinetText, frontEdge, cornerLabelPoint, autoRotate, clearSpot,
+  STYLES, PATTERNS, DOOR_OPTIONS, APPLIANCES, applyRot, rotateAbout, cabinetNumbers, cabinetText, frontEdge, cornerLabelPoint, autoRotate, clearSpot,
+  blindGeometry, refreshPosts, endPanels, panelLines,
 } from '../plan.js';
 
 const SNAP = 5; // cm
@@ -28,7 +29,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
   const dims = mode === 'dimensions';
   const section = dims ? 'dimensions' : 'plan';
   const editable = (type) => (dims ? isStructure(type) : !isStructure(type)); // else it is locked on this tab
-  const save = () => scheduleSave(job);
+  const save = () => { refreshPosts(floor()); scheduleSave(job); }; // corner posts always fit the cabinets beside them
   let fi = 0;
   const floor = () => plan.floors[fi];
   const roomById = (rid) => floor().rooms.find((r) => r.id === rid);
@@ -97,6 +98,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       out.push(`<rect class="room${sel?.type === 'room' && sel.id === r.id ? ' sel' : ''}" x="${X(r.x)}" y="${Y(r.y)}" width="${r.w * s}" height="${r.h * s}"/>`);
     }
     const isSel = (it) => sel?.type === 'item' && sel.id === it.id;
+    refreshPosts(f);
     const nums = cabinetNumbers(f);
     const badge = (cx, cy, n) => out.push(`<circle class="cab-dot" cx="${cx}" cy="${cy}" r="8"/><text class="cab-n" x="${cx}" y="${cy}">${n}</text>`);
     // fixtures, then openings, then symbols
@@ -106,6 +108,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       if (!r || d.kind !== 'fixture') continue;
       const x = X(r.x + it.dx), y = Y(r.y + it.dy), w = it.w * s, hh = it.h * s;
       const cls = `fx${d.dashed ? ' dashed' : ''}${isSel(it) ? ' sel' : ''}`;
+      const line = (c, a) => `<line class="${c}" x1="${x + a[0] * s}" y1="${y + a[1] * s}" x2="${x + a[2] * s}" y2="${y + a[3] * s}"/>`;
       if (d.corner) {
         out.push(`<polygon class="${cls}" points="${cornerPoints(it).map(([px, py]) => `${x + px * s},${y + py * s}`).join(' ')}"/>`);
         const [lx, ly] = cornerLabelPoint(it);
@@ -113,11 +116,25 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
         continue;
       }
       out.push(`<rect class="${cls}" x="${x}" y="${y}" width="${w}" height="${hh}"/>`);
+      if (d.blind) {
+        const g = blindGeometry(it);
+        out.push(line('front', g.door), line('front open', g.open), `<polygon class="post" points="${g.post.map(([px, py]) => `${x + px * s},${y + py * s}`).join(' ')}"/>`);
+      } else if (d.facing && !d.space) {
+        out.push(line('front', frontEdge(it)));
+      }
       if (d.cab) {
-        const [fx1, fy1, fx2, fy2] = frontEdge(it);
-        out.push(`<line class="front" x1="${x + fx1 * s}" y1="${y + fy1 * s}" x2="${x + fx2 * s}" y2="${y + fy2 * s}"/>`);
-        if (Math.min(w, hh) > 14) badge(x + w / 2, y + hh / 2, nums.get(it.id));
-      } else if (w > 34 && hh > 13) out.push(`<text class="fx-t" x="${x + w / 2}" y="${y + hh / 2}" font-size="${Math.min(11, hh * 0.45, w / d.label.length * 1.9)}">${esc(d.label)}</text>`);
+        if (Math.min(w, hh) > 14) badge(x + w / 2, y + hh / 2 - (d.space && hh > 40 ? 6 : 0), nums.get(it.id));
+        if (d.space && w > 40 && hh > 40) out.push(`<text class="fx-t" x="${x + w / 2}" y="${y + hh / 2 + 12}" font-size="9">${esc(it.appliance || '')}</text>`);
+      } else if (!d.filler && w > 34 && hh > 13) {
+        out.push(`<text class="fx-t" x="${x + w / 2}" y="${y + hh / 2}" font-size="${Math.min(11, hh * 0.45, w / d.label.length * 1.9)}">${esc(d.label)}</text>`);
+      }
+    }
+    // end panels (thin, drawn at least 3 px so they show when zoomed out)
+    for (const p of endPanels(f)) {
+      const r = roomById(p.roomId);
+      if (!r) continue;
+      const pw = Math.max(p.w * s, 3), ph = Math.max(p.h * s, 3);
+      out.push(`<rect class="endp" x="${X(r.x + p.x) - (pw - p.w * s) / 2}" y="${Y(r.y + p.y) - (ph - p.h * s) / 2}" width="${pw}" height="${ph}"/>`);
     }
     for (const it of f.items) {
       const r = roomById(it.roomId);
@@ -212,6 +229,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       const it = newPlanItem(type, { roomId: r.id });
       it.dx = snap(w.x - r.x - (it.w || 0) / 2);
       it.dy = snap(w.y - r.y - (it.h || 0) / 2);
+      autoRotate(r, it);
       settleItem(r, it);
       snapToUnits(r, f.items, it);
       f.items.push(it);
@@ -389,17 +407,41 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
   const cabinetDialog = async (type) => {
     const d = ITEMS[type];
     let width = d.sizes.includes(d.w) ? d.w : d.sizes[0];
-    const widthField = selectField('Width', String(width), d.sizes.map((n) => [String(n), `${n * 10} mm`]), (v) => { width = Number(v); }, { placeholder: null });
+    let door = null, hand = 'right';
+    const doorsFor = (n) => DOOR_OPTIONS[n] || [Math.round(n / 2)];
+    const doorOptions = (n) => doorsFor(n).map((m) => h('option', { value: String(m) }, `${m * 10} mm`));
+    const parts = [];
+    let doorField = null;
+    const widthField = selectField('Width', String(width), d.sizes.map((n) => [String(n), `${n * 10} mm`]), (v) => {
+      width = Number(v);
+      if (d.blind) {
+        const sel = doorField.querySelector('select');
+        sel.replaceChildren(...doorOptions(width));
+        door = doorsFor(width).slice(-1)[0];
+        sel.value = String(door);
+      }
+    }, { placeholder: null });
+    parts.push(widthField);
+    if (d.blind) {
+      door = doorsFor(width).slice(-1)[0];
+      doorField = selectField('Door width', String(door), doorsFor(width).map((m) => [String(m), `${m * 10} mm`]), (v) => { door = Number(v); }, { placeholder: null });
+      parts.push(doorField, selectField('Blind end (seen from the front)', 'right', [['right', 'Right'], ['left', 'Left']], (v) => { hand = v; }, { placeholder: null }));
+    }
     const choices = d.styles ? Object.entries(STYLES).map(([value, label]) => ({ value, label }))
       : d.patterns ? PATTERNS.map((p) => ({ value: p, label: `Doors ${p}` }))
-        : [{ value: 'add', label: 'Add' }];
+        : d.space ? APPLIANCES.map((a) => ({ value: a, label: a }))
+          : [{ value: 'add', label: 'Add' }];
     const v = await choose({
       title: d.label,
-      message: d.styles ? 'Pick the width, then the type of unit.' : d.patterns ? 'Pick the width, then the door pattern (upper door / lower door).' : 'Pick the width.',
-      content: widthField,
+      message: d.styles ? 'Pick the width, then the type of unit.'
+        : d.patterns ? 'Pick the width, then the door pattern (upper door / lower door).'
+          : d.space ? 'Pick the width, then what goes in the space. End panels are added either side.'
+            : d.blind ? 'Pick the width, the door width and which end is blind. The corner post sizes itself to the cabinet beside it.'
+              : 'Pick the width.',
+      content: h('div', null, ...parts),
       buttons: [...choices.map((c) => ({ ...c, class: 'btn-primary btn-big' })), { label: 'Cancel', value: null }],
     });
-    return v ? { width, choice: v } : null;
+    return v ? { width, choice: v, door, hand } : null;
   };
   const addCabinet = async (type) => {
     const d = ITEMS[type];
@@ -417,6 +459,8 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     if (d.corner) it.ud = pick.width;
     if (d.styles) it.style = pick.choice;
     if (d.patterns) it.pattern = pick.choice;
+    if (d.space) it.appliance = pick.choice;
+    if (d.blind) { it.door = pick.door; it.hand = pick.hand; }
     applyRot(it);
     clearSpot(r, f.items, it); // the middle of the room, or the nearest clear space
     autoRotate(r, it);
@@ -425,7 +469,8 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     sel = { type: 'item', id: it.id };
     save();
     renderAll();
-    toast(`No. ${cabinetNumbers(f).get(it.id)} added – drag it into place`);
+    const n = cabinetNumbers(f).get(it.id);
+    toast(n ? `No. ${n} added – drag it into place` : `${d.label} added – drag it into place`);
   };
 
   // ----- floors (whole property plans) -----
@@ -486,7 +531,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
         class: 'btn-small plan-tool',
         'aria-pressed': String(placing === t),
         onclick: () => {
-          if (ITEMS[t].cab) return addCabinet(t); // cabinets ask their size, then land in the room
+          if (ITEMS[t].sizes) return addCabinet(t); // units ask their size first, then land in the room
           placing = placing === t ? null : t;
           renderToolbar();
         },
@@ -592,29 +637,59 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
         parts.push(h('p', { class: 'hint' }, 'Drag it along the wall, or onto another wall.'));
       } else if (d.kind === 'fixture') {
         const r = roomById(it.roomId);
-        if (d.cab) {
-          const refit = () => { applyRot(it); settleItem(r, it); snapToUnits(r, f.items, it); };
-          const widthNow = it.uw;
-          const opts = d.sizes.includes(widthNow) ? d.sizes : [...d.sizes, widthNow].sort((x, y) => x - y);
-          const custom = field(d.corner ? 'Size (cm)' : 'Width (cm)', String(widthNow), (v) => { const n = num(v); if (n > 5) { it.uw = Math.round(n); if (d.corner) it.ud = it.uw; refit(); } }, { inputmode: 'decimal' });
-          custom.hidden = true;
-          parts.push(selectField('Unit width', String(widthNow), [...opts.map((n) => [String(n), `${n * 10} mm`]), ['other', 'Other…']], (v) => {
-            if (v === 'other') {
-              custom.hidden = false;
-              custom.querySelector('input').focus();
-              return;
-            }
-            remember();
-            it.uw = Number(v);
-            if (d.corner) it.ud = it.uw;
-            refit();
-            save();
-            renderAll();
-          }, { placeholder: null }), custom);
-          if (!d.corner) parts.push(field('Depth (cm)', String(it.ud), (v) => { const n = num(v); if (n > 5) { it.ud = Math.round(n); refit(); } }, { inputmode: 'decimal' }));
+        if (d.facing) {
+          const refit = () => { applyRot(it); settleItem(r, it); snapToUnits(r, f.items, it); save(); };
+          const minCm = d.filler ? 0.5 : 5;
+          const setWidth = (n) => {
+            it.uw = n;
+            if (d.corner) it.ud = n;
+            if (d.blind) it.door = Math.min((DOOR_OPTIONS[n] || [it.door]).slice(-1)[0], n - 20);
+          };
+          if (d.sizes) {
+            const widthNow = it.uw;
+            const opts = d.sizes.includes(widthNow) ? d.sizes : [...d.sizes, widthNow].sort((x, y) => x - y);
+            const custom = field(d.corner ? 'Size (cm)' : 'Width (cm)', String(widthNow), (v) => { const n = num(v); if (n > minCm) { setWidth(d.filler ? Math.round(n * 10) / 10 : Math.round(n)); refit(); } }, { inputmode: 'decimal' });
+            custom.hidden = true;
+            parts.push(selectField('Unit width', String(widthNow), [...opts.map((n) => [String(n), `${n * 10} mm`]), ['other', 'Other…']], (v) => {
+              if (v === 'other') {
+                custom.hidden = false;
+                custom.querySelector('input').focus();
+                return;
+              }
+              remember();
+              setWidth(Number(v));
+              refit();
+              renderAll();
+            }, { placeholder: null }), custom);
+            if (!d.corner) parts.push(field('Depth (cm)', String(it.ud), (v) => { const n = num(v); if (n > 5) { it.ud = Math.round(n); refit(); } }, { inputmode: 'decimal' }));
+          } else {
+            parts.push(h('div', { class: 'grid-2' },
+              field('Width (cm)', String(it.uw), (v) => { const n = num(v); if (n > 5) { it.uw = Math.round(n); refit(); } }, { inputmode: 'decimal' }),
+              field('Depth (cm)', String(it.ud), (v) => { const n = num(v); if (n > 5) { it.ud = Math.round(n); refit(); } }, { inputmode: 'decimal' })));
+          }
           if (d.styles) parts.push(selectField('Type', it.style || 'door', Object.entries(STYLES), (v) => { remember(); it.style = v; save(); renderAll(); }, { placeholder: null }));
           if (d.patterns) parts.push(selectField('Door pattern', it.pattern || PATTERNS[0], PATTERNS, (v) => { remember(); it.pattern = v; save(); renderAll(); }, { placeholder: null }));
-          parts.push(h('p', { class: 'hint' }, `No. ${cabinetNumbers(f).get(it.id)} on the key. It turns its back to the nearest wall by itself – use Turn for a special detail.`));
+          if (d.blind) {
+            const doorOpts = DOOR_OPTIONS[Math.round(it.uw)] || [];
+            const doors = doorOpts.includes(it.door) ? doorOpts : [...doorOpts, it.door].sort((x, y) => x - y);
+            parts.push(
+              selectField('Door width', String(it.door), doors.map((m) => [String(m), `${m * 10} mm`]), (v) => { remember(); it.door = Number(v); save(); renderAll(); }, { placeholder: null }),
+              selectField('Blind end (seen from the front)', it.hand || 'right', [['right', 'Right'], ['left', 'Left']], (v) => { remember(); it.hand = v; it.handLock = true; save(); renderAll(); }, { placeholder: null }),
+              h('p', { class: 'hint' }, `Corner post: ${Math.round((it.post ?? 7) * 10)} mm – it resizes itself to meet the cabinet beside the blind end.`));
+          }
+          if (d.space) parts.push(selectField('Appliance', it.appliance || APPLIANCES[0], APPLIANCES, (v) => { remember(); it.appliance = v; save(); renderAll(); }, { placeholder: null }));
+          if (d.cab && !d.corner && !d.space) {
+            const ends = it.endL && it.endR ? 'both' : it.endL ? 'left' : it.endR ? 'right' : 'none';
+            parts.push(selectField('End panels (seen from the front)', ends, [['none', 'None'], ['left', 'Left end'], ['right', 'Right end'], ['both', 'Both ends']], (v) => {
+              remember();
+              it.endL = v === 'left' || v === 'both';
+              it.endR = v === 'right' || v === 'both';
+              save();
+              renderAll();
+            }, { placeholder: null }));
+          }
+          const n = cabinetNumbers(f).get(it.id);
+          parts.push(h('p', { class: 'hint' }, `${n ? `No. ${n} on the key. ` : d.filler ? 'Listed under the key. ' : ''}It turns its back to the nearest wall by itself – use Turn for a special detail.${d.space ? ' End panels are added either side automatically.' : ''}`));
           parts.push(h('div', { class: 'btn-row' },
             h('button', { type: 'button', class: 'btn-small', onclick: () => {
               remember();
@@ -659,11 +734,13 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     const key = legend([floor()]);
     const nums = cabinetNumbers(floor());
     const cabs = floor().items.filter((it) => nums.has(it.id));
+    const extras = panelLines(floor());
     summary.replaceChildren(...[
       h('span', null, kind === 'property' ? `${floor().name}: ` : 'Floor area: ', h('b', null, sqm(floorArea(floor())))),
       kind === 'property' && plan.floors.length > 1 ? h('span', null, 'Whole property: ', h('b', null, sqm(planArea(plan)))) : null,
       key.length ? h('span', { class: 'plan-key' }, key.map(([c, l]) => `${c} = ${l}`).join(' · ')) : null,
-      cabs.length ? h('ol', { class: 'plan-cabs' }, cabs.map((it) => h('li', null, h('b', null, String(nums.get(it.id))), cabinetText(it)))) : null].filter(Boolean));
+      cabs.length ? h('ol', { class: 'plan-cabs' }, cabs.map((it) => h('li', null, h('b', null, String(nums.get(it.id))), cabinetText(it)))) : null,
+      extras.length ? h('ul', { class: 'plan-cabs plan-extras' }, extras.map((t) => h('li', null, t))) : null].filter(Boolean));
   };
 
   const renderAll = () => {
