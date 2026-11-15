@@ -27,6 +27,11 @@ export default async function priceTotals(root, { id }) {
       row('Cost', t.labour.cost),
       row('Markup', t.labour.markup),
       row('Labour total', t.labour.total, 'tot-sub'),
+      ...(t.delivery.count ? [
+        group(`Delivery (${t.delivery.count})`),
+        ...p.deliveries.map((d) => row(`${d.supplier || 'Delivery'}${d.leadTime ? ` – ${d.leadTime}` : ''}`, money(d.cost))),
+        row('Delivery total', t.delivery.total, 'tot-sub'),
+      ] : []),
       group('Job total'),
       row('Total markup', t.markup),
       row('Total before VAT', t.net),

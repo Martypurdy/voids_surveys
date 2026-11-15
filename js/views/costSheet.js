@@ -4,7 +4,7 @@
 // are ignored in totals and the PDF. Materials lines can be filled from a supplier's
 // product link (🔗 – see linkfill.js).
 import { scheduleSave } from '../db.js';
-import { newMaterialLine, newLabourLine } from '../model.js';
+import { newMaterialLine, newLabourLine, newDelivery } from '../model.js';
 import { lineTotals, sheetTotals, gbp, isBlankLine, money, VAT_MODES, LABOUR_BASIS, UNIT_SUGGESTIONS } from '../pricing.js';
 import { h, toast, choose, busy } from '../ui.js';
 import { lookupProduct, applyToLine, sheetPrice, findUrl, noPriceReason, LOOKUP_URL, takePendingLink } from '../linkfill.js';
@@ -83,6 +83,7 @@ export function runningTotal(p) {
     el.replaceChildren(
       h('span', null, 'Materials ', h('b', null, gbp(t.materials.total))),
       h('span', null, 'Labour ', h('b', null, gbp(t.labour.total))),
+      t.delivery.count ? h('span', null, 'Delivery ', h('b', null, gbp(t.delivery.total))) : null,
       h('span', { class: 'run-grand' }, 'Total ', h('b', null, gbp(t.gross)), h('small', null, ` (${vatNote})`)));
   };
   el.update();
@@ -352,6 +353,69 @@ export default async function costSheet(root, { id, kind }) {
     h('th', { class: 'num', style: 'min-width:96px' }, 'Total £'),
     h('th', { style: 'min-width:44px', 'aria-label': 'Remove' }));
   const table = h('table', { class: 'calc' }, h('thead', null, head), tbody);
+
+  // ----- Delivery & lead times (materials only): separate lines, added to the totals -----
+  const vatWord = () => ({ plus: ' (+ VAT)', inc: ' (inc VAT)' }[p.vat] || '');
+  const deliveryList = h('div', { class: 'delivery-list' });
+  const editDelivery = async (d) => {
+    const isNew = !d;
+    d ||= newDelivery();
+    const suppliers = [...new Set(lines.map((l) => l.supplier.trim()).filter(Boolean))];
+    const field = (label, key, opts = {}) => {
+      const input = h('input', { type: 'text', value: d[key], placeholder: opts.ph || '', inputmode: opts.inputmode, list: opts.list, autocapitalize: opts.cap || 'sentences', 'aria-label': label });
+      return { input, el: h('label', { class: 'field' }, h('span', { class: 'field-label' }, label), input) };
+    };
+    const sup = field('Supplier', 'supplier', { ph: 'e.g. Wickes', list: 'delivery-suppliers', cap: 'words' });
+    const cost = field(`Delivery cost £${vatWord()}`, 'cost', { ph: '0.00 (free = 0)', inputmode: 'decimal' });
+    const lead = field('Lead time', 'leadTime', { ph: 'e.g. 3–5 working days' });
+    const quick = h('div', { class: 'chips lead-chips' }, ['Next day', '2–3 days', '1 week', '2 weeks', 'Collect'].map((t) => h('button', {
+      type: 'button',
+      onclick: () => { lead.input.value = t; },
+    }, t)));
+    const notes = field('Notes', 'notes', { ph: 'e.g. Kerbside only, needs someone in' });
+    const v = await choose({
+      title: isNew ? '🚚 Add delivery' : '🚚 Delivery',
+      content: h('div', null,
+        h('datalist', { id: 'delivery-suppliers' }, suppliers.map((s) => h('option', { value: s }))),
+        sup.el, cost.el, lead.el, quick, notes.el),
+      buttons: [
+        { label: isNew ? 'Add delivery' : 'Save', value: 'save', class: 'btn-primary btn-big' },
+        isNew ? null : { label: 'Remove delivery', value: 'delete', class: 'btn-danger' },
+        { label: 'Cancel', value: null },
+      ].filter(Boolean),
+    });
+    if (v === 'delete') {
+      p.deliveries.splice(p.deliveries.indexOf(d), 1);
+    } else if (v === 'save') {
+      Object.assign(d, { supplier: sup.input.value.trim(), cost: cost.input.value.trim(), leadTime: lead.input.value.trim(), notes: notes.input.value.trim() });
+      if (isNew) p.deliveries.push(d);
+    } else return;
+    save();
+    renderDeliveries();
+    updateFoot();
+  };
+  const renderDeliveries = () => {
+    deliveryList.replaceChildren(...p.deliveries.map((d) => h('button', {
+      type: 'button',
+      class: 'card delivery-item',
+      onclick: () => editDelivery(d),
+    },
+    h('span', { class: 'dl-icon', 'aria-hidden': 'true' }, '🚚'),
+    h('span', { class: 'dl-text' },
+      h('strong', null, `${d.supplier || 'Delivery'} delivery`),
+      h('span', null, [d.leadTime ? `Lead time: ${d.leadTime}` : 'Lead time not given', d.notes].filter(Boolean).join(' · '))),
+    h('b', { class: 'dl-cost' }, money(d.cost) ? gbp(money(d.cost)) : 'Free'))));
+  };
+  renderDeliveries();
+  const deliverySection = mat
+    ? h('section', { class: 'delivery' },
+      h('h3', null, 'Delivery & lead times'),
+      deliveryList,
+      h('button', { type: 'button', class: 'btn-block add-line', onclick: () => editDelivery() }, '+ Add delivery'))
+    : null;
+  const disclaimer = mat
+    ? h('p', { class: 'calc-note' }, h('strong', null, 'Note: '), 'material prices don’t include delivery charges or lead times. Add them with ', h('strong', null, '+ Add delivery'), ' below so they’re included in the totals.')
+    : null;
   const linkTools = mat
     ? h('div', { class: 'btn-row link-tools' },
       h('button', { type: 'button', class: 'btn-primary', onclick: () => addFromLink() }, '🔗 Add from a product link'),
@@ -374,9 +438,11 @@ export default async function costSheet(root, { id, kind }) {
         : 'Charge per item, per hour or per day. Qty is the number of items, hours or days (blank counts as 1). Markup: tap % / £ to switch.'),
       units,
       linkTools,
+      disclaimer,
       h('div', { class: 'calc-wrap' }, table),
       addBtn,
       sums,
+      deliverySection,
       bar,
       completeFooter(job, section)));
   updateFoot();

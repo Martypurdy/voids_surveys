@@ -1,6 +1,6 @@
 // PDF report (jsPDF, loaded on demand from /vendor).
 import { addressLines, jobTitle, fmtDate, fmtDateTime, slug, todayLocal, allPhotoIds, worksSummary, roomStatus, roomAreas, serviceTitle, hasMeterDoor, isRtl, isPrice, formOf } from '../model.js';
-import { sheetTotals, lineTotals, isBlankLine, gbp, LABOUR_BASIS } from '../pricing.js';
+import { sheetTotals, lineTotals, isBlankLine, gbp, money, LABOUR_BASIS } from '../pricing.js';
 import { UNITS, defectInfo, isSorCode, qtyText as unitQty } from '../data/parts.js';
 import { FEATURES, featuresOf } from '../data/features.js';
 import { loadPhotos, resizeImage } from '../photos.js';
@@ -644,10 +644,17 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
     const vatText = { plus: `Prices entered before VAT - VAT added at ${t.rate}%`, inc: `Prices entered including VAT at ${t.rate}%`, none: 'No VAT' }[p.vat] || '';
 
     const addr = addressLines(job.address);
-    if (addr.length) para(addr.join('\n'), { size: 12, style: 'bold' });
+    if (addr.length) {
+      font(8.5, 'bold', [110, 118, 126]);
+      doc.text('PROJECT ADDRESS', M, y + 3);
+      y += 4.5;
+      para(addr.join('\n'), { size: 12, style: 'bold' });
+    }
     y += 3;
+    const custAddr = addressLines(p.customerAddress || {}).join(', ');
     kv([
       ['Customer', p.customer],
+      ['Customer address', custAddr && custAddr !== addr.join(', ') ? custAddr : custAddr ? 'Same as project address' : ''],
       ['Job reference', p.ref],
       ['Prepared by', job.surveyor],
       ['Created', fmtDateTime(job.created)],
@@ -662,6 +669,19 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
         [['Item', 44], ['Supplier', 26], ['Code / SKU', 22], ['Qty', 12, 'right'], ['Unit', 16], ['Price', 19, 'right'], ['Markup', 18, 'right'], ['Total', 23, 'right']],
         mats.map((l) => [l.item, l.supplier, l.code, qtyOf(l), l.unit, l.price === '' ? '' : gbp(lineTotals({ ...l, qty: 1, markup: '' }).cost), markupText(l), gbp(lineTotals(l).total)]),
         [['Materials total', '', '', '', '', gbp(t.materials.cost), gbp(t.materials.markup), gbp(t.materials.total)]]);
+    }
+    if (mats.length || p.deliveries.length) {
+      if (!mats.length) heading('Materials');
+      y -= 2;
+      para(p.deliveries.length ? 'Material prices exclude delivery; delivery charges and lead times are listed below.' : 'Material prices exclude delivery charges and lead times.', { size: 8.5, rgb: [110, 118, 126] });
+      y += 3;
+    }
+    if (p.deliveries.length) {
+      heading('Delivery & lead times');
+      gridTable(
+        [['Supplier', 44], ['Lead time', 40], ['Notes', 70], ['Cost', 26, 'right']],
+        p.deliveries.map((d) => [d.supplier || 'Delivery', d.leadTime || 'Not given', d.notes, money(d.cost) ? gbp(money(d.cost)) : 'Free']),
+        [['Delivery total', '', '', gbp(t.delivery.total)]]);
     }
     const lab = p.labour.filter((l) => !isBlankLine(l));
     if (lab.length) {
@@ -684,6 +704,7 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
     };
     totalLine('Materials', t.materials.total);
     totalLine('Labour', t.labour.total);
+    if (t.delivery.count) totalLine('Delivery', t.delivery.total);
     totalLine('of which markup', t.markup);
     y += 1;
     doc.setDrawColor(200, 206, 212);

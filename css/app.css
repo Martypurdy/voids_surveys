@@ -1156,3 +1156,15 @@ body.no-scroll { overflow: hidden; }
 .share-list { display: grid; gap: 8px; }
 .share-pick { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; min-height: 64px; padding: 10px 14px; text-align: left; }
 .share-pick span { color: var(--muted); font-size: .85rem; }
+
+/* ----- Pricing: delivery & lead times ----- */
+.calc-note { margin: 0 0 10px; padding: 10px 12px; border-radius: 10px; border-left: 4px solid var(--started-line); background: var(--started-bg); color: var(--started-ink); font-size: .88rem; line-height: 1.4; }
+.delivery { margin: 14px 0 6px; }
+.delivery h3 { margin: 0 0 8px; font-size: 1rem; }
+.delivery-list { display: grid; gap: 8px; margin-bottom: 8px; }
+.delivery-item { display: grid; grid-template-columns: 32px 1fr auto; gap: 10px; align-items: center; width: 100%; min-height: 60px; padding: 10px 12px; text-align: left; }
+.dl-icon { font-size: 1.4rem; }
+.dl-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.dl-text span { color: var(--muted); font-size: .84rem; }
+.dl-cost { font-variant-numeric: tabular-nums; font-size: 1.02rem; }
+.lead-chips { margin: -4px 0 12px; }

@@ -39,12 +39,13 @@ export const VAT_MODES = [['plus', '+ VAT'], ['inc', 'Inc VAT'], ['none', 'No VA
 export function sheetTotals(p) {
   const materials = sum(p.materials);
   const labour = sum(p.labour);
-  const typed = materials.total + labour.total;
+  const delivery = { total: (p.deliveries || []).reduce((a, d) => a + money(d.cost), 0), count: (p.deliveries || []).length };
+  const typed = materials.total + labour.total + delivery.total;
   const rate = p.vat === 'none' ? 0 : money(p.vatRate) / 100;
   let net = typed, vat = 0, gross = typed;
   if (p.vat === 'plus') { vat = typed * rate; gross = typed + vat; }
   if (p.vat === 'inc') { net = typed / (1 + rate); vat = typed - net; }
-  return { materials, labour, markup: materials.markup + labour.markup, net, vat, gross, rate: rate * 100 };
+  return { materials, labour, delivery, markup: materials.markup + labour.markup, net, vat, gross, rate: rate * 100 };
 }
 
 export const LABOUR_BASIS = [['item', 'Per item'], ['hour', 'Per hour'], ['day', 'Per day']];

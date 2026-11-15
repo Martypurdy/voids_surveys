@@ -143,18 +143,15 @@ export default async function jobAddress(root, { id }) {
     },
   }, 'Use my location');
 
-  // Materials & labour costing: customer and job reference at the top.
-  const refBox = isPrice(job)
-    ? h('div', { class: 'card card-body ref-box' },
-      textField('Customer', job.pricing.customer, (v) => { job.pricing.customer = v; save(); updateDerived(); }, { autocapitalize: 'words', placeholder: 'Customer or client name' }),
-      textField('Job reference', job.pricing.ref, (v) => { job.pricing.ref = v; save(); updateDerived(); }, { autocapitalize: 'characters', placeholder: 'e.g. Job number or order ref' }))
-    : null;
+  // Materials & labour costing: customer (with their own address – they may not live at
+  // the project address) and job reference at the top.
+  const refBox = isPrice(job) ? customerBox(job, save, updateDerived) : null;
 
   root.append(
     ...jobChrome(job, 'address'),
     h('div', { class: 'content' },
       refBox ? [h('h2', null, 'Customer / job reference'), refBox] : null,
-      h('h2', null, 'Address'),
+      h('h2', null, isPrice(job) ? 'Project address' : 'Address'),
       h('div', { class: 'input-row' }, postcodeField, lookupBtn),
       h('p', { class: 'hint' }, 'Look up finds the street and town for the postcode. Check it and add the house number – you can edit the address freely.'),
       addressField,
@@ -166,4 +163,78 @@ export default async function jobAddress(root, { id }) {
       completeFooter(job, 'address')));
 
   updateDerived();
+}
+
+/** Street, town and postcode for a postcode (first line left blank if no street was found). */
+async function addressForPostcode(postcode) {
+  const demo = demoAddress(postcode);
+  if (demo) return { postcode: demo.postcode, text: demo.text, street: true };
+  const r = await lookupPostcode(postcode);
+  const street = await lookupStreet(r.lat, r.lng); // best effort, may be null
+  const town = street?.town || r.district;
+  const rest = [street?.locality && street.locality !== town ? street.locality : '', town, r.postcode].filter(Boolean);
+  return { postcode: r.postcode, text: [street?.road || '', ...rest].join('\n'), street: Boolean(street?.road) };
+}
+
+/** Costing: customer name, the customer's own address (postcode look-up) and job reference. */
+function customerBox(job, save, onChange) {
+  const p = job.pricing;
+  const ca = p.customerAddress;
+  const pcField = textField('Customer postcode', ca.postcode, (v) => { ca.postcode = v; save(); }, { autocapitalize: 'characters', enterkeyhint: 'search', placeholder: 'e.g. LS1 1UR' });
+  const pcInput = pcField.querySelector('input');
+  const addrField = textField('Customer address', ca.text, (v) => { ca.text = v; save(); }, { multiline: true, autocapitalize: 'words', placeholder: 'House number and street\nTown\nPostcode' });
+  const addrBox = addrField.querySelector('textarea');
+  addrBox.rows = 4;
+  const setAddress = (postcode, text) => {
+    ca.postcode = postcode;
+    ca.text = text;
+    pcInput.value = postcode;
+    addrBox.value = text;
+    save();
+  };
+  const lookBtn = h('button', {
+    type: 'button',
+    class: 'btn-primary',
+    onclick: async () => {
+      if (!ca.postcode.trim()) return toast('Type the customer’s postcode first');
+      lookBtn.disabled = true;
+      lookBtn.textContent = 'Looking up…';
+      try {
+        const found = await addressForPostcode(ca.postcode);
+        const current = ca.text.trim();
+        if (current && current !== found.text && !(await confirmDialog(`Replace the customer address with “${found.text.split('\n').filter(Boolean).join(', ')}”?`, { title: 'Replace address?', ok: 'Replace', danger: false }))) return;
+        setAddress(found.postcode, found.text);
+        addrBox.focus();
+        addrBox.setSelectionRange(0, 0);
+        toast(found.street ? 'Address found – add the house number at the start' : 'Postcode found – add the house number and street');
+      } catch (e) {
+        toast(e.message);
+      } finally {
+        lookBtn.disabled = false;
+        lookBtn.textContent = 'Look up';
+      }
+    },
+  }, 'Look up');
+  pcInput.addEventListener('blur', () => {
+    const f = formatPostcode(ca.postcode);
+    if (f !== ca.postcode) { ca.postcode = f; pcInput.value = f; save(); }
+  });
+  pcInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') lookBtn.click(); });
+  const sameBtn = h('button', {
+    type: 'button',
+    class: 'btn-small',
+    onclick: async () => {
+      const a = job.address;
+      if (!a.text.trim() && !a.postcode.trim()) return toast('Fill in the project address below first');
+      if (ca.text.trim() && ca.text.trim() !== a.text.trim() && !(await confirmDialog('Replace the customer address with the project address?', { title: 'Replace address?', ok: 'Replace', danger: false }))) return;
+      setAddress(a.postcode, a.text);
+      toast('Customer address set to the project address');
+    },
+  }, 'Same as project address');
+  return h('div', { class: 'card card-body ref-box' },
+    textField('Customer', p.customer, (v) => { p.customer = v; save(); onChange(); }, { autocapitalize: 'words', placeholder: 'Customer or client name' }),
+    h('div', { class: 'input-row' }, pcField, lookBtn),
+    addrField,
+    h('div', { class: 'btn-row' }, sameBtn),
+    textField('Job reference', p.ref, (v) => { p.ref = v; save(); onChange(); }, { autocapitalize: 'characters', placeholder: 'e.g. Job number or order ref' }));
 }

@@ -60,7 +60,9 @@ export const isPrice = (job) => job.form === 'price';
  * Costing sheet. vat: how prices are typed in – 'plus' (+ VAT), 'inc' (including VAT)
  * or 'none' (no VAT). Lines: see newMaterialLine / newLabourLine.
  */
-export const newPricing = () => ({ customer: '', ref: '', vat: 'plus', vatRate: 20, materials: [], labour: [], notes: '' });
+export const newPricing = () => ({ customer: '', customerAddress: { postcode: '', text: '' }, ref: '', vat: 'plus', vatRate: 20, materials: [], labour: [], deliveries: [], notes: '' });
+/** Delivery charge and lead time for a supplier's order (cost typed like the sheet's other prices). */
+export const newDelivery = () => ({ id: uid(), supplier: '', cost: '', leadTime: '', notes: '' });
 /** markupType: '%' of the line, or '£' added to the whole line. */
 export const newMaterialLine = () => ({ id: uid(), item: '', supplier: '', code: '', qty: '', unit: '', price: '', markup: '', markupType: '%', url: '' });
 /** basis: 'item' | 'hour' | 'day'. */
@@ -184,7 +186,8 @@ export function upgradeJob(job) {
   job.security.parts ??= {};
   if (isPrice(job)) {
     job.pricing = { ...newPricing(), ...(job.pricing || {}) };
-    for (const k of ['materials', 'labour']) if (!Array.isArray(job.pricing[k])) job.pricing[k] = [];
+    for (const k of ['materials', 'labour', 'deliveries']) if (!Array.isArray(job.pricing[k])) job.pricing[k] = [];
+    job.pricing.customerAddress = { postcode: '', text: '', ...(job.pricing.customerAddress || {}) };
   }
   job.legionella = { ...newLegionella(), ...(job.legionella || {}) };
   if (!Array.isArray(job.legionella.photos)) job.legionella.photos = [];
