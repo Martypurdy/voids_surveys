@@ -2,6 +2,7 @@
 import { route, start } from './router.js';
 import { flushSave } from './db.js';
 import { toast } from './ui.js';
+import { findUrl, setPendingLink } from './linkfill.js';
 
 route('/', () => import('./views/jobList.js'));
 route('/settings', () => import('./views/settings.js'));
@@ -22,6 +23,18 @@ route('/job/:id/signoff', () => import('./views/signoff.js'));
 route('/job/:id/costs', () => import('./views/costSheet.js'), { kind: 'materials' });
 route('/job/:id/labour', () => import('./views/costSheet.js'), { kind: 'labour' });
 route('/job/:id/totals', () => import('./views/priceTotals.js'));
+route('/share', () => import('./views/shareLink.js'));
+
+// Shared to the app from another app (Android share sheet): ./?url=…&text=…&title=…
+{
+  const q = new URLSearchParams(location.search);
+  if (q.has('url') || q.has('text') || q.has('title')) {
+    const link = findUrl(q.get('url')) || findUrl(q.get('text')) || findUrl(q.get('title'));
+    history.replaceState(null, '', location.pathname + (link ? '#/share' : '#/'));
+    if (link) setPendingLink(link);
+    else setTimeout(() => toast('Nothing to add – share a product page’s link'), 500);
+  }
+}
 
 start(document.getElementById('app'));
 
