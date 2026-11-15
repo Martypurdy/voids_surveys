@@ -53,7 +53,8 @@ export const FORMS = {
 // 'plan' = Designer floor plan (kitchen, bathroom or whole property – job.plan.kind).
 const PLAN_SECTIONS = [
   ['address', 'Address', ''],
-  ['plan', 'Floor plan', 'plan'],
+  ['dimensions', 'Room dimensions', 'dimensions'], // rooms, doors, windows, services: fixed once you move on
+  ['plan', 'Floor plan', 'plan'], // units and fittings, laid out inside those rooms
 ];
 export const isPlan = (job) => job.form === 'plan';
 /** The two inspection forms (Empty home inspection, Ready to let). */
@@ -197,6 +198,8 @@ export function upgradeJob(job) {
   if (isPlan(job)) {
     job.plan = { ...newPlan(job.plan?.kind), ...(job.plan || {}) };
     for (const f of job.plan.floors) { f.rooms ??= []; f.items ??= []; }
+    // Plans finished before the Room dimensions tab existed stay complete.
+    if (job.progress?.plan === 'complete' && !job.progress.dimensions) job.progress.dimensions = 'complete';
   }
   if (isPrice(job)) {
     job.pricing = { ...newPricing(), ...(job.pricing || {}) };

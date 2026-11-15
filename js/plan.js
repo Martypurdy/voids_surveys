@@ -49,10 +49,16 @@ export const ITEMS = {
 
 /** Buttons offered for each kind of plan, in order. */
 export const PALETTE = {
-  property: ['door', 'window', 'fuse', 'water', 'gas', 'elec', 'boiler', 'smoke', 'co', 'radiator'],
+  property: ['door', 'window', 'fuse', 'water', 'gas', 'elec', 'boiler', 'smoke', 'co', 'radiator', 'base', 'cornerbase', 'wallunit', 'cornerwall', 'sink', 'hob', 'oven', 'fridge', 'washer', 'dishwasher', 'bath', 'shower', 'wc', 'basin'],
   kitchen: ['door', 'window', 'base', 'cornerbase', 'wallunit', 'cornerwall', 'sink', 'hob', 'oven', 'fridge', 'washer', 'dishwasher', 'boiler', 'radiator', 'fuse', 'water', 'gas', 'elec'],
   bathroom: ['door', 'window', 'bath', 'shower', 'wc', 'basin', 'radiator', 'water'],
 };
+
+/**
+ * The structure of a room (walls, doors, windows, services, radiators) is set on the Room dimensions
+ * tab; the units and bathroom fittings are laid out on the Floor plan tab.
+ */
+export const isStructure = (type) => ITEMS[type].kind !== 'fixture' || type === 'radiator';
 
 export const ROOM_NAMES = ['Living room', 'Kitchen', 'Kitchen / diner', 'Dining room', 'Bedroom 1', 'Bedroom 2', 'Bedroom 3', 'Box room', 'Bathroom', 'Shower room', 'En-suite', 'WC', 'Hallway', 'Landing', 'Stairs', 'Utility', 'Conservatory', 'Store', 'Garage'];
 export const FLOOR_NAMES = ['Ground floor', 'First floor', 'Second floor', 'Loft', 'Basement'];

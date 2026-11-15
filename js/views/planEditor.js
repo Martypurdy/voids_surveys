@@ -4,10 +4,11 @@
 // Measurements and areas show automatically. One finger drags, two fingers zoom.
 import { scheduleSave } from '../db.js';
 import { h, toast, choose, confirmDialog, selectField } from '../ui.js';
+import { go } from '../router.js';
 import { loadJobOr404, jobChrome, completeFooter } from './chrome.js';
 import {
   ITEMS, PALETTE, ROOM_NAMES, FLOOR_NAMES, newPlanRoom, newFloor, newPlanItem, roomFigures, floorArea, planArea,
-  metres, sqm, openingGeometry, nearestWall, roomAt, bounds, settleItem, legend, cornerPoints, snapToUnits,
+  metres, sqm, openingGeometry, nearestWall, roomAt, bounds, settleItem, legend, cornerPoints, snapToUnits, isStructure,
 } from '../plan.js';
 
 const SNAP = 5; // cm
@@ -17,10 +18,15 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 const num = (v) => { const n = parseFloat(String(v ?? '').replace(',', '.')); return Number.isFinite(n) ? n : NaN; };
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
-export default async function planEditor(root, { id }) {
+// mode 'dimensions': rooms, doors, windows and services. mode 'layout' (Floor plan tab): all of that
+// is fixed; only the units and fittings can be placed and moved.
+export default async function planEditor(root, { id, mode = 'layout' }) {
   const job = await loadJobOr404(id);
   const plan = job.plan;
   const kind = plan.kind;
+  const dims = mode === 'dimensions';
+  const section = dims ? 'dimensions' : 'plan';
+  const editable = (type) => (dims ? isStructure(type) : !isStructure(type)); // else it is locked on this tab
   const save = () => scheduleSave(job);
   let fi = 0;
   const floor = () => plan.floors[fi];
@@ -139,7 +145,7 @@ export default async function planEditor(root, { id }) {
       const r = roomById(sel.id);
       if (r) for (const [cx, cy, id] of handles(r)) out.push(id.length === 2 ? `<circle class="handle" cx="${X(cx)}" cy="${Y(cy)}" r="9"/>` : `<rect class="handle mid" x="${X(cx) - 6}" y="${Y(cy) - 6}" width="12" height="12" rx="3"/>`);
     }
-    if (!f.rooms.length) out.push(`<text class="empty-t" x="${W / 2}" y="${H / 2}">Tap “+ Room” to start</text>`);
+    if (!f.rooms.length) out.push(`<text class="empty-t" x="${W / 2}" y="${H / 2}">${dims ? 'Tap “+ Room” to start' : 'Add the rooms in Room dimensions first'}</text>`);
     svg.innerHTML = out.join('');
   };
   const corners = (r) => [[r.x, r.y, 'nw'], [r.x + r.w, r.y, 'ne'], [r.x, r.y + r.h, 'sw'], [r.x + r.w, r.y + r.h, 'se']];
@@ -162,7 +168,7 @@ export default async function planEditor(root, { id }) {
     }
     for (const it of [...f.items].reverse()) {
       const r = roomById(it.roomId);
-      if (!r) continue;
+      if (!r || !editable(it.type)) continue;
       const d = ITEMS[it.type];
       if (d.kind === 'point' && Math.hypot(w.x - (r.x + it.dx), w.y - (r.y + it.dy)) < 17 / view.s) return { kind: 'item', item: it };
       if (d.kind === 'wall') {
@@ -173,9 +179,9 @@ export default async function planEditor(root, { id }) {
     }
     for (const it of [...f.items].reverse()) {
       const r = roomById(it.roomId);
-      if (r && ITEMS[it.type].kind === 'fixture' && w.x >= r.x + it.dx && w.x <= r.x + it.dx + it.w && w.y >= r.y + it.dy && w.y <= r.y + it.dy + it.h) return { kind: 'item', item: it };
+      if (r && editable(it.type) && ITEMS[it.type].kind === 'fixture' && w.x >= r.x + it.dx && w.x <= r.x + it.dx + it.w && w.y >= r.y + it.dy && w.y <= r.y + it.dy + it.h) return { kind: 'item', item: it };
     }
-    const r = roomAt(f.rooms, w.x, w.y);
+    const r = dims && roomAt(f.rooms, w.x, w.y);
     return r ? { kind: 'room', room: r } : null;
   };
 
@@ -378,9 +384,9 @@ export default async function planEditor(root, { id }) {
       ...plan.floors.map((f, i) => h('button', {
         type: 'button',
         'aria-pressed': String(i === fi),
-        onclick: () => (i === fi ? floorMenu() : (fi = i, sel = null, fitted = false, renderAll())),
+        onclick: () => (i === fi ? (dims && floorMenu()) : (fi = i, sel = null, fitted = false, renderAll())),
       }, f.name)),
-      h('button', { type: 'button', class: 'add-floor', onclick: addFloor }, '+ Floor'));
+      dims ? h('button', { type: 'button', class: 'add-floor', onclick: addFloor }, '+ Floor') : null);
   };
   const addFloor = async () => {
     const used = new Set(plan.floors.map((f) => f.name));
@@ -422,8 +428,8 @@ export default async function planEditor(root, { id }) {
   const toolbar = h('div', { class: 'plan-tools' });
   const renderToolbar = () => {
     toolbar.replaceChildren(
-      h('button', { type: 'button', class: 'btn-primary btn-small', onclick: addRoom }, '+ Room'),
-      ...PALETTE[kind].map((t) => h('button', {
+      dims ? h('button', { type: 'button', class: 'btn-primary btn-small', onclick: addRoom }, '+ Room') : null,
+      ...PALETTE[kind].filter(editable).map((t) => h('button', {
         type: 'button',
         class: 'btn-small plan-tool',
         'aria-pressed': String(placing === t),
@@ -576,10 +582,17 @@ export default async function planEditor(root, { id }) {
       panel.replaceChildren(...parts);
       return;
     }
-    panel.replaceChildren(
+    const toDimensions = h('button', { type: 'button', class: 'btn-small', onclick: () => go(`/job/${job.id}/dimensions`) }, '← Room dimensions');
+    panel.replaceChildren(...(dims ? [
       h('p', { class: 'hint plan-help' }, f.rooms.length
-        ? 'Tap a room to size or rename it – drag it to move (rooms snap together), drag a corner to resize. Pick a button above, then tap the plan to add doors, windows and fittings. Pinch or use two fingers to zoom.'
-        : 'Start with “+ Room”. Add each room with rough sizes, then drag them together like a jigsaw.'));
+        ? 'Tap a room to size or rename it – drag it to move (rooms snap together), drag a corner (or the small square on an edge) to resize. Pick a button above, then tap the plan to add doors, windows and services. When it is right, go on to the Floor plan tab.'
+        : 'Start with “+ Room”. Add each room with rough sizes, then drag them together like a jigsaw.'),
+    ] : [
+      h('p', { class: 'hint plan-help' }, f.rooms.length
+        ? '🔒 Rooms, doors, windows and services are fixed here. Pick a button above, then tap inside a room to place it; drag to move, tap to size or turn.'
+        : 'There are no rooms yet. Add them on the Room dimensions tab first.'),
+      toDimensions,
+    ]));
   };
 
   // ----- totals and key -----
@@ -619,7 +632,7 @@ export default async function planEditor(root, { id }) {
   };
 
   root.append(
-    ...jobChrome(job, 'plan'),
+    ...jobChrome(job, section),
     h('div', { class: 'content plan-page' },
       floorsBar,
       h('div', { class: 'plan-tools-wrap' }, toolbar),
@@ -627,9 +640,9 @@ export default async function planEditor(root, { id }) {
       zoomBtns,
       summary,
       panel,
-      h('label', { class: 'field', style: 'margin-top:14px' }, h('span', { class: 'field-label' }, 'Notes'),
+      dims ? null : h('label', { class: 'field', style: 'margin-top:14px' }, h('span', { class: 'field-label' }, 'Notes'),
         h('textarea', { placeholder: 'Anything to note about the plan', oninput: (e) => { plan.notes = e.target.value; save(); } }, plan.notes || '')),
-      completeFooter(job, 'plan')));
+      completeFooter(job, section, dims ? { check: async () => plan.floors.some((f) => f.rooms.length) || confirmDialog('No rooms added yet. Mark Room dimensions complete anyway?', { title: 'No rooms yet', ok: 'Mark complete', danger: false }) } : {})));
 
   // Draw once the canvas is on screen (it needs its size), and again if the size changes.
   const ro = new ResizeObserver(() => {

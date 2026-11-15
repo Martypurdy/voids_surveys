@@ -188,7 +188,7 @@ async function createJob(choice) {
   await saveJob(job);
   // Ask the browser to keep our data (helps against eviction, esp. on iOS).
   requestPersist();
-  go(isPlan(job) ? `/job/${job.id}/plan` : `/job/${job.id}`);
+  go(isPlan(job) ? `/job/${job.id}/dimensions` : `/job/${job.id}`);
 }
 
 function jobCard(job) {
