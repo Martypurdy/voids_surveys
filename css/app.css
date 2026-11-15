@@ -1144,7 +1144,7 @@ body.no-scroll { overflow: hidden; }
 @media (max-width: 520px) {
   .calc .col-first { min-width: 140px !important; width: 140px !important; max-width: 140px; }
 }
-.add-line { margin: 0 0 12px; border-style: dashed; border-width: 2px; color: var(--primary); font-weight: 700; }
+.add-line { margin: 0 0 12px; border-style: dashed; border-width: 2px; border-color: var(--input-todo); color: var(--input-todo); font-weight: 700; }
 .calc .link-cell { text-align: center; }
 .calc .row-link { min-height: 44px; min-width: 46px; padding: 0; border: 0; border-radius: 0; background: transparent; font-size: 1.1rem; filter: grayscale(1); opacity: .45; }
 .calc .row-link.on { filter: none; opacity: 1; background: color-mix(in srgb, var(--good) 16%, transparent); }
@@ -1168,3 +1168,7 @@ body.no-scroll { overflow: hidden; }
 .dl-text span { color: var(--muted); font-size: .84rem; }
 .dl-cost { font-variant-numeric: tabular-nums; font-size: 1.02rem; }
 .lead-chips { margin: -4px 0 12px; }
+/* Remove (✕) stays in view on the right while the table scrolls sideways. */
+.calc .del-cell, .calc thead th:last-child { position: sticky; right: 0; z-index: 1; box-shadow: -2px 0 0 var(--border); }
+.calc thead th:last-child { z-index: 2; background: var(--surface-2); }
+.calc .row-del { color: var(--danger); font-size: 1.05rem; }

@@ -128,6 +128,7 @@ function parseProduct(html, url) {
     price: offer?.price ?? (Number.isFinite(metaPrice) && metaPrice > 0 ? metaPrice : null),
     currency: offer?.currency || meta(html, ['product:price:currency', 'og:price:currency']) || 'GBP',
     priceIncVat: true, // UK shop pages (and their product data) show prices including VAT
+    per: decode(html.match(/"price_per":"([^"]{1,30})"/)?.[1] || ''), // Selco: what the price is for
     image: typeof image === 'string' ? image : image?.url || meta(html, ['og:image']),
     site: meta(html, ['og:site_name']),
     url,

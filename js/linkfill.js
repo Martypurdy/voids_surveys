@@ -65,8 +65,10 @@ export function fromUrl(url) {
 /** A sensible unit from the product name: pack of 10, bag, sheet, roll… (else each). */
 export function guessUnit(name) {
   const n = String(name || '');
-  const pack = n.match(/pack of (\d+)|box of (\d+)|(\d+)\s*-?\s*(?:pack|pk|pcs|pieces)\b/i);
-  if (pack) return `pack of ${pack[1] || pack[2] || pack[3]}`;
+  // A pack only if the name says so and holds more than one (prices for "Pack of 1" are each).
+  const pack = n.match(/\b(?:pack|box|bag|tub) of (\d+)\b|\b(\d+)\s*-?\s*(?:pack|pk|pcs|pieces)\b/i);
+  const count = pack ? Number(pack[1] || pack[2]) : 0;
+  if (count > 1) return `pack of ${count}`;
   if (/bulk bag|jumbo bag|tonne/i.test(n)) return 'bulk bag';
   if (/\bpallet\b/i.test(n)) return 'pallet';
   if (/\bbag\b|\d{2}\s?kg\b/i.test(n)) return 'bag';
@@ -74,6 +76,14 @@ export function guessUnit(name) {
   if (/\broll\b/i.test(n)) return 'roll';
   if (/\d\s?(l|ltr|litre)s?\b/i.test(n)) return 'tin';
   return 'each';
+}
+
+/** The supplier's own "price per …" (e.g. Selco), as a unit. */
+function perUnit(per) {
+  const p = String(per || '').trim().toLowerCase().replace(/^per\s+/, '');
+  if (!p) return '';
+  if (/^(each|ea|item|unit|1)$/.test(p)) return 'each';
+  return p;
 }
 
 /**
@@ -97,7 +107,7 @@ export async function lookupProduct(url) {
       brand: d.brand || '',
       price: typeof d.price === 'number' && (!d.currency || d.currency === 'GBP') ? d.price : null,
       priceIncVat: d.priceIncVat !== false,
-      unit: guessUnit(item),
+      unit: perUnit(d.per) || guessUnit(item),
       looked: true,
     };
   } catch {
@@ -135,7 +145,7 @@ export function noPriceReason(info) {
   return {
     nolookup: 'Price look-up isn’t switched on yet – type the price.',
     offline: 'No signal – type the price, or tap the line’s 🔗 later to update it.',
-    blocked: `${info.supplier} doesn’t let apps read its prices – type the price.`,
+    blocked: `${info.supplier} doesn’t let apps read its prices – type the price (tap 🔗 › Open the supplier’s page to see it).`,
     failed: 'Couldn’t check the price just now – type it, or try again later.',
   }[info.note] || 'No price found on that page – type the price.';
 }

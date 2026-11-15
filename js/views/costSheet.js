@@ -1,7 +1,8 @@
 // Materials & labour costing › Materials / Labour tabs: a spreadsheet – one line per
 // item, every field on the row, totals worked out as you type. Starts with at least
-// MIN_LINES lines; "+ Add line" (or Enter on the last line) adds another. Empty lines
-// are ignored in totals and the PDF. Materials lines can be filled from a supplier's
+// MIN_LINES lines and always keeps an empty line at the bottom: typing in the last line,
+// or removing a line, adds a new one. "+ Add line" (or Enter on the last line) adds
+// another. Empty lines are ignored in totals and the PDF. Materials lines can be filled from a supplier's
 // product link (🔗 – see linkfill.js).
 import { scheduleSave } from '../db.js';
 import { newMaterialLine, newLabourLine, newDelivery } from '../model.js';
@@ -156,12 +157,14 @@ export default async function costSheet(root, { id, kind }) {
     const priced = applyToLine(line, info, p);
     save();
     const fresh = refreshRow(tr, line);
-    const qty = fresh.querySelector('[data-k="qty"]');
-    qty.scrollIntoView({ block: 'center', inline: 'center' });
-    qty.focus();
+    // Next: the quantity – or the price, if the supplier's site didn't give one.
+    const next = fresh.querySelector(priced ? '[data-k="qty"]' : '[data-k="price"]');
+    next.scrollIntoView({ block: 'center', inline: 'center' });
+    next.focus();
+    if (lines.at(-1) === line) addLine();
     toast(priced
       ? `✓ ${info.supplier}: £${line.price}${p.vat === 'plus' ? ' + VAT' : ''} – now add the quantity`
-      : `✓ ${info.supplier} details added. ${noPriceReason(info)}`, { timeout: 7000 });
+      : `✓ ${info.supplier} details added. ${noPriceReason(info)}`, { timeout: 9000 });
   };
 
   /** Re-check one line's price on the supplier's site. Returns 'same' | 'changed' | 'failed'. */
@@ -248,6 +251,8 @@ export default async function costSheet(root, { id, kind }) {
       save();
       showTotal();
       updateFoot();
+      // Started filling the bottom line: add a fresh empty one below it.
+      if (lines.at(-1) === line && !isBlankLine(line)) addLine();
     };
     const input = (c) => h('input', {
       type: 'text',
@@ -313,6 +318,9 @@ export default async function costSheet(root, { id, kind }) {
         lines.splice(i, 1);
         const before = tr.nextElementSibling;
         tr.remove();
+        // A fresh empty line at the bottom replaces it (and keep at least MIN_LINES).
+        addLine();
+        while (lines.length < MIN_LINES) addLine();
         save();
         updateFoot();
         toast(`${line.item || 'Line'} removed`, {
@@ -331,9 +339,9 @@ export default async function costSheet(root, { id, kind }) {
     return tr;
   };
 
-  // Always start with at least MIN_LINES lines to type in.
-  if (lines.length < MIN_LINES) {
-    while (lines.length < MIN_LINES) lines.push(newLine());
+  // Always start with at least MIN_LINES lines to type in, and an empty one at the bottom.
+  if (lines.length < MIN_LINES || !isBlankLine(lines.at(-1))) {
+    while (lines.length < MIN_LINES || !isBlankLine(lines.at(-1))) lines.push(newLine());
     save();
   }
   tbody.append(...lines.map((l) => row(l)));
