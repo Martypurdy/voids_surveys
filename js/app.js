@@ -19,6 +19,9 @@ route('/job/:id/meters', () => import('./views/meters.js'));
 route('/job/:id/gifted', () => import('./views/gifted.js'));
 route('/job/:id/materials', () => import('./views/materials.js'));
 route('/job/:id/signoff', () => import('./views/signoff.js'));
+route('/job/:id/costs', () => import('./views/costSheet.js'), { kind: 'materials' });
+route('/job/:id/labour', () => import('./views/costSheet.js'), { kind: 'labour' });
+route('/job/:id/totals', () => import('./views/priceTotals.js'));
 
 start(document.getElementById('app'));
 

@@ -1093,3 +1093,57 @@ body.no-scroll { overflow: hidden; }
 .sig-line-hint { position: absolute; left: 6%; bottom: calc(26% + 8px); color: #a5b0bb; font-size: 1.1rem; pointer-events: none; }
 .sig-line-hint[hidden] { display: none; }
 .sig-preview { display: block; width: 100%; max-height: 160px; object-fit: contain; background: #fff; border: 1px solid var(--border); border-radius: 10px; margin: 6px 0 8px; }
+
+/* ----- Pricing: home group cards, form pop-up ----- */
+.dialog-buttons .form-card { min-height: 72px; padding: 10px 12px; justify-content: stretch; }
+.form-card-soon { opacity: .62; box-shadow: none; }
+.form-card-group .form-go { font-size: 1.8rem; line-height: 1; padding-bottom: 3px; }
+
+/* ----- Pricing: Customer / job reference ----- */
+.ref-box { margin-bottom: 16px; }
+.ref-box .field:last-child { margin-bottom: 0; }
+
+/* ----- Pricing: spreadsheet (Materials / Labour) ----- */
+.vat-toggle { grid-template-columns: repeat(3, 1fr); }
+.vat-toggle button[aria-pressed="true"] { background: var(--primary); color: var(--primary-ink); }
+.calc-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); margin: 0 0 12px; }
+.calc { border-collapse: separate; border-spacing: 0; min-width: 100%; font-size: .92rem; }
+.calc th { background: var(--surface-2); color: var(--muted); font-size: .76rem; font-weight: 700; text-align: left; padding: 8px; white-space: nowrap; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); }
+.calc th.num { text-align: right; }
+.calc td { padding: 0; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); background: var(--surface); }
+.calc td input, .calc td select { border: 0 !important; border-radius: 0; min-height: 44px; padding: 8px; width: 100%; background: transparent; }
+.calc td select { padding-right: 4px; }
+.calc td input:focus, .calc td select:focus { outline: 2px solid var(--primary); outline-offset: -2px; background: color-mix(in srgb, var(--primary) 7%, var(--surface)); }
+.calc td.num input { text-align: right; }
+.calc .col-first { position: sticky; left: 0; z-index: 1; box-shadow: 2px 0 0 var(--border); }
+.calc th.col-first { z-index: 2; }
+.calc tr.ghost td input::placeholder { opacity: .55; }
+.calc tr.ghost td { background: color-mix(in srgb, var(--surface-2) 45%, var(--surface)); }
+.calc .total { text-align: right; padding: 0 10px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.calc .mk { display: flex; align-items: stretch; }
+.calc .mk input { flex: 1; min-width: 0; }
+.calc .mk-type { min-height: 44px; min-width: 38px; padding: 0 6px; border: 0; border-left: 1px solid var(--border); border-radius: 0; font-weight: 800; color: var(--primary); background: var(--surface-2); }
+.calc .del-cell { text-align: center; }
+.calc .row-del { min-height: 44px; min-width: 44px; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--muted); }
+.calc tr.ghost .row-del { visibility: hidden; }
+.run-total { position: sticky; bottom: calc(8px + env(safe-area-inset-bottom)); z-index: 5; display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; padding: 10px 14px; margin: 8px 0; border-radius: 12px; background: var(--primary); color: var(--primary-ink); font-size: .88rem; box-shadow: 0 2px 10px rgb(0 0 0 / .18); }
+.run-total b { font-variant-numeric: tabular-nums; }
+.run-grand { margin-left: auto; font-size: 1rem; }
+.run-grand small { opacity: .85; font-size: .78rem; }
+
+/* ----- Pricing: Totals ----- */
+.totals-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; margin-bottom: 0; }
+.totals-table th, .totals-table td { padding: 9px 14px; border-bottom: 1px solid var(--border); text-align: left; font-weight: 500; }
+.totals-table td { text-align: right; font-weight: 600; }
+.totals-table .tot-group th { background: var(--surface-2); font-size: .8rem; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+.totals-table .tot-sub th, .totals-table .tot-sub td { font-weight: 800; }
+.totals-table .tot-grand th, .totals-table .tot-grand td { font-weight: 800; font-size: 1.15rem; color: var(--primary); border-bottom: 0; }
+.vat-toggle + .hint + .field { max-width: 160px; }
+.calc-sum { display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 6px; margin: 0 0 8px; }
+.calc-sum span { display: flex; flex-direction: column; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); color: var(--muted); font-size: .78rem; font-weight: 700; }
+.calc-sum b { color: var(--text); font-size: 1rem; font-variant-numeric: tabular-nums; }
+.calc-sum-total b { font-size: 1.1rem; }
+/* Phones: a narrower Item column so more of the row shows. */
+@media (max-width: 520px) {
+  .calc .col-first { min-width: 140px !important; width: 140px !important; max-width: 140px; }
+}

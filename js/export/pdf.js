@@ -1,5 +1,6 @@
 // PDF report (jsPDF, loaded on demand from /vendor).
-import { addressLines, jobTitle, fmtDate, fmtDateTime, slug, todayLocal, allPhotoIds, worksSummary, roomStatus, roomAreas, serviceTitle, hasMeterDoor, isRtl, formOf } from '../model.js';
+import { addressLines, jobTitle, fmtDate, fmtDateTime, slug, todayLocal, allPhotoIds, worksSummary, roomStatus, roomAreas, serviceTitle, hasMeterDoor, isRtl, isPrice, formOf } from '../model.js';
+import { sheetTotals, lineTotals, isBlankLine, gbp, LABOUR_BASIS } from '../pricing.js';
 import { UNITS, defectInfo, isSorCode, qtyText as unitQty } from '../data/parts.js';
 import { FEATURES, featuresOf } from '../data/features.js';
 import { loadPhotos, resizeImage } from '../photos.js';
@@ -355,6 +356,12 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
   doc.text('PropertyPad', W - M, y + 6, { align: 'right' });
   y += 13;
 
+  // Materials & labour costing has its own, table-based report.
+  if (isPrice(job)) {
+    priceReport();
+    return finish();
+  }
+
   // Property photo (first one taken on the Property type screen) at the top.
   const [coverId, ...otherPropertyPhotos] = job.property.photos;
   if (coverId) {
@@ -579,17 +586,119 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
     }
   }
 
-  // ---------- footers ----------
-  const pages = doc.getNumberOfPages();
-  const footer = jobTitle(job);
-  for (let p = 1; p <= pages; p++) {
-    doc.setPage(p);
-    font(8, 'normal', [110, 118, 126]);
-    doc.text(doc.splitTextToSize(clean(footer), CW - 30)[0] || '', M, H - 8);
-    doc.text(`Page ${p} of ${pages}`, W - M, H - 8, { align: 'right' });
+  return finish();
+
+  // ---------- footers, then the finished file (hoisted) ----------
+  function finish() {
+    const pages = doc.getNumberOfPages();
+    const footer = jobTitle(job);
+    for (let p = 1; p <= pages; p++) {
+      doc.setPage(p);
+      font(8, 'normal', [110, 118, 126]);
+      doc.text(doc.splitTextToSize(clean(footer), CW - 30)[0] || '', M, H - 8);
+      doc.text(`Page ${p} of ${pages}`, W - M, H - 8, { align: 'right' });
+    }
+    return doc.output('blob');
   }
 
-  return doc.output('blob');
+  // ---------- Materials & labour costing (hoisted) ----------
+  /** cols: [label, width mm, 'right'?]; rows: arrays of cell text; foot: rows drawn bold and shaded. */
+  function gridTable(cols, rows, foot = []) {
+    const pad = 1.5, size = 8.5, lh = lineH(size);
+    const drawRow = (cells, { header = false, total = false } = {}) => {
+      font(size, header || total ? 'bold' : 'normal');
+      const wrapped = cells.map((c, i) => doc.splitTextToSize(clean(c), cols[i][1] - pad * 2));
+      const rowH = Math.max(...wrapped.map((l) => l.length)) * lh + pad * 2;
+      if (y + rowH > BOTTOM) {
+        doc.addPage();
+        y = M;
+        if (!header) drawRow(cols.map((c) => c[0]), { header: true });
+        font(size, header || total ? 'bold' : 'normal');
+      }
+      if (header || total) {
+        doc.setFillColor(...(header ? [232, 237, 242] : [244, 246, 248]));
+        doc.rect(M, y, CW, rowH, 'F');
+      }
+      doc.setDrawColor(200, 206, 212);
+      doc.setLineWidth(0.2);
+      doc.line(M, y + rowH, M + CW, y + rowH);
+      let x = M;
+      wrapped.forEach((lines, i) => {
+        const right = cols[i][2] === 'right';
+        lines.forEach((line, k) => doc.text(line, right ? x + cols[i][1] - pad : x + pad, y + pad + lh * (k + 0.75), right ? { align: 'right' } : undefined));
+        x += cols[i][1];
+      });
+      y += rowH;
+    };
+    drawRow(cols.map((c) => c[0]), { header: true });
+    for (const r of rows) drawRow(r);
+    for (const r of foot) drawRow(r, { total: true });
+    y += 5;
+  }
+
+  function priceReport() {
+    const p = job.pricing;
+    const t = sheetTotals(p);
+    const markupText = (l) => (String(l.markup ?? '').trim() === '' ? '' : l.markupType === '£' ? gbp(lineTotals(l).markup) : `${l.markup}%`);
+    const qtyOf = (l) => (String(l.qty ?? '').trim() || '1');
+    const vatText = { plus: `Prices entered before VAT - VAT added at ${t.rate}%`, inc: `Prices entered including VAT at ${t.rate}%`, none: 'No VAT' }[p.vat] || '';
+
+    const addr = addressLines(job.address);
+    if (addr.length) para(addr.join('\n'), { size: 12, style: 'bold' });
+    y += 3;
+    kv([
+      ['Customer', p.customer],
+      ['Job reference', p.ref],
+      ['Prepared by', job.surveyor],
+      ['Created', fmtDateTime(job.created)],
+      ['Report generated', fmtDateTime(new Date().toISOString())],
+      ['Prices', vatText],
+    ]);
+
+    const mats = p.materials.filter((l) => !isBlankLine(l));
+    if (mats.length) {
+      heading('Materials');
+      gridTable(
+        [['Item', 44], ['Supplier', 26], ['Code / SKU', 22], ['Qty', 12, 'right'], ['Unit', 16], ['Price', 19, 'right'], ['Markup', 18, 'right'], ['Total', 23, 'right']],
+        mats.map((l) => [l.item, l.supplier, l.code, qtyOf(l), l.unit, l.price === '' ? '' : gbp(lineTotals({ ...l, qty: 1, markup: '' }).cost), markupText(l), gbp(lineTotals(l).total)]),
+        [['Materials total', '', '', '', '', gbp(t.materials.cost), gbp(t.materials.markup), gbp(t.materials.total)]]);
+    }
+    const lab = p.labour.filter((l) => !isBlankLine(l));
+    if (lab.length) {
+      heading('Labour');
+      const basis = Object.fromEntries(LABOUR_BASIS);
+      gridTable(
+        [['Labour', 66], ['Charged', 24], ['Qty', 16, 'right'], ['Rate', 24, 'right'], ['Markup', 24, 'right'], ['Total', 26, 'right']],
+        lab.map((l) => [l.item, basis[l.basis] || '', qtyOf(l), l.rate === '' ? '' : gbp(lineTotals({ ...l, qty: 1, markup: '' }).cost), markupText(l), gbp(lineTotals(l).total)]),
+        [['Labour total', '', '', gbp(t.labour.cost), gbp(t.labour.markup), gbp(t.labour.total)]]);
+    }
+
+    heading('Totals');
+    const totalLine = (label, value, { bold = false, big = false } = {}) => {
+      const size = big ? 12 : 10.5;
+      ensure(lineH(size) + 2);
+      font(size, bold ? 'bold' : 'normal', big ? BRAND : [0, 0, 0]);
+      doc.text(label, W - M - 60, y + lineH(size) * 0.75, { align: 'right' });
+      doc.text(gbp(value), W - M, y + lineH(size) * 0.75, { align: 'right' });
+      y += lineH(size) + 1.2;
+    };
+    totalLine('Materials', t.materials.total);
+    totalLine('Labour', t.labour.total);
+    totalLine('of which markup', t.markup);
+    y += 1;
+    doc.setDrawColor(200, 206, 212);
+    doc.setLineWidth(0.3);
+    doc.line(W - M - 100, y, W - M, y);
+    y += 2;
+    totalLine('Total before VAT', t.net, { bold: true });
+    totalLine(p.vat === 'none' ? 'VAT (none)' : `VAT @ ${t.rate}%`, t.vat);
+    totalLine(p.vat === 'none' ? 'Total' : 'Total inc VAT', t.gross, { bold: true, big: true });
+
+    if (p.notes) {
+      heading('Notes');
+      para(p.notes);
+    }
+  }
 
   // ---------- key table (hoisted) ----------
   function keyTable(keys, simple = false) {

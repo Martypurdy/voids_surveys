@@ -1,6 +1,6 @@
 // Per-job actions dialog: PDF report, .json backup, delete.
 import { deleteJob, flushSave } from '../db.js';
-import { jobTitle, backupStatus, fmtDateTime } from '../model.js';
+import { jobTitle, backupStatus, fmtDateTime, isPrice } from '../model.js';
 import { h, choose, confirmDialog, toast, busy } from '../ui.js';
 import { offerFile } from '../export/deliver.js';
 
@@ -29,7 +29,7 @@ export async function jobActions(job) {
       { label: '👁 Preview report', value: 'preview', class: 'btn-primary' },
       { label: 'Export PDF report', value: 'pdf', class: 'btn-primary' },
       { label: 'Backup file (.json)', value: 'json', class: 'btn-primary' },
-      { label: 'Delete survey', value: 'delete', class: 'btn-danger' },
+      { label: isPrice(job) ? 'Delete costing' : 'Delete survey', value: 'delete', class: 'btn-danger' },
       { label: 'Cancel', value: null },
     ],
   });
@@ -53,7 +53,7 @@ export async function jobActions(job) {
     return null;
   }
 
-  if (action === 'pdf' && !job.legionella?.done
+  if (action === 'pdf' && !isPrice(job) && !job.legionella?.done
     && !(await confirmDialog('Legionella flush not recorded – export anyway?', { ok: 'Export anyway' }))) return null;
 
   if (action === 'pdf') {

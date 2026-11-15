@@ -1,6 +1,6 @@
 // Screen: address – postcode lookup, address, GPS, navigate, surveyor.
 import { scheduleSave } from '../db.js';
-import { jobTitle, fmtDateTime } from '../model.js';
+import { jobTitle, fmtDateTime, isPrice } from '../model.js';
 import { h, textField, toast, confirmDialog } from '../ui.js';
 import { lookupPostcode, lookupStreet, formatPostcode, getPosition, directionsUrl, pinUrl, demoAddress, DEMO_PIN } from '../geo.js';
 import { surveyorField } from '../surveyors.js';
@@ -143,9 +143,17 @@ export default async function jobAddress(root, { id }) {
     },
   }, 'Use my location');
 
+  // Materials & labour costing: customer and job reference at the top.
+  const refBox = isPrice(job)
+    ? h('div', { class: 'card card-body ref-box' },
+      textField('Customer', job.pricing.customer, (v) => { job.pricing.customer = v; save(); updateDerived(); }, { autocapitalize: 'words', placeholder: 'Customer or client name' }),
+      textField('Job reference', job.pricing.ref, (v) => { job.pricing.ref = v; save(); updateDerived(); }, { autocapitalize: 'characters', placeholder: 'e.g. Job number or order ref' }))
+    : null;
+
   root.append(
     ...jobChrome(job, 'address'),
     h('div', { class: 'content' },
+      refBox ? [h('h2', null, 'Customer / job reference'), refBox] : null,
       h('h2', null, 'Address'),
       h('div', { class: 'input-row' }, postcodeField, lookupBtn),
       h('p', { class: 'hint' }, 'Look up finds the street and town for the postcode. Check it and add the house number – you can edit the address freely.'),
@@ -154,7 +162,7 @@ export default async function jobAddress(root, { id }) {
       h('div', { class: 'btn-row' }, nav, gpsBtn),
 
       h('div', { style: 'margin-top:20px' }, surveyorField(job, save)),
-      h('p', { class: 'hint' }, `Survey created ${fmtDateTime(job.created)}`),
+      h('p', { class: 'hint' }, `${isPrice(job) ? 'Costing' : 'Survey'} created ${fmtDateTime(job.created)}`),
       completeFooter(job, 'address')));
 
   updateDerived();

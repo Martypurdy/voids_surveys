@@ -46,13 +46,31 @@ export const SECTIONS = [
 export const FORMS = {
   void: { title: 'Empty home inspection', pdfTitle: 'Empty Home Inspection', file: 'Empty home inspection' },
   rtl: { title: 'Ready to let', pdfTitle: 'Ready to Let Inspection', file: 'Ready to let' },
+  price: { title: 'Materials & labour', pdfTitle: 'Materials & Labour Costing', file: 'Materials and labour' },
 };
+// 'price' = Materials & labour costing sheet (Pricing on the home screen).
+const PRICE_SECTIONS = [
+  ['address', 'Address', ''],
+  ['costs', 'Materials', 'costs'],
+  ['labour', 'Labour', 'labour'],
+  ['totals', 'Totals', 'totals'],
+];
+export const isPrice = (job) => job.form === 'price';
+/**
+ * Costing sheet. vat: how prices are typed in – 'plus' (+ VAT), 'inc' (including VAT)
+ * or 'none' (no VAT). Lines: see newMaterialLine / newLabourLine.
+ */
+export const newPricing = () => ({ customer: '', ref: '', vat: 'plus', vatRate: 20, materials: [], labour: [], notes: '' });
+/** markupType: '%' of the line, or '£' added to the whole line. */
+export const newMaterialLine = () => ({ id: uid(), item: '', supplier: '', code: '', qty: '', unit: '', price: '', markup: '', markupType: '%', url: '' });
+/** basis: 'item' | 'hour' | 'day'. */
+export const newLabourLine = () => ({ id: uid(), item: '', basis: 'hour', qty: '', rate: '', markup: '', markupType: '%' });
 const RTL_SECTIONS = SECTIONS.filter(([k]) => k !== 'materials');
 /** Sign off signature (both forms). image: PNG data URL; date: ISO time signed. */
 export const newSignature = () => ({ name: '', image: '', date: '' });
 export const isRtl = (job) => job.form === 'rtl';
 /** The tabs for this job's form. */
-export const sectionsOf = (job) => (isRtl(job) ? RTL_SECTIONS : SECTIONS);
+export const sectionsOf = (job) => (isRtl(job) ? RTL_SECTIONS : isPrice(job) ? PRICE_SECTIONS : SECTIONS);
 export const formOf = (job) => FORMS[job.form] || FORMS.void;
 
 /** Ready to let: key types to record (fobs count as communal key / fob). */
@@ -129,7 +147,7 @@ export function upgradeJob(job) {
   if (job.rtl) delete job.rtl.signature;
   job.signature = { ...newSignature(), ...(job.signature || {}) };
   // Empty home inspections finished before Sign off was added stay complete.
-  if (!isRtl(job) && !job.progress?.signoff && job.progress?.materials === 'complete'
+  if (job.form === 'void' && !job.progress?.signoff && job.progress?.materials === 'complete'
     && SECTIONS.every(([k]) => k === 'signoff' || job.progress[k] === 'complete')) {
     job.progress.signoff = 'complete';
   }
@@ -164,6 +182,10 @@ export function upgradeJob(job) {
     delete job.gifted.selected['Lamp shades'];
   }
   job.security.parts ??= {};
+  if (isPrice(job)) {
+    job.pricing = { ...newPricing(), ...(job.pricing || {}) };
+    for (const k of ['materials', 'labour']) if (!Array.isArray(job.pricing[k])) job.pricing[k] = [];
+  }
   job.legionella = { ...newLegionella(), ...(job.legionella || {}) };
   if (!Array.isArray(job.legionella.photos)) job.legionella.photos = [];
   return job;
@@ -189,6 +211,7 @@ export function newJob({ surveyor = '', form = 'void' } = {}) {
     schema: SCHEMA,
     form,
     ...(form === 'rtl' ? { rtl: newRtl() } : {}),
+    ...(form === 'price' ? { pricing: newPricing() } : {}),
     signature: newSignature(),
     id: uid(),
     created: t,
@@ -369,7 +392,9 @@ export function jobTitle(job) {
   const first = textLines(a)[0] || '';
   const pc = (a.postcode || '').trim();
   const title = [first, pc && !squash(first).includes(squash(pc)) ? pc : ''].filter(Boolean).join(', ');
-  return title || 'New survey';
+  if (title) return title;
+  if (isPrice(job)) return [job.pricing?.ref, job.pricing?.customer].filter((s) => s?.trim()).join(' – ') || 'New costing';
+  return 'New survey';
 }
 
 /**
