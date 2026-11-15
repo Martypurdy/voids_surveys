@@ -8,6 +8,7 @@ import { scheduleSave } from '../db.js';
 import { newMaterialLine, newLabourLine, newDelivery } from '../model.js';
 import { lineTotals, sheetTotals, gbp, isBlankLine, money, VAT_MODES, LABOUR_BASIS, UNIT_SUGGESTIONS } from '../pricing.js';
 import { h, toast, choose, busy } from '../ui.js';
+import { showPriceInfo, maybeShowIntro, maybeWarnNoPrice, NO_PRICE_SUPPLIERS } from './priceHelp.js';
 import { lookupProduct, applyToLine, sheetPrice, findUrl, noPriceReason, LOOKUP_URL, takePendingLink } from '../linkfill.js';
 import { loadJobOr404, jobChrome, completeFooter } from './chrome.js';
 
@@ -84,7 +85,7 @@ export function runningTotal(p) {
     el.replaceChildren(
       h('span', null, 'Materials ', h('b', null, gbp(t.materials.total))),
       h('span', null, 'Labour ', h('b', null, gbp(t.labour.total))),
-      t.delivery.count ? h('span', null, 'Delivery ', h('b', null, gbp(t.delivery.total))) : null,
+      t.delivery.count ? h('span', null, 'Delivery ', h('b', null, gbp(t.delivery.total))) : '',
       h('span', { class: 'run-grand' }, 'Total ', h('b', null, gbp(t.gross)), h('small', null, ` (${vatNote})`)));
   };
   el.update();
@@ -154,9 +155,13 @@ export default async function costSheet(root, { id, kind }) {
       tr = line ? tbody.children[lines.indexOf(line)] : addLine();
       line ||= lines.at(-1);
     }
+    // First link on this list from a supplier whose prices can't be read (Screwfix)?
+    const noPriceSupplier = !info.looked || info.price == null ? NO_PRICE_SUPPLIERS.find((s) => s === info.supplier) : null;
+    const firstOfThem = noPriceSupplier && !lines.some((l) => l !== line && l.url && l.supplier === noPriceSupplier);
     const priced = applyToLine(line, info, p);
     save();
     const fresh = refreshRow(tr, line);
+    if (firstOfThem) await maybeWarnNoPrice(noPriceSupplier);
     // Next: the quantity – or the price, if the supplier's site didn't give one.
     const next = fresh.querySelector(priced ? '[data-k="qty"]' : '[data-k="price"]');
     next.scrollIntoView({ block: 'center', inline: 'center' });
@@ -452,10 +457,14 @@ export default async function costSheet(root, { id, kind }) {
       sums,
       deliverySection,
       bar,
+      mat ? h('button', { type: 'button', class: 'btn-block info-btn', onclick: showPriceInfo }, 'ℹ️ About prices & product links') : null,
       completeFooter(job, section)));
   updateFoot();
 
   // A product link shared to the app from another app (Android share sheet).
   const shared = mat ? takePendingLink() : null;
-  if (shared) setTimeout(() => addFromLink(shared), 300);
+  setTimeout(async () => {
+    if (mat) await maybeShowIntro();
+    if (shared) addFromLink(shared);
+  }, 300);
 }

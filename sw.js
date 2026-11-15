@@ -1,6 +1,6 @@
 // Service worker: precache the app shell, serve it cache-first so the app works offline.
 // Bump VERSION whenever any file below changes, so devices pick up the update.
-const VERSION = 'v60';
+const VERSION = 'v61';
 const CACHE = `voids-${VERSION}`;
 
 const ASSETS = [
@@ -49,6 +49,7 @@ const ASSETS = [
   'js/views/priceTotals.js',
   'js/linkfill.js',
   'js/views/shareLink.js',
+  'js/views/priceHelp.js',
   'js/views/keysRtl.js',
   'js/materials.js',
   'js/views/featureList.js',
