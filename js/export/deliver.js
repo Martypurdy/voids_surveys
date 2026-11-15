@@ -20,7 +20,8 @@ function shareableFile(blob, filename) {
 }
 
 /** Can this device show the share sheet for this file? */
-export const canShareFile = (blob, filename) => isTouch() && Boolean(shareableFile(blob, filename));
+// Phones and computers alike (Windows shows its own share panel: Outlook, Teams, WhatsApp…).
+export const canShareFile = (blob, filename) => Boolean(shareableFile(blob, filename));
 
 /** Save / download the file. */
 export function saveFile(blob, filename) {
@@ -35,7 +36,7 @@ export function saveFile(blob, filename) {
 
 /** Share sheet if possible, else save. Must be called inside a tap. Resolves true if not cancelled. */
 export async function deliverFile(blob, filename) {
-  const file = isTouch() ? shareableFile(blob, filename) : null;
+  const file = shareableFile(blob, filename);
   if (file) {
     try {
       await navigator.share({ files: [file], title: filename });
@@ -66,7 +67,7 @@ export function offerFile(blob, filename, title = 'File ready') {
       share
         ? { label: '📤 Share – WhatsApp, Teams, email, OneDrive…', value: 'go', class: 'btn-primary btn-big', onClick: () => { result = deliverFile(blob, filename); } }
         : null,
-      { label: share ? '💾 Save to phone' : (isTouch() ? '💾 Save' : 'Download'), value: 'go', class: share ? 'btn-big' : 'btn-primary', onClick: () => { result = Promise.resolve(saveFile(blob, filename)); } },
+      { label: isTouch() ? '💾 Save to phone' : '💾 Save to computer', value: 'go', class: share ? 'btn-big' : 'btn-primary btn-big', onClick: () => { result = Promise.resolve(saveFile(blob, filename)); } },
       { label: 'Cancel', value: null },
     ].filter(Boolean),
   }).then((v) => (v === 'go' ? result : false));
