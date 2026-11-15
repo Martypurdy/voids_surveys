@@ -1183,3 +1183,50 @@ body.no-scroll { overflow: hidden; }
 .help .check { margin-top: 10px; font-weight: 600; }
 .email-pop textarea { min-height: 150px; font-size: .92rem; }
 .email-pop .warn { margin: 0 0 8px; }
+
+/* ----- Designer: floor plan editor ----- */
+:root { --plan-bg: #fbfcfd; --plan-grid: #e7ecf1; --plan-grid-m: #cfd8e1; --plan-room: #ffffff; --plan-wall: #2c3a47; --plan-fx: #eef3f8; --plan-text: #17202a; --plan-dim: #6a7783; --plan-pt: #b3261e; --plan-win: #2f7fc1; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --plan-bg: #11161b; --plan-grid: #1c242c; --plan-grid-m: #2a3540; --plan-room: #1a2128; --plan-wall: #d7e0e8; --plan-fx: #24303b; --plan-text: #e8edf2; --plan-dim: #9aa6b2; --plan-pt: #ff8a80; --plan-win: #6fb4ea; }
+}
+:root[data-theme="dark"] { --plan-bg: #11161b; --plan-grid: #1c242c; --plan-grid-m: #2a3540; --plan-room: #1a2128; --plan-wall: #d7e0e8; --plan-fx: #24303b; --plan-text: #e8edf2; --plan-dim: #9aa6b2; --plan-pt: #ff8a80; --plan-win: #6fb4ea; }
+.plan-page { padding-top: 8px; }
+.plan-floors { margin: 0 0 8px; }
+.plan-floors .add-floor { border-style: dashed; color: var(--primary); }
+.plan-tools-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -16px 8px; padding: 0 16px; }
+.plan-tools { display: flex; gap: 6px; width: max-content; }
+.plan-tools .btn-small { white-space: nowrap; min-height: 42px; }
+.plan-tool[aria-pressed="true"] { background: var(--primary); color: var(--primary-ink); border-color: var(--primary); }
+.plan-banner { position: absolute; left: 8px; right: 8px; top: 8px; z-index: 2; box-shadow: 0 2px 8px rgb(0 0 0 / .15); display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; padding: 8px 12px; border-radius: 10px; background: var(--started-bg); color: var(--started-ink); font-weight: 600; font-size: .9rem; }
+.plan-canvas { position: relative; height: min(62vh, 560px); min-height: 320px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--plan-bg); touch-action: none; user-select: none; -webkit-user-select: none; }
+.plan-svg { display: block; touch-action: none; }
+.plan-svg .g { stroke: var(--plan-grid); stroke-width: 1; }
+.plan-svg .g.gm { stroke: var(--plan-grid-m); }
+.plan-svg .room { fill: var(--plan-room); stroke: var(--plan-wall); stroke-width: 4; }
+.plan-svg .room.sel { stroke: var(--primary); }
+.plan-svg .fx { fill: var(--plan-fx); stroke: var(--plan-wall); stroke-width: 1.2; }
+.plan-svg .fx.dashed { fill: none; stroke-dasharray: 4 3; }
+.plan-svg .fx.sel, .plan-svg .leaf.sel, .plan-svg .swing.sel, .plan-svg .win.sel { stroke: var(--primary); stroke-width: 2.5; }
+.plan-svg .fx-t { fill: var(--plan-text); text-anchor: middle; dominant-baseline: central; font-weight: 600; pointer-events: none; }
+.plan-svg .gap { stroke: var(--plan-room); stroke-width: 6; }
+.plan-svg .leaf { stroke: var(--plan-wall); stroke-width: 1.6; }
+.plan-svg .swing { fill: none; stroke: var(--plan-wall); stroke-width: 1; stroke-dasharray: 3 2; }
+.plan-svg .win { stroke: var(--plan-win); stroke-width: 6; }
+.plan-svg .win-in { stroke: var(--plan-room); stroke-width: 2; }
+.plan-svg .pt { fill: var(--plan-pt); stroke: #fff; stroke-width: 2; }
+.plan-svg .pt.sel { stroke: var(--primary); stroke-width: 3.5; }
+.plan-svg .pt-t { fill: #fff; font-size: 10px; font-weight: 800; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+.plan-svg .rn { fill: var(--plan-text); font-size: 13px; font-weight: 800; text-anchor: middle; pointer-events: none; }
+.plan-svg .ra { fill: var(--plan-dim); font-size: 11px; text-anchor: middle; pointer-events: none; }
+.plan-svg .dim { fill: var(--plan-dim); font-size: 10.5px; font-weight: 600; text-anchor: middle; pointer-events: none; }
+.plan-svg .handle { fill: var(--primary); stroke: #fff; stroke-width: 2; }
+.plan-svg .empty-t { fill: var(--plan-dim); font-size: 15px; text-anchor: middle; }
+.plan-zoom { display: flex; gap: 6px; margin: 8px 0; }
+.plan-zoom .btn-small { flex: 1; }
+.plan-summary { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0 0 10px; font-size: .9rem; color: var(--muted); }
+.plan-summary b { color: var(--text); }
+.plan-key { flex-basis: 100%; font-size: .82rem; }
+.plan-panel strong { display: block; margin-bottom: 8px; }
+.plan-figures { margin: 0 0 8px; font-weight: 600; font-size: .9rem; }
+.plan-help { margin: 0; }
+.plan-banner[hidden] { display: none; }

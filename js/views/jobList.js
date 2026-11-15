@@ -1,7 +1,8 @@
 // Screen 1: home – branded header, quick stats, start a new form, and the
 // surveys on this device (search / filter once there are a few).
 import { listJobs, saveJob, requestPersist, storageInfo } from '../db.js';
-import { newJob, jobTitle, backupStatus, fmtDate, allPhotoIds, sectionsOf, completedCount, sectionState, formOf, isRtl, isPrice } from '../model.js';
+import { newJob, jobTitle, backupStatus, fmtDate, allPhotoIds, sectionsOf, completedCount, sectionState, formOf, isRtl, isPrice, isPlan } from '../model.js';
+import { planArea, sqm } from '../plan.js';
 import { h, icon, ICONS, torchButton, choose } from '../ui.js';
 import { sheetTotals, gbp, isBlankLine } from '../pricing.js';
 import { go, refresh } from '../router.js';
@@ -38,6 +39,14 @@ const GROUPS = [
       { form: 'price', emoji: '🧮', title: 'Materials & labour', text: 'Cost materials and labour line by line – markup, VAT and running totals.' },
       { emoji: '📝', title: 'Quote', text: 'Turn a costing into a quote for the customer.' },
       { emoji: '🧾', title: 'Invoice', text: 'Turn a quote into an invoice.' },
+    ],
+  },
+  {
+    key: 'designer', emoji: '📐', title: 'Designer', text: 'Kitchen, bathroom and whole property floor plans.',
+    forms: [
+      { form: 'plan:kitchen', emoji: '🍳', title: 'Kitchen plan', text: 'Room size, doors, windows, units, sink, hob and appliances.' },
+      { form: 'plan:bathroom', emoji: '🛁', title: 'Bathroom plan', text: 'Room size, doors, windows, bath, shower, WC and basin.' },
+      { form: 'plan:property', emoji: '🏠', title: 'Whole property plan', text: 'Every room and floor with measurements, doors, windows, fuse board and water main.' },
     ],
   },
   { key: 'repair', emoji: '🛠️', title: 'Repair job sheet', text: 'Job details, materials used, photos and completion.' },
@@ -173,12 +182,13 @@ export default async function jobList(root) {
       footnote()));
 }
 
-async function createJob(form) {
-  const job = newJob({ surveyor: getLastSurveyor(), form });
+async function createJob(choice) {
+  const [form, planKind] = choice.split(':'); // e.g. 'plan:kitchen'
+  const job = newJob({ surveyor: getLastSurveyor(), form, planKind });
   await saveJob(job);
   // Ask the browser to keep our data (helps against eviction, esp. on iOS).
   requestPersist();
-  go(`/job/${job.id}`);
+  go(isPlan(job) ? `/job/${job.id}/plan` : `/job/${job.id}`);
 }
 
 function jobCard(job) {
@@ -193,12 +203,12 @@ function jobCard(job) {
       h('div', { class: 'job-head' },
         h('div', { class: 'job-title' }, jobTitle(job)),
         h('span', { class: 'job-pill' }, state === 'done' ? '✓ Complete' : state === 'progress' ? 'In progress' : 'New')),
-      h('div', { class: 'job-sub' }, [(isRtl(job) ? '🔑 ' : isPrice(job) ? '🧮 ' : '🏠 ') + formOf(job).title, isPrice(job) ? job.pricing.customer : '', job.surveyor].filter(Boolean).join(' · ')),
+      h('div', { class: 'job-sub' }, [(isRtl(job) ? '🔑 ' : isPrice(job) ? '🧮 ' : isPlan(job) ? `${formOf(job).emoji} ` : '🏠 ') + formOf(job).title, isPrice(job) ? job.pricing.customer : '', job.surveyor].filter(Boolean).join(' · ')),
       h('div', { class: 'job-progress' },
         h('div', { class: 'progress', 'aria-hidden': 'true' }, SECTIONS.map(([k]) => h('span', { dataset: { state: sectionState(job, k) || 'todo' } }))),
         h('span', { class: 'job-pct' }, `${pct}%`)),
       h('div', { class: 'job-meta' },
-        isPrice(job) ? priceMeta(job) : `📅 ${fmtDate(job.created)} · 🚪 ${job.rooms.length} room${job.rooms.length === 1 ? '' : 's'} · 📷 ${nPhotos}`),
+        isPlan(job) ? planMeta(job) : isPrice(job) ? priceMeta(job) : `📅 ${fmtDate(job.created)} · 🚪 ${job.rooms.length} room${job.rooms.length === 1 ? '' : 's'} · 📷 ${nPhotos}`),
       status.stale ? h('span', { class: 'warn' }, '⚠ ', status.text) : null),
     h('button', {
       type: 'button',
@@ -208,6 +218,12 @@ function jobCard(job) {
         if (await jobActions(job)) refresh();
       },
     }, icon(ICONS.more)));
+}
+
+/** Floor plan card: date, rooms and floor area. */
+function planMeta(job) {
+  const rooms = job.plan.floors.reduce((n, f) => n + f.rooms.length, 0);
+  return `📅 ${fmtDate(job.created)} · 📐 ${rooms} room${rooms === 1 ? '' : 's'} · ${sqm(planArea(job.plan))}`;
 }
 
 /** Costing card: date, number of lines and the total. */

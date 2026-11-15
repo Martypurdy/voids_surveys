@@ -24,6 +24,7 @@ route('/job/:id/costs', () => import('./views/costSheet.js'), { kind: 'materials
 route('/job/:id/labour', () => import('./views/costSheet.js'), { kind: 'labour' });
 route('/job/:id/totals', () => import('./views/priceTotals.js'));
 route('/share', () => import('./views/shareLink.js'));
+route('/job/:id/plan', () => import('./views/planEditor.js'));
 
 // Shared to the app from another app (Android share sheet): ./?url=…&text=…&title=…
 {

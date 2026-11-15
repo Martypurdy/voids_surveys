@@ -2,7 +2,7 @@
 // and the "Mark complete" footer. Opening a section marks it started (amber);
 // the footer button marks it complete (green) and moves to the next section.
 import { getJob, scheduleSave, flushSave } from '../db.js';
-import { sectionsOf, jobTitle, sectionState, isPrice } from '../model.js';
+import { sectionsOf, jobTitle, sectionState, isInspection } from '../model.js';
 import { h, icon, ICONS, pageHeader, toast, scrollTabs, choose } from '../ui.js';
 import { jobActions } from './jobActions.js';
 import { go } from '../router.js';
@@ -98,8 +98,8 @@ export function completeFooter(job, section, { check } = {}) {
             title: '✓ All sections complete',
             message: 'Everything on this form is complete. Do you want to close the form now?',
             buttons: [
-              isPrice(job) ? null : { label: '📧 Email report', value: 'email', class: 'btn-primary btn-big' },
-              { label: 'Close form', value: 'close', class: isPrice(job) ? 'btn-primary btn-big' : 'btn-big' },
+              isInspection(job) ? { label: '📧 Email report', value: 'email', class: 'btn-primary btn-big' } : null,
+              { label: 'Close form', value: 'close', class: isInspection(job) ? 'btn-big' : 'btn-primary btn-big' },
               { label: 'Export / share report', value: 'export', class: 'btn-big' },
               { label: 'Stay on this page', value: null },
             ].filter(Boolean),

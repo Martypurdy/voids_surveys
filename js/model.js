@@ -5,6 +5,7 @@ export const SCHEMA = 1;
 export const CONDITIONS = ['Good', 'Fair', 'Poor', 'N/A'];
 
 import { AREA_PRESETS, defaultFeatures } from './data/features.js';
+import { newPlan, PLAN_KINDS } from './plan.js';
 
 export const ROOM_PRESETS = AREA_PRESETS.rooms;
 export const EXTERNAL_PRESETS = AREA_PRESETS.externals;
@@ -47,7 +48,16 @@ export const FORMS = {
   void: { title: 'Empty home inspection', pdfTitle: 'Empty Home Inspection', file: 'Empty home inspection' },
   rtl: { title: 'Ready to let', pdfTitle: 'Ready to Let Inspection', file: 'Ready to let' },
   price: { title: 'Materials & labour', pdfTitle: 'Materials & Labour Costing', file: 'Materials and labour' },
+  plan: { title: 'Floor plan', pdfTitle: 'Floor Plan', file: 'Floor plan' },
 };
+// 'plan' = Designer floor plan (kitchen, bathroom or whole property – job.plan.kind).
+const PLAN_SECTIONS = [
+  ['address', 'Address', ''],
+  ['plan', 'Floor plan', 'plan'],
+];
+export const isPlan = (job) => job.form === 'plan';
+/** The two inspection forms (Empty home inspection, Ready to let). */
+export const isInspection = (job) => !job.form || job.form === 'void' || job.form === 'rtl';
 // 'price' = Materials & labour costing sheet (Pricing on the home screen).
 const PRICE_SECTIONS = [
   ['address', 'Address', ''],
@@ -72,8 +82,8 @@ const RTL_SECTIONS = SECTIONS.filter(([k]) => k !== 'materials');
 export const newSignature = () => ({ name: '', image: '', date: '' });
 export const isRtl = (job) => job.form === 'rtl';
 /** The tabs for this job's form. */
-export const sectionsOf = (job) => (isRtl(job) ? RTL_SECTIONS : isPrice(job) ? PRICE_SECTIONS : SECTIONS);
-export const formOf = (job) => FORMS[job.form] || FORMS.void;
+export const sectionsOf = (job) => (isRtl(job) ? RTL_SECTIONS : isPrice(job) ? PRICE_SECTIONS : isPlan(job) ? PLAN_SECTIONS : SECTIONS);
+export const formOf = (job) => (isPlan(job) ? { ...FORMS.plan, ...PLAN_KINDS[job.plan?.kind || 'property'] } : FORMS[job.form] || FORMS.void);
 
 /** Ready to let: key types to record (fobs count as communal key / fob). */
 export const RTL_KEY_TYPES = ['Front door', 'Back door', 'Patio door', 'French doors', 'Window keys', 'Shed', 'Gate', 'Garage', 'Post box', 'Meter box', 'Communal key / fob'];
@@ -184,6 +194,10 @@ export function upgradeJob(job) {
     delete job.gifted.selected['Lamp shades'];
   }
   job.security.parts ??= {};
+  if (isPlan(job)) {
+    job.plan = { ...newPlan(job.plan?.kind), ...(job.plan || {}) };
+    for (const f of job.plan.floors) { f.rooms ??= []; f.items ??= []; }
+  }
   if (isPrice(job)) {
     job.pricing = { ...newPricing(), ...(job.pricing || {}) };
     for (const k of ['materials', 'labour', 'deliveries']) if (!Array.isArray(job.pricing[k])) job.pricing[k] = [];
@@ -208,13 +222,14 @@ export function todayLocal() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-export function newJob({ surveyor = '', form = 'void' } = {}) {
+export function newJob({ surveyor = '', form = 'void', planKind = 'property' } = {}) {
   const t = nowISO();
   return {
     schema: SCHEMA,
     form,
     ...(form === 'rtl' ? { rtl: newRtl() } : {}),
     ...(form === 'price' ? { pricing: newPricing() } : {}),
+    ...(form === 'plan' ? { plan: newPlan(planKind) } : {}),
     signature: newSignature(),
     id: uid(),
     created: t,
@@ -397,6 +412,7 @@ export function jobTitle(job) {
   const title = [first, pc && !squash(first).includes(squash(pc)) ? pc : ''].filter(Boolean).join(', ');
   if (title) return title;
   if (isPrice(job)) return [job.pricing?.ref, job.pricing?.customer].filter((s) => s?.trim()).join(' – ') || 'New costing';
+  if (isPlan(job)) return `New ${(PLAN_KINDS[job.plan?.kind] || PLAN_KINDS.property).title.toLowerCase()}`;
   return 'New survey';
 }
 

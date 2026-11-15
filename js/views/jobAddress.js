@@ -1,6 +1,6 @@
 // Screen: address – postcode lookup, address, GPS, navigate, surveyor.
 import { scheduleSave } from '../db.js';
-import { jobTitle, fmtDateTime, isPrice } from '../model.js';
+import { jobTitle, fmtDateTime, isPrice, isPlan } from '../model.js';
 import { h, textField, toast, confirmDialog } from '../ui.js';
 import { lookupPostcode, lookupStreet, formatPostcode, getPosition, directionsUrl, pinUrl, demoAddress, isDemoPostcode } from '../geo.js';
 import { surveyorField } from '../surveyors.js';
@@ -160,7 +160,7 @@ export default async function jobAddress(root, { id }) {
       h('div', { class: 'btn-row' }, nav, gpsBtn),
 
       h('div', { style: 'margin-top:20px' }, surveyorField(job, save)),
-      h('p', { class: 'hint' }, `${isPrice(job) ? 'Costing' : 'Survey'} created ${fmtDateTime(job.created)}`),
+      h('p', { class: 'hint' }, `${isPrice(job) ? 'Costing' : isPlan(job) ? 'Plan' : 'Survey'} created ${fmtDateTime(job.created)}`),
       completeFooter(job, 'address')));
 
   updateDerived();
