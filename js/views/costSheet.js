@@ -1,6 +1,7 @@
 // Materials & labour costing › Materials / Labour tabs: a spreadsheet – one line per
-// item, every field on the row, totals worked out as you type. There's always an
-// empty line at the bottom; typing in it starts a new line.
+// item, every field on the row, totals worked out as you type. Starts with at least
+// MIN_LINES lines; "+ Add line" (or Enter on the last line) adds another. Empty lines
+// are ignored in totals and the PDF.
 import { scheduleSave } from '../db.js';
 import { newMaterialLine, newLabourLine } from '../model.js';
 import { lineTotals, sheetTotals, gbp, isBlankLine, VAT_MODES, LABOUR_BASIS, UNIT_SUGGESTIONS } from '../pricing.js';
@@ -24,6 +25,7 @@ const LABOUR_COLS = [
   { k: 'markup', label: 'Markup', w: 104, markup: true },
 ];
 const QTY_HINT = { item: 'items', hour: 'hours', day: 'days' };
+const MIN_LINES = 4;
 
 /** VAT mode buttons (shared by Materials, Labour and Totals). */
 export function vatToggle(p, onChange) {
@@ -74,26 +76,31 @@ export default async function costSheet(root, { id, kind }) {
     bar.update();
   };
 
-  /** Move to the same column on the next line (Enter key), like a spreadsheet. */
+  const newLine = () => (mat ? newMaterialLine() : newLabourLine());
+  /** Add a line at the bottom; returns its row. */
+  const addLine = () => {
+    const line = newLine();
+    lines.push(line);
+    const tr = row(line);
+    tbody.append(tr);
+    save();
+    return tr;
+  };
+  /** Move to the same column on the next line (Enter key), like a spreadsheet; adds a line at the bottom. */
   const nextRow = (tr, k) => {
-    const next = tr.nextElementSibling;
-    next?.querySelector(`[data-k="${k}"]`)?.focus();
+    const next = tr.nextElementSibling || addLine();
+    const el = next.querySelector(`[data-k="${k}"]`);
+    el?.focus();
+    el?.scrollIntoView({ block: 'nearest' });
   };
 
-  const row = (line, ghost) => {
-    const tr = h('tr', { class: ghost ? 'ghost' : null });
+  const row = (line) => {
+    const tr = h('tr');
     const totalCell = h('td', { class: 'total' });
     const showTotal = () => {
       totalCell.textContent = isBlankLine(line) ? '' : gbp(lineTotals(line).total);
     };
-    // First change to the empty bottom line makes it a real line and adds a new empty one.
     const changed = () => {
-      if (ghost) {
-        ghost = false;
-        tr.classList.remove('ghost');
-        lines.push(line);
-        tbody.append(row(mat ? newMaterialLine() : newLabourLine(), true));
-      }
       save();
       showTotal();
       updateFoot();
@@ -148,7 +155,6 @@ export default async function costSheet(root, { id, kind }) {
       class: 'row-del',
       'aria-label': 'Remove line',
       onclick: () => {
-        if (ghost) return;
         const i = lines.indexOf(line);
         if (i < 0) return;
         lines.splice(i, 1);
@@ -172,7 +178,22 @@ export default async function costSheet(root, { id, kind }) {
     return tr;
   };
 
-  tbody.append(...lines.map((l) => row(l, false)), row(mat ? newMaterialLine() : newLabourLine(), true));
+  // Always start with at least MIN_LINES lines to type in.
+  if (lines.length < MIN_LINES) {
+    while (lines.length < MIN_LINES) lines.push(newLine());
+    save();
+  }
+  tbody.append(...lines.map((l) => row(l)));
+  const addBtn = h('button', {
+    type: 'button',
+    class: 'btn-block add-line',
+    onclick: () => {
+      const tr = addLine();
+      const el = tr.querySelector('[data-k="item"]');
+      el.scrollIntoView({ block: 'center' });
+      el.focus();
+    },
+  }, '+ Add line');
 
   const head = h('tr', null,
     COLS.map((c) => h('th', { class: [c.first ? 'col-first' : '', c.num || c.markup ? 'num' : ''].filter(Boolean).join(' ') || null, style: `min-width:${c.w}px;width:${c.w}px` }, c.label)),
@@ -196,6 +217,7 @@ export default async function costSheet(root, { id, kind }) {
         : 'Charge per item, per hour or per day. Qty is the number of items, hours or days (blank counts as 1). Markup: tap % / £ to switch.'),
       units,
       h('div', { class: 'calc-wrap' }, table),
+      addBtn,
       sums,
       bar,
       completeFooter(job, section)));

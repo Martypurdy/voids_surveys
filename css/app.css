@@ -1117,15 +1117,12 @@ body.no-scroll { overflow: hidden; }
 .calc td.num input { text-align: right; }
 .calc .col-first { position: sticky; left: 0; z-index: 1; box-shadow: 2px 0 0 var(--border); }
 .calc th.col-first { z-index: 2; }
-.calc tr.ghost td input::placeholder { opacity: .55; }
-.calc tr.ghost td { background: color-mix(in srgb, var(--surface-2) 45%, var(--surface)); }
 .calc .total { text-align: right; padding: 0 10px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .calc .mk { display: flex; align-items: stretch; }
 .calc .mk input { flex: 1; min-width: 0; }
 .calc .mk-type { min-height: 44px; min-width: 38px; padding: 0 6px; border: 0; border-left: 1px solid var(--border); border-radius: 0; font-weight: 800; color: var(--primary); background: var(--surface-2); }
 .calc .del-cell { text-align: center; }
 .calc .row-del { min-height: 44px; min-width: 44px; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--muted); }
-.calc tr.ghost .row-del { visibility: hidden; }
 .run-total { position: sticky; bottom: calc(8px + env(safe-area-inset-bottom)); z-index: 5; display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; padding: 10px 14px; margin: 8px 0; border-radius: 12px; background: var(--primary); color: var(--primary-ink); font-size: .88rem; box-shadow: 0 2px 10px rgb(0 0 0 / .18); }
 .run-total b { font-variant-numeric: tabular-nums; }
 .run-grand { margin-left: auto; font-size: 1rem; }
@@ -1147,3 +1144,4 @@ body.no-scroll { overflow: hidden; }
 @media (max-width: 520px) {
   .calc .col-first { min-width: 140px !important; width: 140px !important; max-width: 140px; }
 }
+.add-line { margin: 0 0 12px; border-style: dashed; border-width: 2px; color: var(--primary); font-weight: 700; }
