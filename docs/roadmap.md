@@ -9,17 +9,17 @@ Before each phase, show a short plan and wait for an OK.
 # Void Surveys – Roadmap
 
 ## Phase 0 – Responsive layout (desktop, tablet, mobile)
-- Desktop: use the full screen width, not a narrow phone column. Multi-column layouts
+- [x] Desktop: use the full screen width, not a narrow phone column. Multi-column layouts
   where it helps (e.g. property list + selected property side by side), wide
   spreadsheet-style tables for surveys and materials.
-- Tablet and mobile: fully support landscape orientation, and use it to show
-  wider layouts (more table columns, photos beside fields).
-- Portrait still works on phones for quick data entry.
-- Wide screens (repair survey, materials list, calculators) suggest rotating to
-  landscape on phones, but never force it.
-- manifest.webmanifest: set "orientation": "any" so the installed app rotates freely.
-- Test at phone portrait, phone landscape, tablet portrait, tablet landscape and desktop.
-- All later phases must follow these layout rules.
+- [x] Tablet: landscape and portrait use the extra room (Designer full screen with a movable, resizable panel; forms in
+  two columns; properties list beside the selected property). Phone landscape: no special treatment (scope reduced).
+- [x] Portrait still works on phones for quick data entry.
+- [ ] Wide screens (repair survey, materials list, calculators) suggest rotating to
+  landscape on phones, but never force it. (Dropped for now: phone landscape is not a priority.)
+- [x] manifest.webmanifest: set "orientation": "any" so the installed app rotates freely.
+- [x] Test at phone portrait, tablet portrait, tablet landscape and desktop (and 1920 wide). Phone portrait is checked pixel-for-pixel against the previous screenshots.
+- [x] All later phases must follow these layout rules: see docs/layout.md.
 
 ## Phase 1 – Property-based structure
 - [x] Front screen lists PROPERTIES, not jobs. Search bar: postcode, address or reference.

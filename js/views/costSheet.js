@@ -442,7 +442,7 @@ export default async function costSheet(root, { id, kind }) {
 
   root.append(
     ...jobChrome(job, section),
-    h('div', { class: 'content' },
+    h('div', { class: 'content wide' },
       h('h2', null, mat ? 'Materials' : 'Labour'),
       h('span', { class: 'field-label' }, 'Prices entered'),
       vatToggle(p, () => { save(); updateFoot(); }),

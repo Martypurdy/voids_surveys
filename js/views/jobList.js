@@ -87,8 +87,10 @@ export default async function jobList(root) {
   root.append(
     hero,
     h('div', { class: 'content home' },
-      h('h2', { class: 'home-h' }, 'Start a new form'),
-      formGrid(null), // no address needed: it goes in "No address yet" until you give it one
+      h('div', { class: 'home-main' },
+        h('h2', { class: 'home-h' }, 'Start a new form'),
+        formGrid(null)), // no address needed: it goes in "No address yet" until you give it one
+      h('div', { class: 'home-side' },
       recent.length ? [h('h2', { class: 'home-h' }, 'Continue'), h('div', { class: 'job-list compact' }, recent.map(continueCard))] : null,
       h('h2', { class: 'home-h' }, 'Properties and history'),
       h('a', { class: 'form-card form-card-ready form-card-group', href: '#/properties', dataset: { group: 'properties' } },
@@ -97,7 +99,7 @@ export default async function jobList(root) {
           title: 'Properties and history',
           text: props.length ? `${props.length} propert${props.length === 1 ? 'y' : 'ies'} · ${all.length} entr${all.length === 1 ? 'y' : 'ies'}. Search by postcode, address or reference.` : 'Every address and everything done there, in one place.',
         }, true, '›')),
-      footnote()));
+      footnote())));
 }
 
 function footnote() {

@@ -15,6 +15,15 @@ export default async function propertyPage(root, { id }) {
   await flushSave();
   const p = await getProperty(id);
   if (!p) throw new Error('Property not found on this device');
+  if (matchMedia('(min-width: 1000px)').matches) return (await import('./propertySplit.js')).renderSplit(root, id); // list beside it
+  const d = buildDetail(p);
+  root.append(
+    pageHeader(d.title, { back: '#/properties', actions: d.menuBtn }),
+    h('div', { class: 'content prop-detail' }, ...d.children));
+}
+
+/** The property's card, start button and history: on its own page, or beside the list on wide screens. */
+export function buildDetail(p) {
   const title = addressTitle(p.address);
 
   // ----- property menu -----
@@ -123,15 +132,15 @@ export default async function propertyPage(root, { id }) {
   };
   render();
 
-  root.append(
-    pageHeader(firstLine(p.address) || title, {
-      back: '#/properties',
-      actions: h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Property actions', onclick: menu }, icon(ICONS.more)),
-    }),
-    h('div', { class: 'content' },
+  return {
+    title: firstLine(p.address) || title,
+    menuBtn: h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Property actions', onclick: menu }, icon(ICONS.more)),
+    children: [
       card,
       h('button', { type: 'button', class: 'btn-primary btn-big btn-block', onclick: () => pickGroup(p.id) }, '＋ Start something new here'),
       h('h2', { class: 'home-h' }, `History (${entries.length})`),
       chips,
-      list));
+      list,
+    ],
+  };
 }

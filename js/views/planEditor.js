@@ -691,12 +691,12 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     if (dims) return all;
     const parts = all.filter((t) => ITEMS[t].cab || ITEMS[t].filler);
     const rest = all.filter((t) => !(ITEMS[t].cab || ITEMS[t].filler));
-    return parts.length && rest.length ? [...parts, '|', ...rest] : all;
+    return parts.length && rest.length ? ['||', ...parts, '|', ...rest] : all;
   };
   const renderToolbar = () => {
     toolbar.replaceChildren(...[
       dims ? h('button', { type: 'button', class: 'btn-primary btn-small', onclick: addRoom }, '+ Room') : null,
-      ...orderedTools().map((t) => (t === '|' ? h('span', { class: 'plan-sep' }, 'Appliances') : h('button', {
+      ...orderedTools().map((t) => (t === '||' ? h('span', { class: 'plan-sep lead' }, 'Cabinets') : t === '|' ? h('span', { class: 'plan-sep' }, 'Appliances') : h('button', {
         type: 'button',
         class: 'btn-small plan-tool',
         'aria-pressed': String(placing === t),
@@ -972,19 +972,104 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     renderCanvas();
   };
 
-  root.append(
-    ...jobChrome(job, section),
-    h('div', { class: 'content plan-page' },
-      floorsBar,
-      h('div', { class: 'plan-tools-wrap' }, toolbar),
-      canvas,
-      zoomBtns,
-      summary,
-      settingsCard,
-      panel,
-      dims ? null : h('label', { class: 'field', style: 'margin-top:14px' }, h('span', { class: 'field-label' }, 'Notes'),
-        h('textarea', { placeholder: 'Anything to note about the plan', oninput: (e) => { plan.notes = e.target.value; save(); } }, plan.notes || '')),
-      completeFooter(job, section, dims ? { check: async () => plan.floors.some((f) => f.rooms.length) || confirmDialog('No rooms added yet. Mark Room dimensions complete anyway?', { title: 'No rooms yet', ok: 'Mark complete', danger: false }) } : {})));
+  // ----- layout -----
+  // Phones: one column, exactly as before. Tablets and desktops (760 px and up): the window is split into a
+  // panel (tools, floors, the selected item, key, notes) and a canvas that fills the height. The panel starts
+  // on the left; drag its handle across to move it, drag the edge to resize it, or hide it. Remembered per device.
+  const PANEL_KEY = 'voids.planPanel';
+  const prefs = (() => {
+    const d = { side: 'left', width: 340, collapsed: false };
+    try { return { ...d, ...JSON.parse(localStorage.getItem(PANEL_KEY) || '{}') }; } catch { return d; }
+  })();
+  const savePrefs = () => { try { localStorage.setItem(PANEL_KEY, JSON.stringify(prefs)); } catch { /* storage blocked */ } };
+  const clampWidth = (w) => Math.max(260, Math.min(560, Math.round(w) || 340));
+  const page = h('div', { class: 'content plan-page' });
+  const applyPrefs = () => {
+    prefs.width = clampWidth(prefs.width);
+    page.dataset.side = prefs.side === 'right' ? 'right' : 'left';
+    page.dataset.collapsed = String(Boolean(prefs.collapsed));
+    page.style.setProperty('--side-w', `${prefs.width}px`);
+  };
+  const toolsWrap = h('div', { class: 'plan-tools-wrap' }, toolbar);
+  const notes = dims ? null : h('label', { class: 'field plan-notes', style: 'margin-top:14px' }, h('span', { class: 'field-label' }, 'Notes'),
+    h('textarea', { placeholder: 'Anything to note about the plan', oninput: (e) => { plan.notes = e.target.value; save(); } }, plan.notes || ''));
+  const footer = completeFooter(job, section, dims ? { check: async () => plan.floors.some((f) => f.rooms.length) || confirmDialog('No rooms added yet. Mark Room dimensions complete anyway?', { title: 'No rooms yet', ok: 'Mark complete', danger: false }) } : {});
+
+  const sideBtn = (label, title, onclick) => h('button', { type: 'button', class: 'plan-side-btn', 'aria-label': title, title, onclick }, label);
+  const grip = h('div', { class: 'plan-grip', title: 'Drag to the other side of the screen', 'aria-label': 'Drag to move the panel' }, '⠿ Tools');
+  const sideHandle = h('div', { class: 'plan-side-handle' }, grip,
+    sideBtn('⇄', 'Move the panel to the other side', () => { prefs.side = prefs.side === 'left' ? 'right' : 'left'; applyPrefs(); savePrefs(); }),
+    sideBtn('⇤', 'Hide the panel', () => { prefs.collapsed = true; applyPrefs(); savePrefs(); }));
+  const splitter = h('div', { class: 'plan-split', role: 'separator', 'aria-orientation': 'vertical', 'aria-label': 'Drag to resize the panel', tabindex: '0' });
+  const showBtn = h('button', { type: 'button', class: 'plan-show-panel btn-small', onclick: () => { prefs.collapsed = false; applyPrefs(); savePrefs(); } }, '▸ Tools');
+  const sideEl = h('div', { class: 'plan-side' });
+  const mainEl = h('div', { class: 'plan-main' });
+
+  // drag the handle across the screen to move the panel to the other side
+  grip.addEventListener('pointerdown', (e) => {
+    if (e.button > 0) return;
+    e.preventDefault();
+    grip.setPointerCapture(e.pointerId);
+    let target = prefs.side;
+    const move = (ev) => {
+      const r = page.getBoundingClientRect();
+      target = ev.clientX > r.left + r.width / 2 ? 'right' : 'left';
+      page.dataset.drop = target; // shows where it will land
+    };
+    const up = () => {
+      grip.removeEventListener('pointermove', move);
+      grip.removeEventListener('pointerup', up);
+      grip.removeEventListener('pointercancel', up);
+      delete page.dataset.drop;
+      if (target !== prefs.side) { prefs.side = target; applyPrefs(); savePrefs(); }
+    };
+    grip.addEventListener('pointermove', move);
+    grip.addEventListener('pointerup', up);
+    grip.addEventListener('pointercancel', up);
+  });
+  // drag the edge to make the panel wider or narrower
+  splitter.addEventListener('pointerdown', (e) => {
+    if (e.button > 0) return;
+    e.preventDefault();
+    splitter.setPointerCapture(e.pointerId);
+    const move = (ev) => {
+      const r = page.getBoundingClientRect();
+      prefs.width = prefs.side === 'left' ? ev.clientX - r.left : r.right - ev.clientX;
+      applyPrefs();
+    };
+    const up = () => {
+      splitter.removeEventListener('pointermove', move);
+      splitter.removeEventListener('pointerup', up);
+      splitter.removeEventListener('pointercancel', up);
+      savePrefs();
+    };
+    splitter.addEventListener('pointermove', move);
+    splitter.addEventListener('pointerup', up);
+    splitter.addEventListener('pointercancel', up);
+  });
+  splitter.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    const grow = (e.key === 'ArrowRight') === (prefs.side === 'left');
+    prefs.width += grow ? 24 : -24;
+    applyPrefs();
+    savePrefs();
+  });
+
+  const wideMq = matchMedia('(min-width: 760px)');
+  const arrange = () => {
+    if (wideMq.matches) {
+      sideEl.replaceChildren(...[sideHandle, floorsBar, toolsWrap, panel, summary, settingsCard, notes, footer].filter(Boolean));
+      mainEl.replaceChildren(canvas, zoomBtns, showBtn);
+      page.replaceChildren(sideEl, splitter, mainEl);
+    } else {
+      page.replaceChildren(...[floorsBar, toolsWrap, canvas, zoomBtns, summary, settingsCard, panel, notes, footer].filter(Boolean)); // the phone layout, as it always was
+    }
+  };
+  applyPrefs();
+  arrange();
+  wideMq.addEventListener('change', () => { if (!page.isConnected) return; arrange(); fitted = false; renderAll(); });
+  root.append(...jobChrome(job, section), page);
 
   // Draw once the canvas is on screen (it needs its size), and again if the size changes.
   const ro = new ResizeObserver(() => {
@@ -992,5 +1077,46 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     if (!fitted && canvas.clientWidth) { fitted = true; fit(); } else renderCanvas();
   });
   ro.observe(canvas);
+
+  // Keyboard (desktop): Ctrl+Z undo, Delete removes the selected item or room, Esc cancels / deselects.
+  const onKey = (e) => {
+    if (!canvas.isConnected) return document.removeEventListener('keydown', onKey);
+    if (e.target.closest?.('input, textarea, select, [contenteditable="true"]') || document.querySelector('dialog[open]')) return;
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+      e.preventDefault();
+      if (history.length) undo();
+    } else if (e.key === 'Escape') {
+      placing = null;
+      sel = null;
+      renderToolbar();
+      renderCanvas();
+      renderPanel();
+    } else if ((e.key === 'Delete' || e.key === 'Backspace') && sel) {
+      e.preventDefault();
+      const f = floor();
+      if (sel.type === 'item') {
+        const i = f.items.findIndex((x) => x.id === sel.id);
+        if (i < 0) return;
+        remember();
+        f.items.splice(i, 1);
+        sel = null;
+        save();
+        renderAll();
+      } else {
+        const r = roomById(sel.id);
+        if (!r) return;
+        confirmDialog(`Delete “${r.name}” and everything in it?`).then((ok) => {
+          if (!ok) return;
+          remember();
+          f.rooms.splice(f.rooms.indexOf(r), 1);
+          f.items = f.items.filter((it) => it.roomId !== r.id);
+          sel = null;
+          save();
+          renderAll();
+        });
+      }
+    }
+  };
+  document.addEventListener('keydown', onKey);
   renderAll();
 }
