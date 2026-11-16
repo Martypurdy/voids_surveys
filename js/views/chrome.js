@@ -3,6 +3,7 @@
 // the footer button marks it complete (green) and moves to the next section.
 import { getJob, scheduleSave, flushSave } from '../db.js';
 import { sectionsOf, jobTitle, sectionState, isInspection } from '../model.js';
+import { hasAddress } from '../properties.js';
 import { h, icon, ICONS, pageHeader, toast, scrollTabs, choose } from '../ui.js';
 import { jobActions } from './jobActions.js';
 import { go } from '../router.js';
@@ -35,7 +36,10 @@ function tabs(job, active) {
 }
 
 /** Header + tabs for a job screen; marks `section` as started on first visit. */
-export function jobChrome(job, section, { back = job.propertyId ? `#/property/${job.propertyId}` : '#/', title } = {}) {
+// Quick jobs (no address yet) go back to the home screen; a job at an address goes back to its property.
+const homeOf = (job) => (job.propertyId && hasAddress(job.address) ? `/property/${job.propertyId}` : '/');
+
+export function jobChrome(job, section, { back = `#${homeOf(job)}`, title } = {}) {
   if (!sectionState(job, section)) {
     job.progress[section] = 'started';
     scheduleSave(job);
@@ -50,7 +54,7 @@ export function jobChrome(job, section, { back = job.propertyId ? `#/property/${
         'aria-label': 'Export / survey actions',
         onclick: async () => {
           const r = await jobActions(job);
-          if (r === 'deleted' || r === 'moved') go(job.propertyId ? `/property/${job.propertyId}` : '/');
+          if (r === 'deleted' || r === 'moved') go(homeOf(job));
         },
       }, icon(ICONS.share)),
     }),
@@ -105,12 +109,12 @@ export function completeFooter(job, section, { check } = {}) {
               { label: 'Stay on this page', value: null },
             ].filter(Boolean),
           });
-          if (v === 'close') return go(job.propertyId ? `/property/${job.propertyId}` : '/');
+          if (v === 'close') return go(homeOf(job));
           if (v === 'email') {
             const { emailReport } = await import('../export/email.js');
             await emailReport(job);
           }
-          if (v === 'export' && ['deleted', 'moved'].includes(await jobActions(job))) return go(job.propertyId ? `/property/${job.propertyId}` : '/');
+          if (v === 'export' && ['deleted', 'moved'].includes(await jobActions(job))) return go(homeOf(job));
           document.querySelector('.tabs')?.refresh?.();
           render();
         },

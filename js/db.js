@@ -124,6 +124,25 @@ export async function mergeProperties(fromId, toId) {
 }
 
 /**
+ * Two properties with the same postcode and first address line are the same place (for example a quick job
+ * that was given an address later): move the later one's entries into the earlier one. Returns how many merged.
+ */
+export async function consolidateProperties() {
+  const props = (await listProperties()).sort((a, b) => (a.created || '').localeCompare(b.created || ''));
+  const seen = new Map();
+  let merged = 0;
+  for (const p of props) {
+    const key = propKey(p.address);
+    if (!key) continue;
+    const keep = seen.get(key);
+    if (!keep) { seen.set(key, p); continue; }
+    await mergeProperties(p.id, keep.id);
+    merged++;
+  }
+  return merged;
+}
+
+/**
  * File entries that aren't in a property yet (existing jobs from before properties, imports, anything
  * left over). Entries with the same postcode and first address line share a property; anything without
  * both stays on its own so nothing is merged wrongly. Safe to run on every start: it only reads job ids,

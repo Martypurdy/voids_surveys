@@ -1,4 +1,6 @@
 Principles throughout: offline-first, all data on the device, no backend, no accounts.
+Quick work never needs an address: forms and tools start from buttons on the home screen. Properties
+and history sit behind the "Properties and history" button, and a quick job joins an address when it is given one.
 
 How to use this roadmap: when "do phase N" is requested, build only that phase, tick its items
 below, bump the service worker VERSION, commit and push, then stop and summarise.

@@ -7,6 +7,8 @@ import { sheetTotals, gbp, isBlankLine } from './pricing.js';
 
 const norm = (s) => (s || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
 export const firstLine = (a) => textLines(a || {})[0] || '';
+/** Has anything been entered for the address yet? (Quick jobs start without one.) */
+export const hasAddress = (a) => Boolean(firstLine(a) || (a?.postcode || '').trim());
 
 /** Two entries belong together when postcode and first address line (number + street) both match. */
 export function propKey(a) {

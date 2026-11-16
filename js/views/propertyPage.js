@@ -56,7 +56,7 @@ export default async function propertyPage(root, { id }) {
       if (await confirmDialog(`Delete “${title}”${n ? ` and its ${n} entr${n === 1 ? 'y' : 'ies'}, with all their photos,` : ''} from this device? This can’t be undone.`)) {
         await deleteProperty(p.id);
         toast('Property deleted');
-        go('/');
+        go('/properties');
       }
     }
   };
@@ -125,7 +125,7 @@ export default async function propertyPage(root, { id }) {
 
   root.append(
     pageHeader(firstLine(p.address) || title, {
-      back: '#/',
+      back: '#/properties',
       actions: h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Property actions', onclick: menu }, icon(ICONS.more)),
     }),
     h('div', { class: 'content' },
