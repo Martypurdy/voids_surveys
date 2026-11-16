@@ -5,6 +5,7 @@ export const SCHEMA = 2; // 2: jobs belong to a property (propertyId) and may ca
 export const CONDITIONS = ['Good', 'Fair', 'Poor', 'N/A'];
 
 import { AREA_PRESETS, defaultFeatures } from './data/features.js';
+import { HAZARDS, CORE_HAZARD_KEYS } from './data/hazards.js';
 import { newPlan, PLAN_KINDS, upgradePlanItem, refreshDepths, DEFAULT_SETTINGS } from './plan.js';
 
 export const ROOM_PRESETS = AREA_PRESETS.rooms;
@@ -49,6 +50,7 @@ export const FORMS = {
   rtl: { title: 'Ready to let', pdfTitle: 'Ready to Let Inspection', file: 'Ready to let' },
   price: { title: 'Materials & labour', pdfTitle: 'Materials & Labour Costing', file: 'Materials and labour' },
   plan: { title: 'Floor plan', pdfTitle: 'Floor Plan', file: 'Floor plan' },
+  rams: { title: 'RAMS pack', pdfTitle: 'RAMS & CDM Pack', file: 'RAMS pack', emoji: '🦺' },
   repair: { title: 'Property repair survey', pdfTitle: 'Property Repair Survey', file: 'Repair survey', emoji: '🛠️' },
 };
 // 'plan' = Designer floor plan (kitchen, bathroom or whole property – job.plan.kind).
@@ -101,12 +103,50 @@ export const newRepair = () => ({
   date: todayLocal(), propertyType: '', occupancy: '', weather: '', access: '',
   reason: '', brief: '', rows: [newRepairRow()], materials: [], notes: '',
 });
+// 'rams' = RAMS pack (Health and safety on the home screen): a small-job construction phase plan, risk assessments
+// (HSE layout), method statements and a briefing record, all for one job.
+const RAMS_SECTIONS = [
+  ['address', 'Address', ''],
+  ['cpp', 'Plan', 'cpp'],
+  ['risks', 'Risks', 'risks'],
+  ['methods', 'Methods', 'methods'],
+  ['briefing', 'Briefing', 'briefing'],
+  ['signoff', 'Sign off', 'signoff'],
+];
+export const isRams = (job) => job.form === 'rams';
+export const newRiskRow = () => ({ id: uid(), hazard: '', who: '', controls: '', action: '', owner: '', when: '', done: false });
+export const newRisk = (title = '') => ({ id: uid(), title, ref: '', date: todayLocal(), reviewDate: '', rows: [newRiskRow()] });
+/** On-the-day check: checks maps a question key to 'yes' | 'no' | 'na'; found = hazards spotted (rows like a risk assessment's). */
+export const newDynamic = () => ({ id: uid(), task: '', location: '', date: todayLocal(), checks: {}, found: [newRiskRow()], outcome: '', notes: '' });
+export const newPerson = () => ({ id: uid(), name: '', role: '', competence: '' });
+export const newStep = () => ({ id: uid(), text: '', photos: [] });
+export const newTool = () => ({ id: uid(), type: '', details: '' });
+export const newMethod = (title = '', description = '') => ({
+  id: uid(), title, ref: '', description, raIds: [], start: '', duration: '', workers: '', areas: '',
+  personnel: [newPerson()], emergency: { fire: '', firstAid: '', spill: '', other: '' },
+  ppe: [], ppeOther: '', dust: '', dustControls: '', hazmat: '', coshh: '', hazControls: '',
+  permits: [], permitOther: '', permitBy: '', steps: [newStep()], tools: [newTool()],
+});
+export const newAttendee = () => ({ id: uid(), name: '', trade: '', company: '', signature: '' });
+export const newBriefing = () => ({ id: uid(), kinds: [], subject: '', date: todayLocal(), location: '', attendees: [newAttendee()], feedback: '', by: '' });
+/** A danger line in the construction phase plan. */
+export const newDanger = (hazard = '', controls = '') => ({ id: uid(), hazard, controls, present: false });
+/** RAMS pack. customer / customerAddress / ref are the tenant or client and the job number (same boxes as the repair survey). */
+export const newRams = () => ({
+  ref: '', customer: '', customerAddress: { postcode: '', text: '' }, company: '', description: '', sourceId: '', tasks: [],
+  cpp: {
+    principal: '', designer: '', startDate: '', endDate: '', welfare: '', others: '', updates: '', rules: '', supervision: '', responsible: '',
+    asbestos: '', services: '', emergency: '', days: '', workers: '', personDays: '',
+    dangers: HAZARDS.filter((h) => CORE_HAZARD_KEYS.includes(h.key)).map((h) => newDanger(h.hazard, h.controls)),
+  },
+  risks: [], dynamics: [], methods: [], briefings: [], notes: '',
+});
 const RTL_SECTIONS = SECTIONS.filter(([k]) => k !== 'materials');
 /** Sign off signature (both forms). image: PNG data URL; date: ISO time signed. */
 export const newSignature = () => ({ name: '', image: '', date: '' });
 export const isRtl = (job) => job.form === 'rtl';
 /** The tabs for this job's form. */
-export const sectionsOf = (job) => (isRtl(job) ? RTL_SECTIONS : isPrice(job) ? PRICE_SECTIONS : isPlan(job) ? PLAN_SECTIONS : isRepair(job) ? REPAIR_SECTIONS : SECTIONS);
+export const sectionsOf = (job) => (isRtl(job) ? RTL_SECTIONS : isPrice(job) ? PRICE_SECTIONS : isPlan(job) ? PLAN_SECTIONS : isRepair(job) ? REPAIR_SECTIONS : isRams(job) ? RAMS_SECTIONS : SECTIONS);
 export const formOf = (job) => (isPlan(job) ? { ...FORMS.plan, ...PLAN_KINDS[job.plan?.kind || 'property'] } : FORMS[job.form] || FORMS.void);
 
 /** Ready to let: key types to record (fobs count as communal key / fob). */
@@ -228,6 +268,24 @@ export function upgradeJob(job) {
     // Plans finished before the Room dimensions tab existed stay complete.
     if (job.progress?.plan === 'complete' && !job.progress.dimensions) job.progress.dimensions = 'complete';
   }
+  if (isRams(job)) {
+    const d = newRams();
+    job.rams = { ...d, ...(job.rams || {}) };
+    job.rams.customerAddress = { postcode: '', text: '', ...(job.rams.customerAddress || {}) };
+    job.rams.cpp = { ...d.cpp, ...(job.rams.cpp || {}) };
+    for (const k of ['risks', 'dynamics', 'methods', 'briefings', 'tasks']) if (!Array.isArray(job.rams[k])) job.rams[k] = [];
+    if (!Array.isArray(job.rams.cpp.dangers)) job.rams.cpp.dangers = d.cpp.dangers;
+    for (const r of job.rams.risks) { r.rows ??= []; if (!r.rows.length) r.rows.push(newRiskRow()); }
+    for (const x of job.rams.dynamics) { x.checks ??= {}; x.found ??= []; }
+    for (const m of job.rams.methods) {
+      const dm = newMethod();
+      for (const k of Object.keys(dm)) m[k] ??= dm[k];
+      m.emergency = { ...dm.emergency, ...(m.emergency || {}) };
+      for (const k of ['raIds', 'personnel', 'ppe', 'permits', 'steps', 'tools']) if (!Array.isArray(m[k])) m[k] = [];
+      m.steps.forEach((s) => { if (!Array.isArray(s.photos)) s.photos = []; });
+    }
+    for (const b of job.rams.briefings) { b.kinds ??= []; b.attendees ??= []; }
+  }
   if (isRepair(job)) {
     const d = newRepair();
     job.repair = { ...d, ...(job.repair || {}) };
@@ -269,6 +327,7 @@ export function newJob({ surveyor = '', form = 'void', planKind = 'property' } =
     ...(form === 'price' ? { pricing: newPricing() } : {}),
     ...(form === 'plan' ? { plan: newPlan(planKind) } : {}),
     ...(form === 'repair' ? { repair: newRepair() } : {}),
+    ...(form === 'rams' ? { rams: newRams() } : {}),
     signature: newSignature(),
     id: uid(),
     created: t,
@@ -404,6 +463,7 @@ export function photoLists(job) {
     job.rtl?.voucher?.photos || [],
     job.rtl?.appliances?.photos || [],
     ...(job.repair?.rows || []).map((r) => r.photos),
+    ...(job.rams?.methods || []).flatMap((m) => m.steps.map((s) => s.photos)),
   ];
 }
 
@@ -453,6 +513,7 @@ export function jobTitle(job) {
   if (title) return title;
   if (isPrice(job)) return [job.pricing?.ref, job.pricing?.customer].filter((s) => s?.trim()).join(' – ') || 'New costing';
   if (isRepair(job)) return 'New repair survey';
+  if (isRams(job)) return 'New RAMS pack';
   if (isPlan(job)) return `New ${(PLAN_KINDS[job.plan?.kind] || PLAN_KINDS.property).title.toLowerCase()}`;
   return 'New survey';
 }

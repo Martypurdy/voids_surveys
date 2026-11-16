@@ -1,5 +1,5 @@
 // PDF report (jsPDF, loaded on demand from /vendor).
-import { addressLines, jobTitle, fmtDate, fmtDateTime, slug, todayLocal, allPhotoIds, worksSummary, roomStatus, roomAreas, serviceTitle, hasMeterDoor, isRtl, isPrice, isPlan, isRepair, formOf, textLines } from '../model.js';
+import { addressLines, jobTitle, fmtDate, fmtDateTime, slug, todayLocal, allPhotoIds, worksSummary, roomStatus, roomAreas, serviceTitle, hasMeterDoor, isRtl, isPrice, isPlan, isRepair, isRams, formOf, textLines } from '../model.js';
 import { usedRows, usedMaterials, rowNumbers, materialSource, repairPhotos, rowPhotoNumbers } from '../repair.js';
 import { fileBase } from '../properties.js';
 import { ITEMS, roomFigures, floorArea, planArea, metres, sqm, openingGeometry, bounds, legend, cornerPoints, cabinetNumbers, cabinetText, frontEdge, cornerLabelPoint, blindGeometry, endPanels, panelLines, refreshPosts, refreshDepths, settingsLine, cabinetShapes, badgePoint, featureTags, describeFeature, serviceInfo } from '../plan.js';
@@ -57,7 +57,7 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
   const { jsPDF } = await loadJsPDF();
   // SOR codes are printed only while an SOR library is loaded on this device.
   const showCodes = Boolean(await getLibrary());
-  const land = isPlan(job) || isRepair(job); // floor plans and repair surveys print landscape
+  const land = isPlan(job) || isRepair(job) || isRams(job); // floor plans, repair surveys and RAMS packs print landscape
   const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: land ? 'landscape' : 'portrait', compress: true });
   const rtl = isRtl(job); // Ready to let form
 
@@ -365,8 +365,8 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
 
   // ---------- cover ----------
   onProgress('Building report…');
-  font(20, 'bold', isRepair(job) ? TEAL : BRAND);
-  doc.text(isRepair(job) ? formOf(job).pdfTitle.toUpperCase() : formOf(job).pdfTitle, M, y + 7);
+  font(20, 'bold', isRepair(job) || isRams(job) ? TEAL : BRAND);
+  doc.text(isRepair(job) || isRams(job) ? formOf(job).pdfTitle.toUpperCase() : formOf(job).pdfTitle, M, y + 7);
   font(9, 'bold', [120, 128, 136]);
   doc.text('PropertyPad', W - M, y + 6, { align: 'right' });
   y += 13;
@@ -374,6 +374,11 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
   // Materials & labour costing has its own, table-based report.
   if (isPrice(job)) {
     priceReport();
+    return finish();
+  }
+  // RAMS pack: the same description Word uses, drawn as tables.
+  if (isRams(job)) {
+    await modelReport((await import('./docs/rams.js')).ramsModel(job));
     return finish();
   }
   // Property repair survey: your template's tables, small pictures in the schedule, large ones at the end.
@@ -1373,6 +1378,151 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
       y += hgt + 3;
     } else {
       detailRows([['Signature', 'Not signed']]);
+    }
+  }
+
+  // ---------- RAMS pack and other model-based documents (hoisted) ----------
+  // model = { subtitle, sections: [{ paras, band, grid, table, heading, photos }] } as built by docs/rams.js.
+  // Table cells: text, { thumbs: [{ id, n }] } (small numbered photos) or { sig } (a signature picture).
+  async function modelReport(model) {
+    const pad = 1.6, size = 9, lh = lineH(size), THUMB = 14;
+    const line = () => { doc.setDrawColor(190, 200, 206); doc.setLineWidth(0.2); };
+    if (model.subtitle) {
+      font(10, 'normal', [90, 98, 106]);
+      doc.text(doc.splitTextToSize(clean(model.subtitle), CW)[0], M, y);
+      y += 5;
+    }
+    const band = (title) => {
+      ensure(24);
+      y += 2;
+      doc.setFillColor(...TEAL);
+      doc.rect(M, y, CW, 7, 'F');
+      font(10, 'bold', [255, 255, 255]);
+      doc.text(doc.splitTextToSize(clean(title), CW - 5)[0], M + 2.5, y + 4.9);
+      y += 7;
+    };
+    const gridRows = (rows) => {
+      for (const r of rows) {
+        const full = r.length === 2;
+        const widths = full ? [48, CW - 48] : [38, (CW - 76) / 2, 38, (CW - 76) / 2];
+        font(size, 'normal');
+        const wrapped = r.map((c, i) => doc.splitTextToSize(clean(c == null ? '' : String(c)), widths[i] - pad * 2));
+        const rowH = Math.max(7, Math.max(...wrapped.map((l) => l.length)) * lh + pad * 2);
+        ensure(Math.min(rowH, 40));
+        let x = M;
+        line();
+        wrapped.forEach((lines, i) => {
+          const isLabel = i % 2 === 0;
+          if (isLabel) { doc.setFillColor(...TEAL_PALE); doc.rect(x, y, widths[i], rowH, 'F'); }
+          doc.rect(x, y, widths[i], rowH);
+          font(size, isLabel ? 'bold' : 'normal', isLabel ? TEAL : [0, 0, 0]);
+          lines.forEach((l, k) => { if (y + pad + lh * (k + 0.75) < H) doc.text(l, x + pad, y + pad + lh * (k + 0.75)); });
+          x += widths[i];
+        });
+        y += rowH;
+      }
+      y += 2;
+    };
+    const tableBlock = async (t) => {
+      const totalW = t.cols.reduce((a, c) => a + (c.w || 1), 0);
+      const widths = t.cols.map((c) => (CW * (c.w || 1)) / totalW);
+      // small pictures first, so each row's height is known
+      const recs = new Map();
+      for (const row of t.rows) for (const c of row) if (c && typeof c === 'object' && c.thumbs) for (const p of c.thumbs) if (!recs.has(p.id)) { const [rec] = await loadPhotos([p.id]); if (rec) recs.set(p.id, await pdfImage(rec)); }
+      const head = () => {
+        font(size, 'bold', [255, 255, 255]);
+        const titles = t.cols.map((c, i) => doc.splitTextToSize(clean(c.title), widths[i] - pad * 2));
+        const hh = Math.max(7, Math.max(...titles.map((l) => l.length)) * lh + pad * 2);
+        ensure(hh + 12);
+        doc.setFillColor(...TEAL);
+        doc.rect(M, y, CW, hh, 'F');
+        font(size, 'bold', [255, 255, 255]);
+        let hx = M;
+        titles.forEach((lines, i) => { lines.forEach((l, k) => doc.text(l, hx + pad, y + pad + lh * (k + 0.75))); hx += widths[i]; });
+        y += hh;
+      };
+      head();
+      for (const row of t.rows) {
+        font(size, 'normal');
+        const cellH = row.map((c, i) => {
+          if (c && typeof c === 'object' && c.thumbs) {
+            const shown = c.thumbs.filter((p) => recs.has(p.id));
+            const per = Math.max(1, Math.floor((widths[i] - pad * 2 + 1.5) / (THUMB + 1.5)));
+            return Math.ceil(shown.length / per) * (THUMB + 4) + pad;
+          }
+          if (c && typeof c === 'object' && c.sig) return 16;
+          return doc.splitTextToSize(clean(c == null ? '' : String(c)), widths[i] - pad * 2).length * lh + pad * 2;
+        });
+        const rowH = Math.max(7, ...cellH);
+        if (y + rowH > BOTTOM) { doc.addPage(); y = M; head(); }
+        line();
+        let x = M;
+        row.forEach((c, i) => {
+          doc.rect(x, y, widths[i], rowH);
+          if (c && typeof c === 'object' && c.sig) {
+            try {
+              const p = doc.getImageProperties(c.sig);
+              const hgt = Math.min(13, ((widths[i] - pad * 2) * p.height) / p.width), w = (hgt * p.width) / p.height;
+              doc.addImage(c.sig, 'PNG', x + pad, y + 1.5, w, hgt);
+            } catch { /* unreadable signature: leave the cell empty */ }
+          } else if (c && typeof c === 'object' && c.thumbs) {
+            const shown = c.thumbs.filter((p) => recs.has(p.id));
+            const per = Math.max(1, Math.floor((widths[i] - pad * 2 + 1.5) / (THUMB + 1.5)));
+            shown.forEach((p, k) => {
+              const img = recs.get(p.id);
+              const s = Math.min(THUMB / img.w, THUMB / img.h);
+              const w = img.w * s, hgt = img.h * s;
+              const px = x + pad + (k % per) * (THUMB + 1.5), py = y + pad + Math.floor(k / per) * (THUMB + 4);
+              doc.addImage(img.bytes, 'JPEG', px + (THUMB - w) / 2, py + (THUMB - hgt) / 2, w, hgt, `photo-${p.id}`, 'NONE');
+              font(6.5, 'normal', [90, 98, 106]);
+              doc.text(`Photo ${p.n}`, px + THUMB / 2, py + THUMB + 2.6, { align: 'center' });
+            });
+          } else {
+            font(size, i === 0 && t.cols[0].title === 'No.' ? 'bold' : 'normal', i === 0 && t.cols[0].title === 'No.' ? TEAL : [0, 0, 0]);
+            doc.splitTextToSize(clean(c == null ? '' : String(c)), widths[i] - pad * 2).forEach((l, k) => doc.text(l, x + pad, y + pad + lh * (k + 0.75)));
+          }
+          x += widths[i];
+        });
+        y += rowH;
+      }
+      y += 3;
+    };
+
+    const bigPhotos = [];
+    for (const s of model.sections) {
+      if (s.photos) { bigPhotos.push(...s.photos); continue; }
+      if (s.heading) { ensure(16); font(12, 'bold', TEAL); doc.text(clean(s.heading), M, y + 5); y += 8; }
+      for (const t of s.paras || []) { para(t, { size: 9, rgb: [90, 98, 106] }); y += 1.5; }
+      if (s.band) band(s.band);
+      if (s.grid?.length) gridRows(s.grid);
+      if (s.table?.rows?.length) await tableBlock(s.table);
+      else if (s.band) y += 2;
+    }
+
+    // the large photos, two to a page side by side (landscape)
+    if (bigPhotos.length) {
+      const recs = new Map((await loadPhotos(bigPhotos.map((p) => p.id))).map((r) => [r.id, r]));
+      const shown = bigPhotos.filter((p) => recs.has(p.id));
+      if (shown.length) {
+        doc.addPage();
+        y = M;
+        doc.setFillColor(...TEAL);
+        doc.rect(M, y, CW, 7, 'F');
+        font(10, 'bold', [255, 255, 255]);
+        doc.text('PHOTOS', M + 2.5, y + 4.9);
+        y += 10;
+        const gap = 8, colW = (CW - gap) / 2;
+        for (const [i, p] of shown.entries()) {
+          const col = i % 2;
+          if (i > 0 && col === 0) { doc.addPage(); y = M; }
+          const top = y, x0 = M + col * (colW + gap);
+          font(10.5, 'bold', TEAL);
+          doc.text(doc.splitTextToSize(clean(p.caption), colW)[0], x0, top + 4.5);
+          const img = await pdfImage(recs.get(p.id));
+          const s = Math.min(colW / img.w, (BOTTOM - top - 9) / img.h);
+          doc.addImage(img.bytes, 'JPEG', x0 + (colW - img.w * s) / 2, top + 7, img.w * s, img.h * s, `photo-${p.id}`, 'NONE');
+        }
+      }
     }
   }
 

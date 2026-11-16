@@ -1,7 +1,7 @@
 // Property-first structure (pure helpers). A property is the permanent file for an address; every
 // inspection, repair, plan or costing done there is an entry in it. The property record holds a small
 // summary of each entry, so the front screen and the timeline never have to load whole jobs.
-import { formOf, sectionsOf, completedCount, textLines, squash, isPlan, isPrice, isRepair, fmtDate, uid, nowISO } from './model.js';
+import { formOf, sectionsOf, completedCount, textLines, squash, isPlan, isPrice, isRepair, isRams, fmtDate, uid, nowISO } from './model.js';
 import { planArea, sqm } from './plan.js';
 import { sheetTotals, gbp, isBlankLine } from './pricing.js';
 
@@ -33,7 +33,7 @@ export const natureOf = (job) => (job.nature || '').trim() || formOf(job).title;
 /** The form an entry summary belongs to (for its emoji and title). */
 export const entryForm = (e) => {
   const f = formOf({ form: e.form, plan: { kind: e.kind } });
-  return { ...f, emoji: f.emoji || { rtl: '🔑', price: '🧮', repair: '🛠️' }[e.form] || '🏠' }; // only plan forms carry an emoji of their own
+  return { ...f, emoji: f.emoji || { rtl: '🔑', price: '🧮', repair: '🛠️', rams: '🦺' }[e.form] || '🏠' }; // only plan forms carry an emoji of their own
 };
 
 /** File name for an entry: "first line of address, postcode – nature of file". */
@@ -50,6 +50,11 @@ export function entryMeta(job) {
     const p = job.pricing;
     const n = [...p.materials, ...p.labour].filter((l) => !isBlankLine(l)).length;
     return `📄 ${n} line${n === 1 ? '' : 's'} · 💷 ${gbp(sheetTotals(p).gross)}${p.vat === 'none' ? '' : ' inc VAT'}`;
+  }
+  if (isRams(job)) {
+    const r = job.rams;
+    const n = (list, one) => `${list.length} ${one}${list.length === 1 ? '' : 's'}`;
+    return `🦺 ${n(r.risks, 'risk assessment')} · ${n(r.methods, 'method statement')}`;
   }
   if (isRepair(job)) {
     const rows = job.repair.rows.filter((r) => r.location || r.condition || r.causation || r.fix || r.photos.length);
@@ -73,7 +78,7 @@ export function entrySummary(job) {
     started: Object.keys(job.progress || {}).length > 0,
     lastExported: job.lastExported || null,
     meta: entryMeta(job),
-    ref: isPrice(job) ? [job.pricing?.ref, job.pricing?.customer].filter((s) => s && s.trim()).join(' ') : isRepair(job) ? [job.repair?.ref, job.repair?.customer].filter((s) => s && s.trim()).join(' ') : '',
+    ref: isPrice(job) ? [job.pricing?.ref, job.pricing?.customer].filter((s) => s && s.trim()).join(' ') : isRepair(job) ? [job.repair?.ref, job.repair?.customer].filter((s) => s && s.trim()).join(' ') : isRams(job) ? [job.rams?.ref, job.rams?.customer].filter((s) => s && s.trim()).join(' ') : '',
   };
 }
 

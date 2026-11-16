@@ -60,16 +60,16 @@ Before each phase, show a short plan and wait for an OK.
 - Materials + labour costs total automatically.
 
 ## Phase 5 – RAMS & CDM
-- [x] "Health and safety" button on the home screen (shows "Coming soon" until this phase is built).
-- Risk assessment and method statement (RAMS), pre-filled from the repair survey
-  (address, job description).
-- Common hazards pick list (working at height, dust, asbestos, etc.).
-- Generic risk assessment library the user builds over time; pulls in property and
-  project details automatically.
-- Blank dynamic risk assessments for task-, time- and environment-specific conditions;
-  can be saved back into the library as a new generic one.
-- CDM paperwork for every job: responsible duty holders, task risks,
-  simple Construction Phase Plan for small jobs.
+- [x] "Health and safety" button on the home screen, opening the **RAMS pack**: one pack per job, filed in the property folder. Tabs: Address, Plan, Risks, Methods, Briefing, Sign off.
+- [x] Pre-filled from the repair survey ("Start from a repair survey": address, tenant or contact, job number, the brief and the repairs; each repair can start a method statement in one tap).
+- [x] Plan (CDM 2015): a short construction phase plan for small jobs (people, dates, site rules, welfare, emergency, asbestos and services information, main dangers with controls, supervision), with a notifiable-job warning (over 30 working days with over 20 people, or over 500 person-days).
+- [x] Common hazards pick list (original wording, editable) with who is harmed and starting controls.
+- [x] Risk assessments in the simple HSE layout (hazard, who might be harmed and how, controls in place, further action, who, by when, done), plus a library you build up on the device ("Add hazards", "Save to library").
+- [x] Blank dynamic risk assessment: a short "stop and check" card with an outcome, whose hazards can be saved to the library.
+- [x] Method statements: description, linked risk assessments, people and competence, emergency arrangements, PPE, dust and fumes, hazardous materials, permits, step-by-step method with photos, tools and equipment.
+- [x] Briefing record with attendee signatures; sign-off with the surveyor's signature.
+- [x] Exports through the Phase 2 engine: one landscape document as PDF, Word and Excel (Word and PDF share one description), with a "starting point, not legal advice" line.
+- Note: the hazard and control lists are starting points written for repairs and refurbishment work. The CITB, HSE and similar forms were used only as a guide to structure; none of their wording is copied.
 
 ## Phase 6 – Accountancy: receipt tracker
 - "Accountancy" button on the front screen.

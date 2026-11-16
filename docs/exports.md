@@ -9,8 +9,9 @@ the formats with the one that suits the document best first, and a one-line reas
 | Inspection report (Empty home, Ready to let) | PDF (photos, the record) | Word, Excel |
 | Floor plan (Designer) | PDF (drawn to scale) | Excel (schedules), Word |
 | Property repair survey | PDF (your template layout) | Word, Excel |
+| RAMS pack | PDF (print, sign and send) | Word, Excel |
 
-A pack (zip) holds the PDF plus the best editable copy: Excel for costings and plans, Word for inspections and repair surveys.
+A pack (zip) holds the PDF plus the best editable copy: Excel for costings and plans, Word for inspections, repair surveys and RAMS packs.
 
 The Word writer takes `band`, `grid` and thumbnail cells (`{ thumbs: [{ id, n }] }`), and the Excel writer takes `images` on a sheet, as used by the repair survey (`docs/repair.js`). A picture used twice (small, then large) is stored once.
 
@@ -50,3 +51,5 @@ formula rows so lines can be added. Product links are clickable in Excel, Word a
 The tests (kept outside the repo) read the files with independent tools (an Excel reader, a Word reader and a
 formula engine) and validate every part is well-formed with consistent relationships. They cannot prove Microsoft
 Office itself accepts a file, so open one sample of each in real Word and Excel after changing a writer.
+
+The RAMS pack (`docs/rams.js`) builds one description (`ramsModel`) that both Word and PDF draw (PDF: `modelReport` in `pdf.js`), so they always agree. Table cells can hold `{ thumbs }` (small numbered photos) or `{ sig }` (a signature).

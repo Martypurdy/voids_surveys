@@ -1347,7 +1347,7 @@ a.form-card { text-decoration: none; color: inherit; }
   .content:not(.plan-page):not(.home):not(.wide):not(.props):not(.prop-detail) > h2 { break-after: avoid; margin-top: 0; } /* a column top drops its margin, so headings start level */
   .content:not(.plan-page):not(.home):not(.wide):not(.props):not(.prop-detail) > .complete-footer { column-span: all; }
   .content.wide { max-width: 1500px; margin-inline: auto; }
-  .content.wide > :not(.calc-wrap):not(.add-line):not(.run-total):not(.rep-sheet) { max-width: 720px; } /* the table uses the width; the controls keep their normal size */
+  .content.wide > :not(.calc-wrap):not(.add-line):not(.run-total):not(.rep-sheet):not(.ra-list) { max-width: 720px; } /* the table uses the width; the controls keep their normal size */
   .content.props, .content.prop-detail { max-width: 720px; margin-inline: auto; }
 
   /* home: start buttons beside Continue and Properties */
@@ -1403,4 +1403,27 @@ a.form-card { text-decoration: none; color: inherit; }
   .rep-mat-src { grid-column: auto; }
   .rep-mat input[aria-label="Material"] { grid-column: auto; }
   .rep-mat .defect-remove { grid-column: auto; grid-row: auto; }
+}
+
+/* ----- RAMS pack ----- */
+.rep-sheet.lst .rep-row .rep-check { flex-direction: row; align-items: center; gap: 8px; }
+.rep-sheet.lst .rep-check input[type="checkbox"] { width: 26px; height: 26px; }
+.rep-sheet.lst .rep-cell .btn-small[data-has="true"] { background: var(--done-bg, #e1f3e6); border-color: #1e7d3a; color: #1e5c33; }
+.ra-list { display: flex; flex-direction: column; gap: 14px; margin-bottom: 14px; }
+.ra-card { padding: 0; overflow: hidden; }
+.ra-card > summary { font-weight: 700; }
+.ra-card > summary::-webkit-details-marker { display: none; }
+.ra-body { padding: 4px 12px 14px; }
+.warn-note { margin: 10px 0 0; padding: 10px 12px; border-radius: 10px; background: #fff1d6; color: #7a4b00; font-weight: 600; }
+.dyn-list { display: flex; flex-direction: column; gap: 10px; }
+.dyn-q { display: flex; flex-direction: column; gap: 6px; }
+.dyn-ans button, .dyn-out button { min-height: 44px; }
+.lib-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; border-top: 1px solid var(--border); }
+.task-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.pick-field { width: 100%; text-align: left; margin: 6px 0; }
+@media (min-width: 900px) {
+  .rep-sheet.lst .rep-head, .rep-sheet.lst .rep-row { grid-template-columns: var(--cols); }
+  .rep-sheet.lst .rep-check { padding-top: 8px; }
+  .dyn-q { flex-direction: row; align-items: center; justify-content: space-between; }
+  .dyn-ans { min-width: 260px; }
 }

@@ -15,7 +15,7 @@
 //     images: [{ bytes, w, h, type, caption, widthCm }],
 //   }],
 // }
-// A table cell is a string, a number, or { t, link, bold } or { thumbs: [{ id, n }] } (small numbered pictures).
+// A table cell is a string, a number, or { t, link, bold } or { thumbs: [{ id, n }] } (small numbered pictures) or { sig } (a signature, PNG data URL).
 import { zipFiles } from './zip.js';
 
 const esc = (s) => String(s ?? '')
@@ -149,16 +149,25 @@ export async function buildDocx(model, { loadImage = async () => null } = {}) {
   const thumbParas = (imgs, width) => {
     const cm = (width / 1440) * 2.54 - 0.4;
     const size = 1.7;
-    const perLine = Math.max(1, Math.floor(cm / (size + 0.45)));
+    const perLine = imgs[0]?.box ? 1 : Math.max(1, Math.floor(cm / (size + 0.45)));
     let out = '';
     for (let i = 0; i < imgs.length; i += perLine) {
-      out += para(imgs.slice(i, i + perLine).map(({ img, n }) => { const [cx, cy] = fit(img, size, size); return drawing(img, cx, cy) + run(` ${n}   `, { size: 14, color: '505860' }); }).join(''), { after: 40 });
+      out += para(imgs.slice(i, i + perLine).map(({ img, n, box }) => { const [cx, cy] = box ? fit(img, Math.min(box[0], cm), box[1]) : fit(img, size, size); return drawing(img, cx, cy) + (n === '' ? '' : run(` ${n}   `, { size: 14, color: '505860' })); }).join(''), { after: 40 });
     }
     return out || para('');
   };
   const preloadThumbs = async (t) => {
     for (const row of [...t.rows, ...(t.foot || [])]) {
       for (const c of row) {
+        if (c && typeof c === 'object' && c.sig) { // a signature (PNG data URL)
+          const b64 = String(c.sig).split(',')[1];
+          if (b64) {
+            const bytes = Uint8Array.from(atob(b64), (ch) => ch.charCodeAt(0));
+            const dv = new DataView(bytes.buffer);
+            c._imgs = [{ img: { bytes, w: dv.getUint32(16), h: dv.getUint32(20), type: 'image/png' }, n: '', box: [3.6, 1.5] }];
+          }
+          continue;
+        }
         if (c && typeof c === 'object' && c.thumbs) {
           c._imgs = [];
           for (const p of c.thumbs) { const img = await loadImage(p.id); if (img) c._imgs.push({ img, n: p.n }); }
