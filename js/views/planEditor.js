@@ -11,7 +11,7 @@ import {
   metres, sqm, openingGeometry, nearestWall, roomAt, bounds, settleItem, legend, cornerPoints, snapToUnits, isStructure,
   STYLES, PATTERNS, DOOR_OPTIONS, APPLIANCES, applyRot, rotateAbout, cabinetNumbers, cabinetText, frontEdge, cornerLabelPoint, autoRotate, clearSpot,
   blindGeometry, refreshPosts, endPanels, panelLines, setDepth, refreshDepths,
-  featureTags, placementDims, wallCorners, WALL_NAMES, DOOR_SIZES, WINDOW_SIZES, hingeSide, setHinge, radiatorWall, nearestRoom, clampItem,
+  cabinetShapes, badgePoint, featureTags, placementDims, wallCorners, WALL_NAMES, DOOR_SIZES, WINDOW_SIZES, hingeSide, setHinge, radiatorWall, nearestRoom, clampItem,
 } from '../plan.js';
 
 const SNAP = 5; // cm
@@ -118,14 +118,16 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
         continue;
       }
       out.push(`<rect class="${cls}" x="${x}" y="${y}" width="${w}" height="${hh}"/>`);
-      if (d.blind) {
-        const g = blindGeometry(it);
-        out.push(line('front', g.door), line('front open', g.open), `<polygon class="post" points="${g.post.map(([px, py]) => `${x + px * s},${y + py * s}`).join(' ')}"/>`);
+      const shapes = cabinetShapes(it, plan.settings);
+      if (shapes.length) {
+        // a bird's-eye view of the cabinet: carcass, open top with its rails, and the door in front
+        for (const sh of shapes) out.push(`<rect class="cab-${sh.c}${d.dashed ? ' dashed' : ''}" x="${x + sh.x * s}" y="${y + sh.y * s}" width="${sh.w * s}" height="${sh.h * s}"/>`);
       } else if (d.facing && !d.space) {
         out.push(line('front', frontEdge(it)));
       }
       if (d.cab) {
-        if (Math.min(w, hh) > 14) badge(x + w / 2, y + hh / 2 - (d.space && hh > 40 ? 6 : 0), nums.get(it.id));
+        const [bpx, bpy] = badgePoint(it);
+        if (Math.min(w, hh) > 14) badge(x + bpx * s, y + bpy * s - (d.space && hh > 40 ? 6 : 0), nums.get(it.id));
         if (d.space && w > 40 && hh > 40) out.push(`<text class="fx-t" x="${x + w / 2}" y="${y + hh / 2 + 12}" font-size="9">${esc(it.appliance || '')}</text>`);
       } else if (!d.filler && w > 34 && hh > 13) {
         out.push(`<text class="fx-t" x="${x + w / 2}" y="${y + hh / 2}" font-size="${Math.min(11, hh * 0.45, w / d.label.length * 1.9)}">${esc(d.label)}</text>`);

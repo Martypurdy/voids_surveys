@@ -285,7 +285,7 @@ export function nearestWall(rooms, x, y, maxDist) {
 export const roomAt = (rooms, x, y) => [...rooms].reverse().find((r) => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h);
 
 /** Extent of a floor's rooms, or null when empty. */
-export function bounds(floor) {
+export function bounds(floor, withPoints = true) {
   if (!floor.rooms.length) return null;
   const b = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
   for (const r of floor.rooms) {
@@ -294,7 +294,7 @@ export function bounds(floor) {
     b.maxX = Math.max(b.maxX, r.x + r.w);
     b.maxY = Math.max(b.maxY, r.y + r.h);
   }
-  for (const it of floor.items) {
+  for (const it of withPoints ? floor.items : []) {
     const r = floor.rooms.find((x) => x.id === it.roomId);
     if (!r || ITEMS[it.type]?.kind !== 'point') continue;
     b.minX = Math.min(b.minX, r.x + it.dx - 20);
@@ -649,4 +649,62 @@ export function clearSpot(room, items, it) {
   const pick = spots.sort((a, b) => a.d - b.d).find((s) => free(s.x, s.y)) || spots[0];
   it.dx = Math.round(pick.x);
   it.dy = Math.round(pick.y);
+}
+
+/**
+ * A bird's-eye view of a cabinet, as rectangles inside its box (cm): the carcass, and for base units an
+ * open top showing the cavity between the front and rear rails, then the door / drawer front in the
+ * front plane (a blind corner has its door and corner post only across part of the width).
+ */
+export function cabinetShapes(it, st) {
+  const d = ITEMS[it.type];
+  if (!d?.cab || d.corner || d.space) return [];
+  const t = boardCm(st), T = frontCm(st);
+  const uw = it.uw, cd = it.cd ?? it.ud - GAP - T;
+  const rect = (c, u0, v0, u1, v1) => {
+    const [x1, y1] = boxPoint(it, u0, v0), [x2, y2] = boxPoint(it, u1, v1);
+    return { c, x: Math.min(x1, x2), y: Math.min(y1, y2), w: Math.abs(x2 - x1), h: Math.abs(y2 - y1) };
+  };
+  const out = [rect('carcass', 0, 0, uw, cd)];
+  if (d.styles || d.blind) {
+    // open top: rear rail, front rail and the cavity between them (shelf and base below)
+    out.push(rect('cavity', t, 0.6, uw - t, cd), rect('rail', t, 0.6, uw - t, 0.6 + 7), rect('rail', t, cd - 7, uw - t, cd));
+  }
+  const v0 = cd + GAP, v1 = v0 + T;
+  if (d.blind) {
+    const door = Math.min(it.door, uw - 10), post = Math.min(it.post ?? 7, uw - door - 3);
+    const right = (it.hand || 'right') === 'right';
+    const d0 = right ? 0 : uw - door, d1 = right ? door : uw;
+    const p0 = right ? door : uw - door - post;
+    out.push(rect('door', d0 + 0.1, v0, d1 - 0.1, v1), rect('post', p0, v0, p0 + post, v1));
+  } else {
+    out.push(rect('door', 0.1, v0, uw - 0.1, v1));
+  }
+  return out;
+}
+
+/** The lines the room page prints for a door, window or radiator: [heading, size, distances from the corners]. */
+export function describeFeature(room, it, tag) {
+  const mm = (cm) => Math.round(cm * 10);
+  const d = ITEMS[it.type];
+  if (d.kind === 'wall') {
+    const g = openingGeometry(room, it);
+    const [ca, cb] = wallCorners[it.wall];
+    const dist = `${mm(g.at)} mm from the ${ca} corner, ${mm(g.L.len - g.at - g.size)} mm from the ${cb} corner`;
+    const head = `${tag}  ${d.label}, ${room.name} - ${WALL_NAMES[it.wall]} wall`;
+    if (it.type === 'door') return [head, `${mm(it.size)} mm wide, ${(it.leaves || 1) === 2 ? 'double doors' : `single door hinged ${hingeSide(it)} (seen from inside)`}`, dist];
+    return [head, `${mm(it.size)} mm wide x ${mm(it.wh ?? 120)} mm high, sill ${mm(it.sill ?? 90)} mm above the floor`, dist];
+  }
+  const rw = radiatorWall(room, it);
+  const [ca, cb] = wallCorners[rw.wall];
+  return [`${tag}  Radiator, ${room.name} - ${WALL_NAMES[rw.wall]} wall`, `${mm(Math.max(it.w, it.h))} mm long x ${mm(Math.min(it.w, it.h))} mm deep`,
+    rw.gap <= 30 ? `${mm(rw.a)} mm from the ${ca} corner, ${mm(rw.b)} mm from the ${cb} corner` : ''].filter((x) => x !== '');
+}
+
+/** Where a unit's number goes (box coordinates, cm). Wall units hang over base units, so theirs sits near the back. */
+export function badgePoint(it) {
+  const d = ITEMS[it.type];
+  if (d.space) return [it.w / 2, it.h / 2];
+  const cd = it.cd ?? it.ud;
+  return boxPoint(it, it.uw / 2, d.run === 'wall' ? Math.max(3, cd * 0.2) : cd / 2);
 }

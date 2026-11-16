@@ -1249,3 +1249,11 @@ body.no-scroll { overflow: hidden; }
 .plan-svg .tag { fill: var(--plan-dim); font-size: 10px; font-weight: 800; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
 .plan-sep { align-self: center; flex: none; padding: 0 8px 0 10px; margin-left: 4px; border-left: 2px solid var(--border); font-size: .72rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
 .feature-form { display: grid; gap: 4px; }
+.plan-svg .cab-carcass { fill: var(--plan-room); stroke: var(--plan-wall); stroke-width: 1.2; pointer-events: none; }
+.plan-svg .cab-cavity { fill: var(--plan-grid-m); stroke: none; pointer-events: none; }
+.plan-svg .cab-rail { fill: var(--plan-fx); stroke: var(--plan-wall); stroke-width: .8; pointer-events: none; }
+.plan-svg .cab-door { fill: var(--plan-wall); stroke: none; pointer-events: none; }
+.plan-svg .cab-post { fill: var(--primary); stroke: none; pointer-events: none; }
+.plan-svg .cab-carcass.dashed { stroke-dasharray: 4 3; }
+.plan-svg .cab-carcass.dashed { fill: none; }
+.plan-svg .cab-door.dashed { fill: none; stroke: var(--plan-wall); stroke-width: .8; }
