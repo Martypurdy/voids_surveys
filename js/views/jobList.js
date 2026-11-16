@@ -89,7 +89,7 @@ export default async function jobList(root) {
     h('div', { class: 'content home' },
       h('h2', { class: 'home-h' }, 'Start a new form'),
       formGrid(null), // no address needed: it goes in "No address yet" until you give it one
-      recent.length ? [h('h2', { class: 'home-h' }, 'Continue'), h('div', { class: 'job-list' }, recent.map(continueCard))] : null,
+      recent.length ? [h('h2', { class: 'home-h' }, 'Continue'), h('div', { class: 'job-list compact' }, recent.map(continueCard))] : null,
       h('h2', { class: 'home-h' }, 'Properties and history'),
       h('a', { class: 'form-card form-card-ready form-card-group', href: '#/properties', dataset: { group: 'properties' } },
         cardInner({

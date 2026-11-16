@@ -1266,3 +1266,15 @@ body.no-scroll { overflow: hidden; }
 .timeline-year { margin: 16px 0 4px; font-size: .95rem; letter-spacing: .05em; color: var(--muted); }
 .prop-count { margin: 0 0 8px; }
 .timeline .job-title, .job-list .job-title { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+/* Continue row on the home screen: a third shorter than the full cards */
+.job-list.compact { gap: 6px; }
+.job-list.compact .job-card { border-left-width: 4px; border-radius: 12px; }
+.job-list.compact .job-card > a { padding: 9px 10px; }
+.job-list.compact .job-head .job-title { font-size: .95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; }
+.job-list.compact .job-pill { padding: 1px 8px; font-size: .68rem; }
+.job-list.compact .job-sub { font-size: .76rem; line-height: 1.25; }
+.job-list.compact .job-progress { gap: 6px; }
+.job-list.compact .progress { margin: 4px 0 3px; }
+.job-list.compact .progress span { height: 4px; }
+.job-list.compact .job-pct { font-size: .72rem; min-width: 30px; }
+a.form-card { text-decoration: none; color: inherit; }
