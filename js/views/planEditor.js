@@ -8,7 +8,7 @@ import { go } from '../router.js';
 import { loadJobOr404, jobChrome, completeFooter } from './chrome.js';
 import {
   ITEMS, PALETTE, ROOM_NAMES, FLOOR_NAMES, newPlanRoom, newFloor, newPlanItem, roomFigures, floorArea, planArea,
-  metres, sqm, openingGeometry, nearestWall, roomAt, bounds, settleItem, legend, cornerPoints, snapToUnits, isStructure,
+  metres, sqm, openingGeometry, nearestWall, wallSnap, roomAt, bounds, settleItem, legend, cornerPoints, snapToUnits, isStructure,
   STYLES, PATTERNS, DOOR_OPTIONS, APPLIANCES, applyRot, rotateAbout, cabinetNumbers, cabinetText, frontEdge, cornerLabelPoint, autoRotate, clearSpot,
   blindGeometry, refreshPosts, endPanels, panelLines, setDepth, refreshDepths,
   cabinetShapes, badgePoint, featureTags, placementDims, wallCorners, WALL_NAMES, DOOR_SIZES, WINDOW_SIZES, hingeSide, setHinge, radiatorWall, nearestRoom, clampItem,
@@ -290,12 +290,15 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
         if (it.type === 'door' && (it.leaves || 1) === 1) {
           parts.push(selectField('Hinged on (seen from inside the room)', hingeSide(it), [['left', 'Left'], ['right', 'Right']], (v) => { touch(); setHinge(it, v); live(); }, { placeholder: null }));
         }
+        if (it.type === 'door') {
+          parts.push(selectField('Opens', it.out ? 'out' : 'in', [['in', 'Into the room'], ['out', 'Out of the room']], (v) => { touch(); it.out = v === 'out'; live(); }, { placeholder: null }));
+        }
         if (it.type === 'window') {
           parts.push(
             mmField('Height from floor to sill (mm)', () => it.sill ?? 90, (v) => { it.sill = v; }),
             mmField('Window height (mm)', () => it.wh ?? 120, (v) => { it.wh = v; }, 10));
         }
-        parts.push(selectField('Wall', it.wall, Object.entries(WALL_NAMES).map(([k, n]) => [k, `${n[0].toUpperCase()}${n.slice(1)} wall`]), (v) => { touch(); it.wall = v; it.at = clampAt(it.at); live(); buildBody(); }, { placeholder: null }));
+        parts.push(selectField('Wall', it.wall, Object.entries(WALL_NAMES).map(([k, n]) => [k, `${n[0].toUpperCase()}${n.slice(1)} wall`]), (v) => { touch(); const hs = it.type === 'door' && (it.leaves || 1) === 1 ? hingeSide(it) : null; it.wall = v; if (hs) setHinge(it, hs); it.at = clampAt(it.at); live(); buildBody(); }, { placeholder: null }));
         const [ca, cb] = wallCorners[it.wall];
         parts.push(
           mmField(`Distance from ${ca} corner (mm)`, () => geo().at, (v) => { it.at = clampAt(v); }),
@@ -337,10 +340,10 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     const d = ITEMS[type];
     const f = floor();
     if (d.kind === 'wall') {
-      const hit = nearestWall(f.rooms, w.x, w.y, 45 / view.s);
+      const hit = wallSnap(f.rooms, w.x, w.y, 45 / view.s);
       if (!hit) return toast(`Tap on a wall to place the ${d.label.toLowerCase()}`);
       remember();
-      const it = newPlanItem(type, { roomId: hit.room.id, wall: hit.wall, at: Math.max(0, snap(hit.at - d.size / 2)) });
+      const it = newPlanItem(type, { roomId: hit.room.id, wall: hit.wall, at: Math.max(0, snap(hit.at - d.size / 2)), ...(type === 'door' && hit.out ? { out: true } : {}) });
       f.items.push(it);
       sel = { type: 'item', id: it.id };
     } else {
@@ -368,6 +371,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
   const pointers = new Map();
   let drag = null;
   let pressTimer = null;
+  let lastTap = null; // the previous tap on a door / window / radiator, for double-click
   const pt = (e) => { const b = svg.getBoundingClientRect(); return { x: e.clientX - b.left, y: e.clientY - b.top }; };
 
   svg.addEventListener('pointerdown', (e) => {
@@ -497,6 +501,20 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       editFeature(it);
       return;
     }
+    // Double-click (or double-tap) a door, window or radiator to edit or delete it. The plan is redrawn on every
+    // press, so the browser never sends its own "dblclick": two quick taps in the same place are timed here.
+    if (e.type === 'pointerup' && drag.kind === 'item' && drag.button === 0 && !drag.moved && dims
+        && (ITEMS[drag.item.type].kind === 'wall' || drag.item.type === 'radiator')) {
+      const now = Date.now();
+      const again = lastTap && lastTap.id === drag.item.id && now - lastTap.t < 500 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 12;
+      lastTap = again ? null : { id: drag.item.id, t: now, x: e.clientX, y: e.clientY };
+      if (again) {
+        const it = drag.item;
+        drag = null;
+        editFeature(it);
+        return;
+      }
+    } else if (e.type === 'pointerup') lastTap = null;
     if (drag.kind === 'pinch') {
       if (pointers.size === 0) drag = null;
       else if (pointers.size === 1) drag = { kind: 'pan', p0: [...pointers.values()][0], v0: { ...view } }; // one finger left: keep panning
@@ -536,9 +554,12 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
   const moveItem = (it, o, w, dx, dy) => {
     const f = floor();
     if (ITEMS[it.type].kind === 'wall') {
-      const hit = nearestWall(f.rooms, w.x, w.y, 80 / view.s);
+      const hit = wallSnap(f.rooms, w.x, w.y, 80 / view.s);
       if (!hit) return;
+      const hinge = it.type === 'door' && (it.leaves || 1) === 1 ? hingeSide(it) : null;
       Object.assign(it, { roomId: hit.room.id, wall: hit.wall, at: Math.max(0, snap(hit.at - it.size / 2)) });
+      if (it.type === 'door') it.out = hit.out; // dragged out of the room: it opens outwards
+      if (hinge) setHinge(it, hinge); // keep the same hinge side (seen from inside) on the new wall
       return;
     }
     const cx = o.ax + (o.w || 0) / 2 + dx, cy = o.ay + (o.h || 0) / 2 + dy; // work from the centre, so turning mid-drag doesn't jump
@@ -800,12 +821,28 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       const removeIt = delBtn('Delete', () => { remember(); f.items.splice(f.items.indexOf(it), 1); sel = null; save(); renderAll(); });
       const parts = [h('strong', null, `${d.emoji} ${d.label}`)];
       if (d.kind === 'wall') {
-        parts.push(field('Width (cm)', String(it.size), (v) => { const n = num(v); if (n > 10) it.size = Math.round(n); }, { inputmode: 'decimal' }));
+        const change = (fn) => { remember(); fn(); save(); renderAll(); };
+        if (it.type === 'door') {
+          const leaves = it.leaves || 1;
+          const sizes = DOOR_SIZES[leaves].includes(it.size) ? DOOR_SIZES[leaves] : [...DOOR_SIZES[leaves], it.size].sort((x, y) => x - y);
+          parts.push(
+            selectField('Door', String(leaves), [['1', 'Single door'], ['2', 'Double doors']], (v) => change(() => {
+              it.leaves = Number(v);
+              if (it.leaves === 2 && it.size < 100) it.size = 150;
+              if (it.leaves === 1 && it.size > 110) it.size = 76;
+            }), { placeholder: null }),
+            selectField('Size', String(it.size), sizes.map((n) => [String(n), `${Math.round(n * 10)} mm`]), (v) => change(() => { it.size = Number(v); }), { placeholder: null }));
+          if (leaves === 1) parts.push(selectField('Hinged on (seen from inside)', hingeSide(it), [['left', 'Left'], ['right', 'Right']], (v) => change(() => setHinge(it, v)), { placeholder: null }));
+          parts.push(selectField('Opens', it.out ? 'out' : 'in', [['in', 'Into the room'], ['out', 'Out of the room']], (v) => change(() => { it.out = v === 'out'; }), { placeholder: null }));
+        } else {
+          parts.push(field('Width (cm)', String(it.size), (v) => { const n = num(v); if (n > 10) it.size = Math.round(n); }, { inputmode: 'decimal' }));
+        }
         parts.push(h('div', { class: 'btn-row' },
           h('button', { type: 'button', class: 'btn-small btn-primary', onclick: () => editFeature(it) }, '✎ Edit details'),
-          it.type === 'door' ? h('button', { type: 'button', class: 'btn-small', onclick: () => { remember(); it.flip = !it.flip; save(); renderCanvas(); } }, '⇄ Flip swing') : null,
           removeIt));
-        parts.push(h('p', { class: 'hint' }, 'Drag it along the wall, or onto another wall. Right-click it (or hold for a second) to edit single / double, hinge side, sizes and distances from the corners.'));
+        parts.push(h('p', { class: 'hint' }, it.type === 'door'
+          ? 'Drag it along the wall and it turns itself on each wall. Drag it out of the room and it opens outwards; back in, and it opens into the room. Double-click it (or hold for a second) for distances from the corners, or to delete it.'
+          : 'Drag it along the wall, or onto another wall. Double-click it (or hold for a second) to edit sizes and distances from the corners.'));
       } else if (d.kind === 'fixture') {
         const r = roomById(it.roomId);
         if (d.facing) {

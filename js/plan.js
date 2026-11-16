@@ -179,7 +179,7 @@ export function openingGeometry(room, item) {
   const at = Math.max(0, Math.min(item.at, L.len - size));
   const a = { x: L.x1 + ux * at, y: L.y1 + uy * at };
   const b = { x: a.x + ux * size, y: a.y + uy * size };
-  const n = { x: L.nx, y: L.ny };
+  const n = item.out ? { x: -L.nx, y: -L.ny } : { x: L.nx, y: L.ny }; // a door opens into the room, or out of it
   let leaves;
   if (item.type === 'door' && (item.leaves || 1) === 2) {
     const mid = { x: a.x + (ux * size) / 2, y: a.y + (uy * size) / 2 };
@@ -279,6 +279,28 @@ export function nearestWall(rooms, x, y, maxDist) {
     }
   }
   return best;
+}
+
+/**
+ * Where a door / window being dragged or placed belongs: the nearest wall, preferring a wall of the room the
+ * pointer is inside (the door opens into it). With the pointer outside every room, the nearest wall is used and
+ * `out` is true: the door opens out of the room. Returns { room, wall, at, dist, out } or null.
+ */
+export function wallSnap(rooms, x, y, maxDist) {
+  let inside = null, outside = null;
+  for (const room of rooms) {
+    for (const wall of ['n', 'e', 's', 'w']) {
+      const L = wallLine(room, wall);
+      const dx = L.x2 - L.x1, dy = L.y2 - L.y1;
+      const t = Math.max(0, Math.min(1, ((x - L.x1) * dx + (y - L.y1) * dy) / (L.len * L.len)));
+      const dist = Math.hypot(x - (L.x1 + dx * t), y - (L.y1 + dy * t));
+      if (dist > maxDist) continue;
+      const isIn = (x - L.x1) * L.nx + (y - L.y1) * L.ny >= 0;
+      const c = { room, wall, at: t * L.len, dist, out: !isIn };
+      if (isIn) { if (!inside || dist < inside.dist) inside = c; } else if (!outside || dist < outside.dist) outside = c;
+    }
+  }
+  return inside || outside;
 }
 
 /** The (top-most) room containing a point. */
@@ -692,7 +714,7 @@ export function describeFeature(room, it, tag) {
     const [ca, cb] = wallCorners[it.wall];
     const dist = `${mm(g.at)} mm from the ${ca} corner, ${mm(g.L.len - g.at - g.size)} mm from the ${cb} corner`;
     const head = `${tag}  ${d.label}, ${room.name} - ${WALL_NAMES[it.wall]} wall`;
-    if (it.type === 'door') return [head, `${mm(it.size)} mm wide, ${(it.leaves || 1) === 2 ? 'double doors' : `single door hinged ${hingeSide(it)} (seen from inside)`}`, dist];
+    if (it.type === 'door') return [head, `${mm(it.size)} mm wide, ${(it.leaves || 1) === 2 ? 'double doors' : `single door hinged ${hingeSide(it)} (seen from inside)`}, opens ${it.out ? 'outwards' : 'into the room'}`, dist];
     return [head, `${mm(it.size)} mm wide x ${mm(it.wh ?? 120)} mm high, sill ${mm(it.sill ?? 90)} mm above the floor`, dist];
   }
   const rw = radiatorWall(room, it);
