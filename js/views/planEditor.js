@@ -11,6 +11,7 @@ import {
   metres, sqm, openingGeometry, nearestWall, roomAt, bounds, settleItem, legend, cornerPoints, snapToUnits, isStructure,
   STYLES, PATTERNS, DOOR_OPTIONS, APPLIANCES, applyRot, rotateAbout, cabinetNumbers, cabinetText, frontEdge, cornerLabelPoint, autoRotate, clearSpot,
   blindGeometry, refreshPosts, endPanels, panelLines, setDepth, refreshDepths,
+  featureTags, placementDims, wallCorners, WALL_NAMES, DOOR_SIZES, WINDOW_SIZES, hingeSide, setHinge, radiatorWall, nearestRoom, clampItem,
 } from '../plan.js';
 
 const SNAP = 5; // cm
@@ -100,6 +101,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     const isSel = (it) => sel?.type === 'item' && sel.id === it.id;
     refreshPosts(f);
     const nums = cabinetNumbers(f);
+    const tags = featureTags(f);
     const badge = (cx, cy, n) => out.push(`<circle class="cab-dot" cx="${cx}" cy="${cy}" r="8"/><text class="cab-n" x="${cx}" y="${cy}">${n}</text>`);
     // fixtures, then openings, then symbols
     for (const it of f.items) {
@@ -143,18 +145,39 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       const seg = `x1="${X(g.a.x)}" y1="${Y(g.a.y)}" x2="${X(g.b.x)}" y2="${Y(g.b.y)}"`;
       out.push(`<line class="gap" ${seg}/>`);
       if (it.type === 'door') {
-        out.push(`<line class="leaf${isSel(it) ? ' sel' : ''}" x1="${X(g.hinge.x)}" y1="${Y(g.hinge.y)}" x2="${X(g.leaf.x)}" y2="${Y(g.leaf.y)}"/>`);
-        out.push(`<polyline class="swing${isSel(it) ? ' sel' : ''}" points="${g.arc.map((p) => `${X(p.x)},${Y(p.y)}`).join(' ')}"/>`);
+        for (const lf of g.leaves) {
+          out.push(`<line class="leaf${isSel(it) ? ' sel' : ''}" x1="${X(lf.hinge.x)}" y1="${Y(lf.hinge.y)}" x2="${X(lf.leaf.x)}" y2="${Y(lf.leaf.y)}"/>`);
+          out.push(`<polyline class="swing${isSel(it) ? ' sel' : ''}" points="${lf.arc.map((p) => `${X(p.x)},${Y(p.y)}`).join(' ')}"/>`);
+        }
       } else {
         out.push(`<line class="win${isSel(it) ? ' sel' : ''}" ${seg}/>`, `<line class="win-in" ${seg}/>`);
       }
+      if (dims && tags.has(it.id)) out.push(`<text class="tag" x="${X((g.a.x + g.b.x) / 2) + g.L.nx * 18}" y="${Y((g.a.y + g.b.y) / 2) + g.L.ny * 18}">${tags.get(it.id)}</text>`);
     }
     for (const it of f.items) {
       const r = roomById(it.roomId);
       const d = ITEMS[it.type];
-      if (!r || d.kind !== 'point') continue;
+      if (!r || d.kind !== 'point' || !dims) continue; // services only show on Room dimensions; they get in the way of the layout
       const cx = X(r.x + it.dx), cy = Y(r.y + it.dy);
       out.push(`<circle class="pt${isSel(it) ? ' sel' : ''}" cx="${cx}" cy="${cy}" r="13"/><text class="pt-t" x="${cx}" y="${cy}">${d.code}</text>`);
+    }
+    // Distances from the corners for the selected door / window / radiator.
+    if (dims && sel?.type === 'item') {
+      const it = f.items.find((i) => i.id === sel.id);
+      const r = it && roomById(it.roomId);
+      if (r && (ITEMS[it.type].kind === 'wall' || it.type === 'radiator')) {
+        const off = 18;
+        for (const m of placementDims(r, it)) {
+          const ox = -m.nx * off, oy = -m.ny * off; // outside the wall
+          const ax = X(m.x1), ay = Y(m.y1), bx = X(m.x2), by = Y(m.y2);
+          out.push(`<line class="dimline" x1="${ax}" y1="${ay}" x2="${ax + ox}" y2="${ay + oy}"/><line class="dimline" x1="${bx}" y1="${by}" x2="${bx + ox}" y2="${by + oy}"/><line class="dimline" x1="${ax + ox}" y1="${ay + oy}" x2="${bx + ox}" y2="${by + oy}"/>`);
+          const tx = (ax + bx) / 2 + ox * 1.55, ty = (ay + by) / 2 + oy * 1.55;
+          const label = `${Math.round(m.cm * 10)} mm`;
+          out.push(m.ny !== 0
+            ? `<text class="dimtxt" x="${tx}" y="${ty}">${label}</text>`
+            : `<text class="dimtxt" transform="translate(${tx} ${ty}) rotate(-90)">${label}</text>`);
+        }
+      }
     }
     // Room names, areas and measurements (on top).
     for (const r of f.rooms) {
@@ -211,6 +234,102 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     return r ? { kind: 'room', room: r } : null;
   };
 
+  // ----- edit a door, window or radiator: right-click, or hold for a second -----
+  const editFeature = async (it) => {
+    const d = ITEMS[it.type];
+    const tag = featureTags(floor()).get(it.id) || '';
+    let touched = false;
+    const touch = () => { if (!touched) { touched = true; remember(); } };
+    const mm = (cm) => String(Math.round(cm * 10));
+    const body = h('div', { class: 'feature-form' });
+    const inputs = []; // the two corner distances move together, so keep their boxes in step
+    const live = () => {
+      save();
+      renderCanvas();
+      for (const [input, get] of inputs) if (document.activeElement !== input) input.value = mm(get());
+    };
+    const mmField = (label, get, set, min = 0) => {
+      const input = h('input', { type: 'text', inputmode: 'decimal', value: mm(get()), 'aria-label': label, oninput: (e) => {
+        const n = num(e.target.value);
+        if (!Number.isFinite(n) || n < min) return;
+        touch();
+        set(n / 10);
+        live();
+      } });
+      inputs.push([input, get]);
+      return h('label', { class: 'field' }, h('span', { class: 'field-label' }, label), input);
+    };
+    const buildBody = () => {
+      inputs.length = 0;
+      const r = roomById(it.roomId);
+      const parts = [];
+      if (d.kind === 'wall') {
+        const geo = () => openingGeometry(r, it);
+        const clampAt = (v) => Math.max(0, Math.min(v, geo().L.len - geo().size));
+        if (it.type === 'door') {
+          parts.push(selectField('Door', String(it.leaves || 1), [['1', 'Single door'], ['2', 'Double doors']], (v) => {
+            touch();
+            it.leaves = Number(v);
+            if (it.leaves === 2 && it.size < 100) it.size = 150;
+            if (it.leaves === 1 && it.size > 110) it.size = 76;
+            live();
+            buildBody();
+          }, { placeholder: null }));
+        }
+        const sizes = it.type === 'door' ? DOOR_SIZES[it.leaves || 1] : WINDOW_SIZES;
+        parts.push(selectField('Standard widths', '', sizes.map((n) => [String(n), `${mm(n)} mm`]), (v) => {
+          if (!v) return;
+          touch();
+          it.size = Number(v);
+          live();
+          buildBody();
+        }, { placeholder: '– choose –' }));
+        parts.push(mmField('Width (mm)', () => it.size, (v) => { it.size = v; }, 10));
+        if (it.type === 'door' && (it.leaves || 1) === 1) {
+          parts.push(selectField('Hinged on (seen from inside the room)', hingeSide(it), [['left', 'Left'], ['right', 'Right']], (v) => { touch(); setHinge(it, v); live(); }, { placeholder: null }));
+        }
+        if (it.type === 'window') {
+          parts.push(
+            mmField('Height from floor to sill (mm)', () => it.sill ?? 90, (v) => { it.sill = v; }),
+            mmField('Window height (mm)', () => it.wh ?? 120, (v) => { it.wh = v; }, 10));
+        }
+        parts.push(selectField('Wall', it.wall, Object.entries(WALL_NAMES).map(([k, n]) => [k, `${n[0].toUpperCase()}${n.slice(1)} wall`]), (v) => { touch(); it.wall = v; it.at = clampAt(it.at); live(); buildBody(); }, { placeholder: null }));
+        const [ca, cb] = wallCorners[it.wall];
+        parts.push(
+          mmField(`Distance from ${ca} corner (mm)`, () => geo().at, (v) => { it.at = clampAt(v); }),
+          mmField(`Distance from ${cb} corner (mm)`, () => geo().L.len - geo().at - geo().size, (v) => { it.at = clampAt(geo().L.len - geo().size - v); }));
+      } else {
+        // radiator
+        const rw = () => radiatorWall(r, it);
+        const horizontal = () => rw().wall === 'n' || rw().wall === 's';
+        parts.push(
+          mmField('Length (mm)', () => Math.max(it.w, it.h), (v) => { if (it.w >= it.h) it.w = v; else it.h = v; clampItem(r, it); }, 10),
+          mmField('Depth (mm)', () => Math.min(it.w, it.h), (v) => { if (it.w >= it.h) it.h = v; else it.w = v; clampItem(r, it); }, 5));
+        const [ca, cb] = wallCorners[rw().wall];
+        parts.push(
+          mmField(`Distance from ${ca} corner (mm)`, () => rw().a, (v) => { if (horizontal()) it.dx = v; else it.dy = v; clampItem(r, it); }),
+          mmField(`Distance from ${cb} corner (mm)`, () => rw().b, (v) => { if (horizontal()) it.dx = r.w - it.w - v; else it.dy = r.h - it.h - v; clampItem(r, it); }));
+        parts.push(h('button', { type: 'button', class: 'btn-small', onclick: () => { touch(); [it.w, it.h] = [it.h, it.w]; clampItem(r, it); live(); buildBody(); } }, '⟳ Turn it round'));
+      }
+      body.replaceChildren(...parts);
+    };
+    buildBody();
+    sel = { type: 'item', id: it.id };
+    renderCanvas();
+    const v = await choose({
+      title: `${tag} ${d.label}`.trim(),
+      content: body,
+      buttons: [{ label: 'Done', value: 'done', class: 'btn-primary btn-big' }, { label: 'Delete', value: 'delete', class: 'btn-danger' }],
+    });
+    if (v === 'delete') {
+      touch();
+      floor().items.splice(floor().items.indexOf(it), 1);
+      sel = null;
+    }
+    save();
+    renderAll();
+  };
+
   // ----- placing new items -----
   const place = (type, w) => {
     const d = ITEMS[type];
@@ -223,7 +342,11 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       f.items.push(it);
       sel = { type: 'item', id: it.id };
     } else {
-      const r = roomAt(f.rooms, w.x, w.y);
+      let r = roomAt(f.rooms, w.x, w.y);
+      if (!r && d.outside) { // gas and electric meters are often on the outside of the house
+        const n = nearestRoom(f.rooms, w.x, w.y);
+        if (n && n.dist <= 400) r = n.room;
+      }
       if (!r) return toast(`Tap inside a room to place the ${d.label.toLowerCase()}`);
       remember();
       const it = newPlanItem(type, { roomId: r.id });
@@ -242,6 +365,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
   // ----- dragging, panning, pinch-zoom -----
   const pointers = new Map();
   let drag = null;
+  let pressTimer = null;
   const pt = (e) => { const b = svg.getBoundingClientRect(); return { x: e.clientX - b.left, y: e.clientY - b.top }; };
 
   svg.addEventListener('pointerdown', (e) => {
@@ -279,6 +403,19 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       sel = null;
       drag = { kind: 'pan', p0: p, v0: { ...view } };
     }
+    drag.button = e.button; // 2 = right button
+    clearTimeout(pressTimer);
+    if (dims && drag.kind === 'item' && e.pointerType !== 'mouse') {
+      // hold a finger on a door, window or radiator for a second to edit it
+      pressTimer = setTimeout(() => {
+        if (drag?.kind === 'item' && !drag.moved && pointers.size === 1) {
+          const it = drag.item;
+          drag = null;
+          pointers.clear();
+          editFeature(it);
+        }
+      }, 1000);
+    }
     renderCanvas();
     renderPanel();
   });
@@ -299,6 +436,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     const p = pt(e);
     if (!drag.moved && Math.hypot(p.x - drag.p0.x, p.y - drag.p0.y) < 5) return;
     drag.moved = true;
+    clearTimeout(pressTimer);
     if (drag.kind === 'pan') {
       view.tx = drag.v0.tx + (p.x - drag.p0.x);
       view.ty = drag.v0.ty + (p.y - drag.p0.y);
@@ -348,8 +486,15 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     drag = null;
   };
   const endPointer = (e) => {
+    clearTimeout(pressTimer);
     pointers.delete(e.pointerId);
     if (!drag) return;
+    if (e.type === 'pointerup' && drag.kind === 'item' && drag.button === 2 && !drag.moved && dims) {
+      const it = drag.item; // a right-click on a door, window or radiator edits it
+      drag = null;
+      editFeature(it);
+      return;
+    }
     if (drag.kind === 'pinch') {
       if (pointers.size === 0) drag = null;
       else if (pointers.size === 1) drag = { kind: 'pan', p0: [...pointers.values()][0], v0: { ...view } }; // one finger left: keep panning
@@ -357,6 +502,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     }
     finishDrag();
   };
+  svg.addEventListener('contextmenu', (e) => e.preventDefault());
   svg.addEventListener('pointerup', endPointer);
   svg.addEventListener('pointercancel', endPointer);
   svg.addEventListener('wheel', (e) => {
@@ -394,7 +540,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       return;
     }
     const cx = o.ax + (o.w || 0) / 2 + dx, cy = o.ay + (o.h || 0) / 2 + dy; // work from the centre, so turning mid-drag doesn't jump
-    const r = roomAt(f.rooms, cx, cy) || roomById(it.roomId);
+    const r = roomAt(f.rooms, cx, cy) || (ITEMS[it.type].outside ? nearestRoom(f.rooms, cx, cy)?.room : null) || roomById(it.roomId);
     it.roomId = r.id;
     it.dx = snap(cx - r.x - (it.w || 0) / 2);
     it.dy = snap(cy - r.y - (it.h || 0) / 2);
@@ -537,10 +683,18 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
 
   // ----- toolbar -----
   const toolbar = h('div', { class: 'plan-tools' });
+  // Floor plan tab: cabinets and their parts first, then the appliances.
+  const orderedTools = () => {
+    const all = PALETTE[kind].filter(editable);
+    if (dims) return all;
+    const parts = all.filter((t) => ITEMS[t].cab || ITEMS[t].filler);
+    const rest = all.filter((t) => !(ITEMS[t].cab || ITEMS[t].filler));
+    return parts.length && rest.length ? [...parts, '|', ...rest] : all;
+  };
   const renderToolbar = () => {
     toolbar.replaceChildren(...[
       dims ? h('button', { type: 'button', class: 'btn-primary btn-small', onclick: addRoom }, '+ Room') : null,
-      ...PALETTE[kind].filter(editable).map((t) => h('button', {
+      ...orderedTools().map((t) => (t === '|' ? h('span', { class: 'plan-sep' }, 'Appliances') : h('button', {
         type: 'button',
         class: 'btn-small plan-tool',
         'aria-pressed': String(placing === t),
@@ -549,7 +703,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
           placing = placing === t ? null : t;
           renderToolbar();
         },
-      }, `${ITEMS[t].emoji} ${ITEMS[t].label}`))].filter(Boolean));
+      }, `${ITEMS[t].emoji} ${ITEMS[t].label}`)))].filter(Boolean));
     if (placing) {
       const d = ITEMS[placing];
       banner.hidden = false;
@@ -646,9 +800,10 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       if (d.kind === 'wall') {
         parts.push(field('Width (cm)', String(it.size), (v) => { const n = num(v); if (n > 10) it.size = Math.round(n); }, { inputmode: 'decimal' }));
         parts.push(h('div', { class: 'btn-row' },
+          h('button', { type: 'button', class: 'btn-small btn-primary', onclick: () => editFeature(it) }, '✎ Edit details'),
           it.type === 'door' ? h('button', { type: 'button', class: 'btn-small', onclick: () => { remember(); it.flip = !it.flip; save(); renderCanvas(); } }, '⇄ Flip swing') : null,
           removeIt));
-        parts.push(h('p', { class: 'hint' }, 'Drag it along the wall, or onto another wall.'));
+        parts.push(h('p', { class: 'hint' }, 'Drag it along the wall, or onto another wall. Right-click it (or hold for a second) to edit single / double, hinge side, sizes and distances from the corners.'));
       } else if (d.kind === 'fixture') {
         const r = roomById(it.roomId);
         if (d.facing) {
@@ -729,6 +884,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
             field('Width (cm)', String(it.w), (v) => { const n = num(v); if (n > 5) { it.w = Math.round(n); settleItem(r, it); } }, { inputmode: 'decimal' }),
             field('Depth (cm)', String(it.h), (v) => { const n = num(v); if (n > 5) { it.h = Math.round(n); settleItem(r, it); } }, { inputmode: 'decimal' })));
           parts.push(h('div', { class: 'btn-row' },
+            it.type === 'radiator' ? h('button', { type: 'button', class: 'btn-small btn-primary', onclick: () => editFeature(it) }, '✎ Edit details') : null,
             h('button', { type: 'button', class: 'btn-small', onclick: () => { remember(); [it.w, it.h] = [it.h, it.w]; settleItem(r, it); save(); renderAll(); } }, '⟳ Turn'),
             removeIt));
         }
@@ -754,7 +910,8 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
   // ----- totals and key -----
   const summary = h('div', { class: 'plan-summary' });
   const renderSummary = () => {
-    const key = legend([floor()]);
+    const key = dims ? legend([floor()]) : []; // services are not shown over the layout
+    const appliances = dims ? [] : floor().items.filter((i) => ITEMS[i.type].facing && !ITEMS[i.type].cab && !ITEMS[i.type].filler);
     const nums = cabinetNumbers(floor());
     const cabs = floor().items.filter((it) => nums.has(it.id));
     const extras = panelLines(floor(), plan.settings);
@@ -763,7 +920,8 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       kind === 'property' && plan.floors.length > 1 ? h('span', null, 'Whole property: ', h('b', null, sqm(planArea(plan)))) : null,
       key.length ? h('span', { class: 'plan-key' }, key.map(([c, l]) => `${c} = ${l}`).join(' · ')) : null,
       cabs.length ? h('ol', { class: 'plan-cabs' }, cabs.map((it) => h('li', null, h('b', null, String(nums.get(it.id))), cabinetText(it)))) : null,
-      extras.length ? h('ul', { class: 'plan-cabs plan-extras' }, extras.map((t) => h('li', null, t))) : null].filter(Boolean));
+      extras.length ? h('ul', { class: 'plan-cabs plan-extras' }, extras.map((t) => h('li', null, t))) : null,
+      appliances.length ? h('span', { class: 'plan-key' }, `Appliances: ${appliances.map((i) => ITEMS[i.type].label).join(', ')}`) : null].filter(Boolean));
   };
 
   // Door / drawer front and end panel / filler board thickness: 18 mm as standard, 22 mm if you prefer.

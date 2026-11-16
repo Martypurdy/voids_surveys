@@ -950,11 +950,14 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
       doc.line(px(g.a.x), py(g.a.y), px(g.b.x), py(g.b.y));
       if (it.type === 'door') {
         doc.setDrawColor(40, 48, 56);
-        doc.setLineWidth(0.3);
-        doc.line(px(g.hinge.x), py(g.hinge.y), px(g.leaf.x), py(g.leaf.y));
-        doc.setLineWidth(0.15);
-        doc.setLineDashPattern([0.6, 0.5], 0);
-        for (let i = 1; i < g.arc.length; i++) doc.line(px(g.arc[i - 1].x), py(g.arc[i - 1].y), px(g.arc[i].x), py(g.arc[i].y));
+        for (const lf of g.leaves) {
+          doc.setLineWidth(0.3);
+          doc.setLineDashPattern([], 0);
+          doc.line(px(lf.hinge.x), py(lf.hinge.y), px(lf.leaf.x), py(lf.leaf.y));
+          doc.setLineWidth(0.15);
+          doc.setLineDashPattern([0.6, 0.5], 0);
+          for (let i = 1; i < lf.arc.length; i++) doc.line(px(lf.arc[i - 1].x), py(lf.arc[i - 1].y), px(lf.arc[i].x), py(lf.arc[i].y));
+        }
         doc.setLineDashPattern([], 0);
       } else {
         doc.setDrawColor(47, 127, 193);

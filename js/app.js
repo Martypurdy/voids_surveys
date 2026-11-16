@@ -4,6 +4,12 @@ import { flushSave } from './db.js';
 import { toast } from './ui.js';
 import { findUrl, setPendingLink } from './linkfill.js';
 
+// No browser right-click menu on the app (right-click is used for editing and dragging the plan);
+// text boxes keep theirs for cut / copy / paste.
+document.addEventListener('contextmenu', (e) => {
+  if (!e.target.closest?.('input, textarea, [contenteditable="true"]')) e.preventDefault();
+});
+
 route('/', () => import('./views/jobList.js'));
 route('/settings', () => import('./views/settings.js'));
 route('/settings/:tab', () => import('./views/settings.js'));

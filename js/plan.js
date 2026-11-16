@@ -25,8 +25,8 @@ export const ITEMS = {
   window: { kind: 'wall', label: 'Window', emoji: '🪟', size: 120 },
   fuse: { kind: 'point', label: 'Fuse board', emoji: '⚡', code: 'FB' },
   water: { kind: 'point', label: 'Water main / stop tap', emoji: '🚰', code: 'WM' },
-  gas: { kind: 'point', label: 'Gas meter', emoji: '🔥', code: 'GM' },
-  elec: { kind: 'point', label: 'Electric meter', emoji: '🔌', code: 'EM' },
+  gas: { kind: 'point', outside: true, label: 'Gas meter', emoji: '🔥', code: 'GM' },
+  elec: { kind: 'point', outside: true, label: 'Electric meter', emoji: '🔌', code: 'EM' },
   boiler: { kind: 'point', label: 'Boiler', emoji: '♨️', code: 'BL' },
   smoke: { kind: 'point', label: 'Smoke alarm', emoji: '🔔', code: 'SA' },
   co: { kind: 'point', label: 'CO alarm', emoji: '⚠️', code: 'CO' },
@@ -99,7 +99,7 @@ export function newPlan(kind = 'property') {
 /** A new item of this type in a room. */
 export function newPlanItem(type, props = {}) {
   const d = ITEMS[type];
-  const base = d.kind === 'wall' ? { size: d.size, flip: false, wall: 'n', at: 0 }
+  const base = d.kind === 'wall' ? { size: d.size, flip: false, wall: 'n', at: 0, ...(type === 'door' ? { leaves: 1 } : { sill: 90, wh: 120 }) }
     : d.facing ? {
       w: d.w, h: d.h, uw: d.w, ud: d.h, rot: 0, manual: false, dx: 0, dy: 0,
       ...(d.cab && !d.corner && !d.space ? { endL: false, endR: false } : {}),
@@ -141,7 +141,37 @@ export function wallLine(room, wall) {
   }
 }
 
-/** Door / window on its wall: ends a–b; doors also hinge, open leaf end and swing arc. */
+/** Standard door widths (cm) offered for single and double doors; window widths. */
+export const DOOR_SIZES = { 1: [52.6, 62.6, 72.6, 76, 82.6, 92.6], 2: [120, 150, 160, 180] };
+export const WINDOW_SIZES = [60, 90, 120, 150, 180, 240];
+export const WALL_NAMES = { n: 'north', e: 'east', s: 'south', w: 'west' };
+/** The two corners at the ends of each wall: a (start) then b (end). */
+export const wallCorners = { n: ['NW', 'NE'], e: ['NE', 'SE'], s: ['SW', 'SE'], w: ['NW', 'SW'] };
+
+/** Which side a single door is hung on, looking at it from inside the room. */
+export function hingeSide(it) {
+  return (it.wall === 'n' || it.wall === 'e') === !it.flip ? 'left' : 'right';
+}
+export function setHinge(it, side) {
+  it.flip = (side === 'left') === (it.wall === 'n' || it.wall === 'e') ? false : true;
+}
+
+/** One door leaf: hinge, open end and the swing arc (it opens into the room). */
+function swingArc(hinge, closedEnd, len, n) {
+  const leaf = { x: hinge.x + n.x * len, y: hinge.y + n.y * len };
+  const t0 = Math.atan2(leaf.y - hinge.y, leaf.x - hinge.x);
+  let d = Math.atan2(closedEnd.y - hinge.y, closedEnd.x - hinge.x) - t0;
+  while (d > Math.PI) d -= 2 * Math.PI;
+  while (d < -Math.PI) d += 2 * Math.PI;
+  const arc = [];
+  for (let i = 0; i <= 12; i++) {
+    const t = t0 + (d * i) / 12;
+    arc.push({ x: hinge.x + Math.cos(t) * len, y: hinge.y + Math.sin(t) * len });
+  }
+  return { hinge, leaf, arc };
+}
+
+/** Door / window on its wall: ends a–b; doors also have leaves (one, or two for double doors). */
 export function openingGeometry(room, item) {
   const L = wallLine(room, item.wall);
   const size = Math.min(item.size, L.len);
@@ -149,19 +179,91 @@ export function openingGeometry(room, item) {
   const at = Math.max(0, Math.min(item.at, L.len - size));
   const a = { x: L.x1 + ux * at, y: L.y1 + uy * at };
   const b = { x: a.x + ux * size, y: a.y + uy * size };
-  const hinge = item.flip ? b : a;
-  const other = item.flip ? a : b;
-  const leaf = { x: hinge.x + L.nx * size, y: hinge.y + L.ny * size };
-  const t0 = Math.atan2(leaf.y - hinge.y, leaf.x - hinge.x);
-  let d = Math.atan2(other.y - hinge.y, other.x - hinge.x) - t0;
-  while (d > Math.PI) d -= 2 * Math.PI;
-  while (d < -Math.PI) d += 2 * Math.PI;
-  const arc = [];
-  for (let i = 0; i <= 12; i++) {
-    const t = t0 + (d * i) / 12;
-    arc.push({ x: hinge.x + Math.cos(t) * size, y: hinge.y + Math.sin(t) * size });
+  const n = { x: L.nx, y: L.ny };
+  let leaves;
+  if (item.type === 'door' && (item.leaves || 1) === 2) {
+    const mid = { x: a.x + (ux * size) / 2, y: a.y + (uy * size) / 2 };
+    leaves = [swingArc(a, mid, size / 2, n), swingArc(b, mid, size / 2, n)];
+  } else {
+    leaves = [swingArc(item.flip ? b : a, item.flip ? a : b, size, n)];
   }
-  return { a, b, hinge, leaf, arc, L, size };
+  const first = leaves[0];
+  return { a, b, hinge: first.hinge, leaf: first.leaf, arc: first.arc, leaves, L, size, at };
+}
+
+/** Tags for the room page: D1, D2 … doors, W1 … windows, R1 … radiators (in the order they were added). */
+export function featureTags(floor) {
+  const count = { D: 0, W: 0, R: 0 };
+  const m = new Map();
+  for (const it of floor.items) {
+    const k = it.type === 'door' ? 'D' : it.type === 'window' ? 'W' : it.type === 'radiator' ? 'R' : null;
+    if (k) m.set(it.id, k + ++count[k]);
+  }
+  return m;
+}
+
+/** The wall a radiator sits against (the nearest), with its distances from the two corners along that wall. */
+export function radiatorWall(room, it) {
+  const gaps = [['n', it.dy], ['s', room.h - (it.dy + it.h)], ['w', it.dx], ['e', room.w - (it.dx + it.w)]];
+  const [wall, gap] = gaps.sort((x, y) => x[1] - y[1])[0];
+  const horizontal = wall === 'n' || wall === 's';
+  const along = horizontal ? it.dx : it.dy, len = horizontal ? room.w : room.h, size = horizontal ? it.w : it.h;
+  return { wall, gap, len, size, a: along, b: len - along - size };
+}
+
+/**
+ * Distances from the corners for a door, window or radiator against a wall: [{ x1, y1, x2, y2, cm, nx, ny }]
+ * in plan coordinates (nx, ny: the direction pointing into the room).
+ */
+export function placementDims(room, it) {
+  const d = ITEMS[it.type];
+  let wall, a, b, size;
+  if (d.kind === 'wall') {
+    const g = openingGeometry(room, it);
+    wall = it.wall;
+    a = g.at;
+    size = g.size;
+    b = g.L.len - g.at - g.size;
+  } else if (it.type === 'radiator') {
+    const rw = radiatorWall(room, it);
+    if (rw.gap > 30) return [];
+    ({ wall, a, b, size } = rw);
+  } else return [];
+  const L = wallLine(room, wall);
+  const ux = (L.x2 - L.x1) / L.len, uy = (L.y2 - L.y1) / L.len;
+  const p = (t) => ({ x: L.x1 + ux * t, y: L.y1 + uy * t });
+  const out = [];
+  if (a > 0.5) out.push({ x1: L.x1, y1: L.y1, x2: p(a).x, y2: p(a).y, cm: a, nx: L.nx, ny: L.ny });
+  if (b > 0.5) out.push({ x1: p(a + size).x, y1: p(a + size).y, x2: L.x2, y2: L.y2, cm: b, nx: L.nx, ny: L.ny });
+  return out;
+}
+
+/** Where a service symbol is: inside which room, or outside which wall, with distances from the corner. */
+export function serviceInfo(room, it) {
+  if (!room) return { outside: false, text: '' };
+  const mm = (cm) => Math.round(cm * 10);
+  const gaps = { n: it.dy, s: room.h - it.dy, w: it.dx, e: room.w - it.dx }; // negative = beyond that wall
+  const out = Object.entries(gaps).filter(([, g]) => g < 0).sort((x, y) => x[1] - y[1])[0];
+  const [wall, gap] = out || Object.entries(gaps).sort((x, y) => x[1] - y[1])[0];
+  const horizontal = wall === 'n' || wall === 's';
+  const along = horizontal ? it.dx : it.dy, len = horizontal ? room.w : room.h;
+  const [ca, cb] = wallCorners[wall];
+  const fromA = along <= len / 2;
+  const corner = fromA ? ca : cb, dist = fromA ? along : len - along;
+  return out
+    ? { outside: true, text: `outside the ${room.name} ${WALL_NAMES[wall]} wall, ${mm(-gap)} mm out from it, ${mm(dist)} mm from the ${corner} corner` }
+    : { outside: false, text: `in ${room.name}, ${mm(gap)} mm from the ${WALL_NAMES[wall]} wall, ${mm(dist)} mm from the ${corner} corner` };
+}
+
+/** The room whose rectangle is nearest a point (and how far away), for things placed outside the walls. */
+export function nearestRoom(rooms, x, y) {
+  let best = null;
+  for (const r of rooms) {
+    const dx = Math.max(r.x - x, 0, x - (r.x + r.w)), dy = Math.max(r.y - y, 0, y - (r.y + r.h));
+    const dist = Math.hypot(dx, dy);
+    if (!best || dist < best.dist) best = { room: r, dist };
+  }
+  return best;
 }
 
 /** Nearest room wall to a point (within maxDist cm): { room, wall, at, dist }. */
@@ -192,12 +294,25 @@ export function bounds(floor) {
     b.maxX = Math.max(b.maxX, r.x + r.w);
     b.maxY = Math.max(b.maxY, r.y + r.h);
   }
+  for (const it of floor.items) {
+    const r = floor.rooms.find((x) => x.id === it.roomId);
+    if (!r || ITEMS[it.type]?.kind !== 'point') continue;
+    b.minX = Math.min(b.minX, r.x + it.dx - 20);
+    b.minY = Math.min(b.minY, r.y + it.dy - 20);
+    b.maxX = Math.max(b.maxX, r.x + it.dx + 20);
+    b.maxY = Math.max(b.maxY, r.y + it.dy + 20);
+  }
   return b;
 }
 
 /** Keep a fixture / symbol inside its room; fixtures within 20 cm of a wall go flush to it. */
 export function settleItem(room, item) {
   const w = item.w || 0, h = item.h || 0;
+  if (ITEMS[item.type].outside) {
+    item.dx = Math.max(-400, Math.min(item.dx, room.w + 400));
+    item.dy = Math.max(-400, Math.min(item.dy, room.h + 400));
+    return;
+  }
   item.dx = Math.max(0, Math.min(item.dx, room.w - w));
   item.dy = Math.max(0, Math.min(item.dy, room.h - h));
   if (ITEMS[item.type].kind === 'fixture') {
