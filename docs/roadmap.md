@@ -88,4 +88,14 @@ Calculators (starter set - full list by trade to be expanded later):
   (e.g. 1:4, 1:5, 1:6). Optional openings to deduct.
 - Laminate / flooring: room size + plank size -> planks; planks per pack -> packs;
   optional underlay rolls and beading/scotia lengths.
-- Screw converter: imperial gauge and inch length (e.g. 3/4" x 6)
+- Screw converter: imperial gauge and inch length (e.g. 3/4" x 6) <-> metric
+  diameter x length in mm, both directions.
+- Unit converter: length, area, volume, weight.
+- Tiles: area + tile size + joint -> tiles, boxes, adhesive and grout.
+- Paint: area, coats, coverage -> litres and tins.
+- Plasterboard & plaster: area -> boards, screws, skim plaster bags.
+- Stud wall: length x height, stud centres -> studs, noggins, head/sole plates.
+- Insulation: area + depth -> rolls or boards.
+- Aggregates: area x depth -> tonnes / bulk bags.
+- Roof tiles: roof area + gauge/cover -> tiles, battens.
+- Fall / gradient: length and fall -> ratio and %, or the reverse.
