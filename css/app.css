@@ -1369,3 +1369,5 @@ a.form-card { text-decoration: none; color: inherit; }
 .props input[type="search"], .split-list input[type="search"] { margin-bottom: 10px; }
 .export-opt { display: flex; flex-direction: column; gap: 2px; text-align: left; }
 .export-opt small { font-weight: 400; opacity: .85; white-space: normal; line-height: 1.3; }
+.plan-banner { pointer-events: none; }
+.plan-banner button { pointer-events: auto; }

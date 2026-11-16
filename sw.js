@@ -1,6 +1,6 @@
 // Service worker: precache the app shell, serve it cache-first so the app works offline.
 // Bump VERSION whenever any file below changes, so devices pick up the update.
-const VERSION = 'v81';
+const VERSION = 'v82';
 const CACHE = `voids-${VERSION}`;
 
 const ASSETS = [

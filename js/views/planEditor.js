@@ -8,7 +8,7 @@ import { go } from '../router.js';
 import { loadJobOr404, jobChrome, completeFooter } from './chrome.js';
 import {
   ITEMS, PALETTE, ROOM_NAMES, FLOOR_NAMES, newPlanRoom, newFloor, newPlanItem, roomFigures, floorArea, planArea,
-  metres, sqm, openingGeometry, nearestWall, wallSnap, roomAt, bounds, settleItem, legend, cornerPoints, snapToUnits, isStructure,
+  metres, sqm, openingGeometry, nearestWall, wallSnap, wallLine, roomAt, bounds, settleItem, legend, cornerPoints, snapToUnits, isStructure,
   STYLES, PATTERNS, DOOR_OPTIONS, APPLIANCES, applyRot, rotateAbout, cabinetNumbers, cabinetText, frontEdge, cornerLabelPoint, autoRotate, clearSpot,
   blindGeometry, refreshPosts, endPanels, panelLines, setDepth, refreshDepths,
   cabinetShapes, badgePoint, featureTags, placementDims, wallCorners, WALL_NAMES, DOOR_SIZES, WINDOW_SIZES, hingeSide, setHinge, radiatorWall, nearestRoom, clampItem,
@@ -226,6 +226,16 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
         const g = openingGeometry(r, it);
         const mx = (g.a.x + g.b.x) / 2, my = (g.a.y + g.b.y) / 2;
         if (Math.abs(w.x - mx) <= (g.L.nx ? tol : g.size / 2 + tol) && Math.abs(w.y - my) <= (g.L.ny ? tol : g.size / 2 + tol)) return { kind: 'item', item: it };
+        if (it.type === 'door') { // anywhere on the door: its leaf and the whole swing
+          const sx = g.L.nx * (it.out ? -1 : 1), sy = g.L.ny * (it.out ? -1 : 1);
+          for (const lf of g.leaves) {
+            const end = lf.arc[lf.arc.length - 1];
+            const len = Math.hypot(lf.leaf.x - lf.hinge.x, lf.leaf.y - lf.hinge.y);
+            const vx = w.x - lf.hinge.x, vy = w.y - lf.hinge.y;
+            const cx = (end.x - lf.hinge.x) / len, cy = (end.y - lf.hinge.y) / len;
+            if (Math.hypot(vx, vy) <= len + tol && vx * sx + vy * sy >= -tol && vx * cx + vy * cy >= -tol) return { kind: 'item', item: it };
+          }
+        }
       }
     }
     for (const it of [...f.items].reverse()) {
@@ -346,6 +356,10 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       const it = newPlanItem(type, { roomId: hit.room.id, wall: hit.wall, at: Math.max(0, snap(hit.at - d.size / 2)), ...(type === 'door' && hit.out ? { out: true } : {}) });
       f.items.push(it);
       sel = { type: 'item', id: it.id };
+      save();
+      renderAll();
+      revealPanel(); // its dropdowns (single / double, size, hinge, opens) appear straight away
+      return;
     } else {
       let r = roomAt(f.rooms, w.x, w.y);
       if (!r && d.outside) { // gas and electric meters are often on the outside of the house
@@ -371,6 +385,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
   const pointers = new Map();
   let drag = null;
   let pressTimer = null;
+  let revealPanel = () => {}; // shows the side panel (set up with the layout below)
   let lastTap = null; // the previous tap on a door / window / radiator, for double-click
   const pt = (e) => { const b = svg.getBoundingClientRect(); return { x: e.clientX - b.left, y: e.clientY - b.top }; };
 
@@ -400,6 +415,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       drag = { kind: 'resize', room: hit.room, corner: hit.corner, o: { ...hit.room }, start, w0: w, p0: p, snapshot };
     } else if (hit?.kind === 'item') {
       sel = { type: 'item', id: hit.item.id };
+      if (ITEMS[hit.item.type].kind === 'wall') setTimeout(revealPanel, 0); // after the panel redraws
       const r = roomById(hit.item.roomId);
       drag = { kind: 'item', item: hit.item, o: { ...hit.item, ax: r.x + (hit.item.dx || 0), ay: r.y + (hit.item.dy || 0) }, w0: w, p0: p, snapshot };
     } else if (hit?.kind === 'room') {
@@ -557,7 +573,12 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       const hit = wallSnap(f.rooms, w.x, w.y, 80 / view.s);
       if (!hit) return;
       const hinge = it.type === 'door' && (it.leaves || 1) === 1 ? hingeSide(it) : null;
-      Object.assign(it, { roomId: hit.room.id, wall: hit.wall, at: Math.max(0, snap(hit.at - it.size / 2)) });
+      if (drag.grab === undefined) { // where along the door it was picked up (so it doesn't jump to centre on the pointer)
+        const r0 = roomById(o.roomId), L = r0 && wallLine(r0, o.wall);
+        const along = L ? ((drag.w0.x - L.x1) * (L.x2 - L.x1) + (drag.w0.y - L.y1) * (L.y2 - L.y1)) / L.len : o.at + it.size / 2;
+        drag.grab = Math.max(0, Math.min(it.size, along - o.at));
+      }
+      Object.assign(it, { roomId: hit.room.id, wall: hit.wall, at: Math.max(0, snap(hit.at - drag.grab)) });
       if (it.type === 'door') it.out = hit.out; // dragged out of the room: it opens outwards
       if (hinge) setHinge(it, hinge); // keep the same hinge side (seen from inside) on the new wall
       return;
@@ -1039,6 +1060,11 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     sideBtn('⇤', 'Hide the panel', () => { prefs.collapsed = true; applyPrefs(); savePrefs(); }));
   const splitter = h('div', { class: 'plan-split', role: 'separator', 'aria-orientation': 'vertical', 'aria-label': 'Drag to resize the panel', tabindex: '0' });
   const showBtn = h('button', { type: 'button', class: 'plan-show-panel btn-small', onclick: () => { prefs.collapsed = false; applyPrefs(); savePrefs(); } }, '▸ Tools');
+  revealPanel = () => {
+    if (prefs.collapsed) { prefs.collapsed = false; applyPrefs(); savePrefs(); }
+    const first = sideEl.querySelector('select');
+    first?.closest('.field')?.scrollIntoView?.({ block: 'nearest' });
+  };
   const sideEl = h('div', { class: 'plan-side' });
   const mainEl = h('div', { class: 'plan-main' });
 
