@@ -1,0 +1,14 @@
+PropertyPad - All rights reserved.
+
+This source code, the app it builds and its documentation are copyrighted works.
+No licence is granted to copy, modify, fork, redistribute, sell, sublicense, host or
+build a product or service from them, in whole or in part, for any purpose, without
+the written permission of the owner.
+
+Looking at the code, and using the app as provided to you, is permitted. That does
+not give you any right to reuse it.
+
+Third-party libraries in the vendor/ folder (idb-keyval, jsPDF, pdf.js) are not part
+of this work and stay under their own licences.
+
+The software is provided "as is", without warranty of any kind.

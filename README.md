@@ -185,3 +185,7 @@ js/photos.js                              capture, compression, photo widget
 js/views/                                 one module per screen
 js/export/                                PDF, JSON backup/import, share/download
 ```
+
+## Licence
+
+All rights reserved – see [LICENSE](LICENSE). The code is public to look at, but it is not open source: copying, forking, selling or building a product from it needs written permission. Third-party libraries in `vendor/` keep their own licences.
