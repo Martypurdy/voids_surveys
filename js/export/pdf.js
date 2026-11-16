@@ -1,5 +1,6 @@
 // PDF report (jsPDF, loaded on demand from /vendor).
-import { addressLines, jobTitle, fmtDate, fmtDateTime, slug, todayLocal, allPhotoIds, worksSummary, roomStatus, roomAreas, serviceTitle, hasMeterDoor, isRtl, isPrice, isPlan, formOf } from '../model.js';
+import { addressLines, jobTitle, fmtDate, fmtDateTime, slug, todayLocal, allPhotoIds, worksSummary, roomStatus, roomAreas, serviceTitle, hasMeterDoor, isRtl, isPrice, isPlan, isRepair, formOf, textLines } from '../model.js';
+import { usedRows, usedMaterials, rowNumbers, materialSource, repairPhotos, rowPhotoNumbers } from '../repair.js';
 import { fileBase } from '../properties.js';
 import { ITEMS, roomFigures, floorArea, planArea, metres, sqm, openingGeometry, bounds, legend, cornerPoints, cabinetNumbers, cabinetText, frontEdge, cornerLabelPoint, blindGeometry, endPanels, panelLines, refreshPosts, refreshDepths, settingsLine, cabinetShapes, badgePoint, featureTags, describeFeature, serviceInfo } from '../plan.js';
 import { sheetTotals, lineTotals, isBlankLine, gbp, money, LABOUR_BASIS } from '../pricing.js';
@@ -48,13 +49,15 @@ const COND_RGB = {
   'Works complete': [30, 125, 58], 'Not complete': [200, 130, 0],
 };
 const BRAND = [31, 95, 139];
+const TEAL = [31, 78, 92]; // repair survey headings (as in the paper template)
+const TEAL_PALE = [227, 238, 241];
 
 /** Build the report. Returns a PDF Blob. */
 export async function buildPdf(job, { includeCode = false, onProgress = () => {} } = {}) {
   const { jsPDF } = await loadJsPDF();
   // SOR codes are printed only while an SOR library is loaded on this device.
   const showCodes = Boolean(await getLibrary());
-  const land = isPlan(job); // floor plans print landscape: key on the left, plan on the right
+  const land = isPlan(job) || isRepair(job); // floor plans and repair surveys print landscape
   const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: land ? 'landscape' : 'portrait', compress: true });
   const rtl = isRtl(job); // Ready to let form
 
@@ -362,8 +365,8 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
 
   // ---------- cover ----------
   onProgress('Building report…');
-  font(20, 'bold', BRAND);
-  doc.text(formOf(job).pdfTitle, M, y + 7);
+  font(20, 'bold', isRepair(job) ? TEAL : BRAND);
+  doc.text(isRepair(job) ? formOf(job).pdfTitle.toUpperCase() : formOf(job).pdfTitle, M, y + 7);
   font(9, 'bold', [120, 128, 136]);
   doc.text('PropertyPad', W - M, y + 6, { align: 'right' });
   y += 13;
@@ -371,6 +374,12 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
   // Materials & labour costing has its own, table-based report.
   if (isPrice(job)) {
     priceReport();
+    return finish();
+  }
+  // Property repair survey: your template's tables, small pictures in the schedule, large ones at the end.
+  if (isRepair(job)) {
+    await repairReport();
+    await photoPages();
     return finish();
   }
   // Designer floor plans: the plan drawn to scale and a room schedule.
@@ -635,6 +644,7 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
   }
 
   async function photoPages() {
+    if (isRepair(job)) return repairPhotoPages();
     const items = photoList();
     if (!items.length) return;
     const recs = new Map((await loadPhotos(items.map((it) => it.id))).map((r) => [r.id, r]));
@@ -662,6 +672,40 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
       doc.addImage(img.bytes, 'JPEG', M + (CW - w) / 2, top + 7, w, hgt, `photo-${it.id}`, 'NONE');
       y = top + slotH;
       slot++;
+    }
+  }
+
+  // Repair survey: the large photos, two to a page side by side (landscape), numbered as in the schedule.
+  async function repairPhotoPages() {
+    const list = repairPhotos(job.repair);
+    if (!list.length) return;
+    const recs = new Map((await loadPhotos(list.map((p) => p.id))).map((r) => [r.id, r]));
+    const shown = list.filter((p) => recs.has(p.id));
+    if (!shown.length) return;
+    doc.addPage();
+    y = M;
+    doc.setFillColor(...TEAL);
+    doc.rect(M, y, CW, 7, 'F');
+    font(10, 'bold', [255, 255, 255]);
+    doc.text('PHOTOS', M + 2.5, y + 4.9);
+    y += 10;
+    const gap = 8, colW = (CW - gap) / 2;
+    for (const [i, p] of shown.entries()) {
+      const col = i % 2;
+      if (i > 0 && col === 0) {
+        doc.addPage();
+        y = M;
+      }
+      const top = y;
+      const x0 = M + col * (colW + gap);
+      font(10.5, 'bold', TEAL);
+      doc.text(doc.splitTextToSize(clean(`Photo ${p.n}  -  ${p.caption}`), colW)[0], x0, top + 4.5);
+      const img = await pdfImage(recs.get(p.id));
+      const boxH = BOTTOM - top - 9;
+      const s = Math.min(colW / img.w, boxH / img.h);
+      const w = img.w * s, hgt = img.h * s;
+      doc.addImage(img.bytes, 'JPEG', x0 + (colW - w) / 2, top + 7, w, hgt, `photo-${p.id}`, 'NONE');
+      if (col === 1 || i === shown.length - 1) y = top;
     }
   }
 
@@ -1148,6 +1192,187 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
     if (p.notes) {
       heading('Notes');
       para(p.notes);
+    }
+  }
+
+  // ---------- Property repair survey (hoisted) ----------
+  // Matches the paper template: project details, purpose of visit, schedule of repairs (No., location, condition,
+  // causation, rectification, images), notes and sign-off. Small pictures sit in the schedule, numbered; the large
+  // ones follow on the Photos pages with the same numbers.
+  async function repairReport() {
+    const rep = job.repair;
+    const THUMB = 17; // mm
+    font(10, 'normal', [90, 98, 106]);
+    doc.text('Condition, causation & recommended rectification', M, y);
+    y += 5;
+
+    const band = (title) => {
+      ensure(24);
+      y += 2;
+      doc.setFillColor(...TEAL);
+      doc.rect(M, y, CW, 7, 'F');
+      font(10, 'bold', [255, 255, 255]);
+      doc.text(clean(title), M + 2.5, y + 4.9);
+      y += 7;
+    };
+    const pad = 1.6, size = 9, lh = lineH(size);
+    const line = () => { doc.setDrawColor(190, 200, 206); doc.setLineWidth(0.2); };
+    /** Rows of [label, value, label, value] (or [label, value] for a full-width row). */
+    const detailRows = (rows) => {
+      for (const r of rows) {
+        const full = r.length === 2;
+        const widths = full ? [38, CW - 38] : [38, (CW - 76) / 2, 38, (CW - 76) / 2];
+        const cells = r.map((c) => (c == null || c === '' ? '' : String(c)));
+        font(size, 'normal');
+        const wrapped = cells.map((c, i) => doc.splitTextToSize(clean(c), widths[i] - pad * 2));
+        const rowH = Math.max(7, Math.max(...wrapped.map((l) => l.length)) * lh + pad * 2);
+        ensure(rowH);
+        let x = M;
+        line();
+        wrapped.forEach((lines, i) => {
+          const isLabel = i % 2 === 0;
+          if (isLabel) {
+            doc.setFillColor(...TEAL_PALE);
+            doc.rect(x, y, widths[i], rowH, 'F');
+          }
+          doc.rect(x, y, widths[i], rowH);
+          font(size, isLabel ? 'bold' : 'normal', isLabel ? TEAL : [0, 0, 0]);
+          lines.forEach((l, k) => doc.text(l, x + pad, y + pad + lh * (k + 0.75)));
+          x += widths[i];
+        });
+        y += rowH;
+      }
+      y += 2;
+    };
+
+    // ----- project details -----
+    const type = rep.propertyType, occ = { void: 'Void', occupied: 'Occupied' }[rep.occupancy] || '';
+    const where = textLines(job.address).join(', ');
+    const cust = [rep.customer, addressLines(rep.customerAddress || {}).join(', ')].filter(Boolean).join(' - ');
+    band('PROJECT DETAILS');
+    detailRows([
+      ['Property address', where, 'Job / work order no.', rep.ref],
+      ['Postcode', job.address.postcode, 'Date of inspection', rep.date ? fmtDate(rep.date) : ''],
+      ['Property type', type, 'Surveyor', job.surveyor],
+      ['Occupancy (void / occupied)', occ, 'Tenant / contact', cust],
+      ['Weather conditions', rep.weather, 'Access arrangements', rep.access],
+    ]);
+    band('PURPOSE OF VISIT & BRIEF');
+    detailRows([
+      ['Reason for visit', { defect: 'Defect', upgrade: 'Upgrade' }[rep.reason] || ''],
+      ['Brief of the issue (as reported)', rep.brief],
+    ]);
+
+    // ----- schedule of repairs -----
+    const rows = usedRows(rep);
+    const nums = rowNumbers(rep);
+    band('SCHEDULE OF REPAIRS');
+    if (!rows.length) {
+      y += 2;
+      para('No repairs recorded.', { size: 10, rgb: [90, 98, 106] });
+    } else {
+      const cols = [['No.', 10], ['Location / element', 40], ['Current condition', 55], ['Suggested causation', 50], ['Recommended rectification', 55], ['Images', CW - 210]];
+      const perLine = Math.max(1, Math.floor((cols[5][1] - pad * 2 + 1.5) / (THUMB + 1.5)));
+      const head = () => {
+        font(size, 'bold', [255, 255, 255]);
+        const hh = 7;
+        ensure(hh + 10);
+        doc.setFillColor(...TEAL);
+        doc.rect(M, y, CW, hh, 'F');
+        let hx = M;
+        for (const [label, w] of cols) {
+          doc.text(doc.splitTextToSize(clean(label), w - pad * 2)[0], hx + pad, y + 4.8);
+          hx += w;
+        }
+        y += hh;
+      };
+      head();
+      for (const r of rows) {
+        const phs = rowPhotoNumbers(rep, r);
+        font(size, 'normal');
+        const texts = [r.location, r.condition, r.causation, r.fix].map((t, i) => doc.splitTextToSize(clean(t || ''), cols[i + 1][1] - pad * 2));
+        const thumbLines = Math.ceil(phs.length / perLine);
+        const thumbH = thumbLines * (THUMB + 4) + (thumbLines ? pad : 0);
+        const rowH = Math.max(9, Math.max(...texts.map((l) => l.length)) * lh + pad * 2, thumbH + pad);
+        if (y + rowH > BOTTOM) {
+          doc.addPage();
+          y = M;
+          head();
+        }
+        line();
+        let x = M;
+        cols.forEach(([, w]) => { doc.rect(x, y, w, rowH); x += w; });
+        font(size, 'bold', TEAL);
+        doc.text(String(nums.get(r.id)), M + pad, y + pad + lh * 0.75);
+        font(size, 'normal');
+        x = M + cols[0][1];
+        texts.forEach((lines, i) => {
+          lines.forEach((l, k) => doc.text(l, x + pad, y + pad + lh * (k + 0.75)));
+          x += cols[i + 1][1];
+        });
+        // small pictures, numbered like the large ones at the end
+        const recs = new Map((await loadPhotos(phs.map((p) => p.id))).map((rec) => [rec.id, rec]));
+        const ix = M + 210;
+        for (const [k, p] of phs.entries()) {
+          const rec = recs.get(p.id);
+          if (!rec) continue;
+          const img = await pdfImage(rec);
+          const s = Math.min(THUMB / img.w, THUMB / img.h);
+          const w = img.w * s, hgt = img.h * s;
+          const px = ix + pad + (k % perLine) * (THUMB + 1.5), py = y + pad + Math.floor(k / perLine) * (THUMB + 4);
+          doc.addImage(img.bytes, 'JPEG', px + (THUMB - w) / 2, py + (THUMB - hgt) / 2, w, hgt, `photo-${p.id}`, 'NONE');
+          font(6.5, 'normal', [90, 98, 106]);
+          doc.text(`Photo ${p.n}`, px + THUMB / 2, py + THUMB + 2.6, { align: 'center' });
+        }
+        y += rowH;
+      }
+      y += 3;
+    }
+
+    // ----- materials -----
+    const mats = usedMaterials(rep);
+    if (mats.length) {
+      band('MATERIALS REQUIRED');
+      const cols = [['Repair', 80], ['Material', CW - 80 - 40 - 40], ['Qty', 40], ['Unit', 40]];
+      let hx = M;
+      doc.setFillColor(...TEAL_PALE);
+      doc.rect(M, y, CW, 6.5, 'F');
+      font(size, 'bold', TEAL);
+      for (const [label, w] of cols) { doc.text(label, hx + pad, y + 4.5); hx += w; }
+      y += 6.5;
+      for (const m of mats) {
+        font(size, 'normal');
+        const cells = [materialSource(rep, m.rowId, nums) || 'Added by surveyor', m.item, m.qty, m.unit];
+        const wrapped = cells.map((c, i) => doc.splitTextToSize(clean(c || ''), cols[i][1] - pad * 2));
+        const rowH = Math.max(6.5, Math.max(...wrapped.map((l) => l.length)) * lh + pad * 2);
+        ensure(rowH);
+        line();
+        let x = M;
+        wrapped.forEach((lines, i) => {
+          doc.rect(x, y, cols[i][1], rowH);
+          lines.forEach((l, k) => doc.text(l, x + pad, y + pad + lh * (k + 0.75)));
+          x += cols[i][1];
+        });
+        y += rowH;
+      }
+      y += 3;
+    }
+
+    // ----- notes and sign-off -----
+    const sg = job.signature || {};
+    band('ADDITIONAL NOTES & SIGN-OFF');
+    detailRows([['Additional notes', rep.notes]]);
+    detailRows([['Surveyor name', sg.name || job.surveyor, 'Date', sg.date ? fmtDate(sg.date.slice(0, 10)) : '']]);
+    if (sg.image) {
+      ensure(30);
+      font(size, 'bold', TEAL);
+      doc.text('Signature', M, y + 4);
+      const p = doc.getImageProperties(sg.image);
+      const hgt = Math.min(22, (60 * p.height) / p.width);
+      doc.addImage(sg.image, 'PNG', M + 38, y, (hgt * p.width) / p.height, hgt);
+      y += hgt + 3;
+    } else {
+      detailRows([['Signature', 'Not signed']]);
     }
   }
 

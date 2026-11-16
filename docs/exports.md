@@ -8,8 +8,11 @@ the formats with the one that suits the document best first, and a one-line reas
 | Costing (Materials & labour) | Excel (live formulas) | PDF, Word |
 | Inspection report (Empty home, Ready to let) | PDF (photos, the record) | Word, Excel |
 | Floor plan (Designer) | PDF (drawn to scale) | Excel (schedules), Word |
+| Property repair survey | PDF (your template layout) | Word, Excel |
 
-A pack (zip) holds the PDF plus the best editable copy: Excel for costings and plans, Word for inspections.
+A pack (zip) holds the PDF plus the best editable copy: Excel for costings and plans, Word for inspections and repair surveys.
+
+The Word writer takes `band`, `grid` and thumbnail cells (`{ thumbs: [{ id, n }] }`), and the Excel writer takes `images` on a sheet, as used by the repair survey (`docs/repair.js`). A picture used twice (small, then large) is stored once.
 
 ## Where things are
 

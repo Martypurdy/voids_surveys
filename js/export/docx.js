@@ -3,17 +3,19 @@
 //   buildDocx(model, { loadImage })
 //
 // model = {
-//   title, subtitle, landscape,
+//   title, subtitle, landscape, accent (heading colour, hex without #, default 1F5F8B),
 //   meta: [[label, value], …],                      a small details table under the title
 //   sections: [{
 //     heading, level (1|2), pageBreak,
 //     paras: [text], bullets: [text], kv: [[label, value]],
-//     table: { cols: [{ title, w, align }], rows: [[cell…]], foot: [[cell…]] },
-//     photos: [{ id, caption }],                    loaded with loadImage(id) -> { bytes, w, h, type }
+//     band: 'TITLE',                                a coloured bar (accent) heading a block of tables
+//     grid: [[label, value, label, value] | [label, value]],   a details table with shaded labels
+//     table: { cols: [{ title, w, align }], rows: [[cell…]], foot: [[cell…]], headFill, headColor },
+//     photos: [{ id, caption }], photoMaxH,         loaded with loadImage(id) -> { bytes, w, h, type }
 //     images: [{ bytes, w, h, type, caption, widthCm }],
 //   }],
 // }
-// A table cell is a string, a number, or { t, link, bold }.
+// A table cell is a string, a number, or { t, link, bold } or { thumbs: [{ id, n }] } (small numbered pictures).
 import { zipFiles } from './zip.js';
 
 const esc = (s) => String(s ?? '')
@@ -44,6 +46,7 @@ const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 </w:styles>`;
 
 export async function buildDocx(model, { loadImage = async () => null } = {}) {
+  const accent = /^[0-9A-Fa-f]{6}$/.test(model.accent || '') ? model.accent.toUpperCase() : '1F5F8B';
   const landscape = Boolean(model.landscape);
   const pageW = landscape ? A4.h : A4.w;
   const pageH = landscape ? A4.w : A4.h;
@@ -60,12 +63,15 @@ export async function buildDocx(model, { loadImage = async () => null } = {}) {
     rels.push({ id, type: 'hyperlink', target: url, external: true });
     return id;
   };
+  const imageIds = new Map(); // the same picture used twice (small, then large) is stored once
   const addImage = (img) => {
+    if (imageIds.has(img.bytes)) return imageIds.get(img.bytes);
     const ext = /png/i.test(img.type || '') ? 'png' : 'jpeg';
     const name = `image${files.length + 1}.${ext}`;
     const id = `rId${nextId++}`;
     rels.push({ id, type: 'image', target: `media/${name}` });
     files.push({ name: `word/media/${name}`, data: img.bytes, ext });
+    imageIds.set(img.bytes, id);
     return id;
   };
 
@@ -101,12 +107,18 @@ export async function buildDocx(model, { loadImage = async () => null } = {}) {
     + '<w:tblCellMar><w:top w:w="40" w:type="dxa"/><w:left w:w="90" w:type="dxa"/><w:bottom w:w="40" w:type="dxa"/><w:right w:w="90" w:type="dxa"/></w:tblCellMar><w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/></w:tblPr>'
     + `<w:tblGrid>${widths.map((w) => `<w:gridCol w:w="${w}"/>`).join('')}</w:tblGrid>${rowsXml}</w:tbl>`;
 
-  const dataTable = ({ cols, rows, foot = [] }) => {
+  const dataTable = ({ cols, rows, foot = [], ...opts }) => {
     const totalW = cols.reduce((a, c) => a + (c.w || 1), 0);
     const widths = cols.map((c) => Math.floor((usable * (c.w || 1)) / totalW));
     const align = (c) => (c.align === 'right' ? 'right' : undefined);
+    const headFill = opts.headFill || 'E8EDF2';
+    const headColor = opts.headColor;
+    const cellXml = (c, i, head, isFoot) => {
+      if (c && c._imgs) return tc(widths[i], thumbParas(c._imgs, widths[i]));
+      return tc(widths[i], para(cellContent(c ?? '', { bold: head || isFoot, size: 19, color: head ? headColor : undefined }), { align: align(cols[i]) }), { fill: head ? headFill : isFoot ? 'F4F6F8' : undefined });
+    };
     const rowXml = (cells, { head = false, foot: isFoot = false } = {}) => `<w:tr><w:trPr><w:cantSplit/>${head ? '<w:tblHeader/>' : ''}</w:trPr>`
-      + cells.map((c, i) => tc(widths[i], para(cellContent(c ?? '', { bold: head || isFoot, size: 19 }), { align: align(cols[i]) }), { fill: head ? 'E8EDF2' : isFoot ? 'F4F6F8' : undefined })).join('')
+      + cells.map((c, i) => cellXml(c, i, head, isFoot)).join('')
       + '</w:tr>';
     return table(widths, rowXml(cols.map((c) => c.title), { head: true }) + rows.map((r) => rowXml(r)).join('') + foot.map((r) => rowXml(r, { foot: true })).join(''))
       + para('', { after: 60 });
@@ -115,6 +127,44 @@ export async function buildDocx(model, { loadImage = async () => null } = {}) {
     const widths = [Math.floor(usable * 0.3), usable - Math.floor(usable * 0.3)];
     return table(widths, rows.map(([k, v]) => `<w:tr><w:trPr><w:cantSplit/></w:trPr>${tc(widths[0], para(run(k, { bold: true, size: 19, color: '505860' })), { fill: 'F4F6F8' })}${tc(widths[1], para(cellContent(v ?? '', { size: 19 })))}</w:tr>`).join(''))
       + para('', { after: 60 });
+  };
+
+  /** A coloured bar with a title (like the headings of a paper form). */
+  const band = (title) => table([usable], `<w:tr><w:trPr><w:cantSplit/></w:trPr>${tc(usable, para(run(title, { bold: true, size: 20, color: 'FFFFFF' }), { keepNext: true, after: 0 }), { fill: accent })}</w:tr>`).replace('<w:tblStyle w:val="TableGrid"/>', '<w:tblStyle w:val="TableNormal"/>');
+  /** Details table: shaded labels, either label | value or label | value | label | value. */
+  const gridTable = (rows) => {
+    const four = rows.some((r) => r.length > 2);
+    const lw = Math.floor(usable * (four ? 0.17 : 0.2));
+    const vw = four ? Math.floor((usable - 2 * lw) / 2) : usable - lw;
+    const label = (t) => tc(lw, para(run(t, { bold: true, size: 19, color: accent })), { fill: 'E3EEF1' });
+    const value = (v, w) => tc(w, para(cellContent(v ?? '', { size: 19 })));
+    return table(four ? [lw, vw, lw, vw] : [lw, vw], rows.map((r) => {
+      if (four && r.length === 2) {
+        return `<w:tr><w:trPr><w:cantSplit/></w:trPr>${label(r[0])}<w:tc><w:tcPr><w:tcW w:w="${vw * 2 + lw}" w:type="dxa"/><w:gridSpan w:val="3"/></w:tcPr>${para(cellContent(r[1] ?? '', { size: 19 }))}</w:tc></w:tr>`;
+      }
+      return `<w:tr><w:trPr><w:cantSplit/></w:trPr>${r.map((c, i) => (i % 2 === 0 ? label(c) : value(c, vw))).join('')}</w:tr>`;
+    }).join('')) + para('', { after: 40 });
+  };
+  /** Small numbered pictures in a table cell (preloaded: [{ img, n }]). */
+  const thumbParas = (imgs, width) => {
+    const cm = (width / 1440) * 2.54 - 0.4;
+    const size = 1.7;
+    const perLine = Math.max(1, Math.floor(cm / (size + 0.45)));
+    let out = '';
+    for (let i = 0; i < imgs.length; i += perLine) {
+      out += para(imgs.slice(i, i + perLine).map(({ img, n }) => { const [cx, cy] = fit(img, size, size); return drawing(img, cx, cy) + run(` ${n}   `, { size: 14, color: '505860' }); }).join(''), { after: 40 });
+    }
+    return out || para('');
+  };
+  const preloadThumbs = async (t) => {
+    for (const row of [...t.rows, ...(t.foot || [])]) {
+      for (const c of row) {
+        if (c && typeof c === 'object' && c.thumbs) {
+          c._imgs = [];
+          for (const p of c.thumbs) { const img = await loadImage(p.id); if (img) c._imgs.push({ img, n: p.n }); }
+        }
+      }
+    }
   };
 
   // ----- pictures -----
@@ -134,7 +184,7 @@ export async function buildDocx(model, { loadImage = async () => null } = {}) {
     return [Math.round(img.w * s * EMU_CM), Math.round(img.h * s * EMU_CM)];
   };
   /** Photos two to a row, each with its caption. */
-  const photoTable = async (items) => {
+  const photoTable = async (items, maxH = 8.5) => {
     const loaded = [];
     for (const it of items) {
       const img = await loadImage(it.id);
@@ -149,7 +199,7 @@ export async function buildDocx(model, { loadImage = async () => null } = {}) {
       out += '<w:tr><w:trPr><w:cantSplit/></w:trPr>' + [0, 1].map((k) => {
         const p = pair[k];
         if (!p) return tc(half, para(''));
-        const [cx, cy] = fit(p.img, cellCm, 8.5);
+        const [cx, cy] = fit(p.img, cellCm, maxH);
         return tc(half, para(drawing(p.img, cx, cy), { after: 40 }) + (p.caption ? para(run(p.caption, { size: 17, color: '505860' }), { after: 60 }) : ''));
       }).join('') + '</w:tr>';
     }
@@ -167,14 +217,16 @@ export async function buildDocx(model, { loadImage = async () => null } = {}) {
     else if (s.pageBreak) body += para('', { pageBreak: true });
     for (const t of s.paras || []) body += para(run(t, { size: 20 }));
     for (const t of s.bullets || []) body += para(run(`•  ${t}`, { size: 20 }), { indent: 360, hanging: 240, after: 40 });
+    if (s.band) body += band(s.band);
+    if (s.grid?.length) body += gridTable(s.grid);
     if (s.kv?.length) body += kvTable(s.kv.filter(([, v]) => v !== '' && v != null));
-    if (s.table?.rows?.length) body += dataTable(s.table);
+    if (s.table?.rows?.length) { await preloadThumbs(s.table); body += dataTable(s.table); }
     for (const img of s.images || []) {
       const [cx, cy] = fit(img, img.widthCm || (usable / 1440) * 2.54, ((pageH - 2 * MARGIN) / 1440) * 2.54 - 2);
       body += para(drawing(img, cx, cy), { after: 60 });
       if (img.caption) body += para(run(img.caption, { size: 17, color: '505860' }));
     }
-    if (s.photos?.length) body += await photoTable(s.photos);
+    if (s.photos?.length) body += await photoTable(s.photos, s.photoMaxH);
   }
   body += `<w:sectPr><w:headerReference w:type="default" r:id="rId2"/><w:footerReference w:type="default" r:id="rId3"/>`
     + `<w:pgSz w:w="${pageW}" w:h="${pageH}"${landscape ? ' w:orient="landscape"' : ''}/>`
@@ -207,7 +259,7 @@ export async function buildDocx(model, { loadImage = async () => null } = {}) {
     { name: '_rels/.rels', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${R}/officeDocument" Target="word/document.xml"/></Relationships>` },
     { name: 'word/document.xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ${NS}><w:body>${body}</w:body></w:document>` },
     { name: 'word/_rels/document.xml.rels', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${docRels}</Relationships>` },
-    { name: 'word/styles.xml', data: STYLES },
+    { name: 'word/styles.xml', data: STYLES.replaceAll('1F5F8B', accent) },
     { name: 'word/header1.xml', data: header },
     { name: 'word/footer1.xml', data: footer },
     ...files.map((f) => ({ name: f.name, data: f.data })),

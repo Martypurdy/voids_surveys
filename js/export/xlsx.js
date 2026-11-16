@@ -1,6 +1,7 @@
 // Minimal .xlsx writer (Excel / Google Sheets / LibreOffice). No library: an .xlsx is zipped XML.
 //
-//   buildXlsx({ sheets: [{ name, cols: [{ w }], rows: [[cell, …]], freeze, landscape, merges, validations, autoFilter }] })
+//   buildXlsx({ sheets: [{ name, cols: [{ w }], rows: [[cell, …]], freeze, landscape, merges, validations, autoFilter, images }] })
+//   images: [{ row, col, dx, dy, wPx, hPx, bytes, type }]  pictures placed from a cell (dx, dy: pixel offsets inside it)
 //
 // A cell is a string, a number, a boolean, null, or { v, f, s, link }:
 //   v     the value (for a formula, the cached result shown before Excel recalculates)
@@ -30,13 +31,14 @@ const FONTS = [
   '<font><b/><sz val="15"/><color rgb="FF1F5F8B"/><name val="Calibri"/><family val="2"/></font>',
   '<font><i/><sz val="10"/><color rgb="FF5A6672"/><name val="Calibri"/><family val="2"/></font>',
 ];
-// fills: 0 none, 1 gray125 (required by Excel), 2 header blue, 3 total grey, 4 input yellow
+// fills: 0 none, 1 gray125 (required by Excel), 2 header blue, 3 total grey, 4 input yellow, 5 header teal
 const FILLS = [
   '<fill><patternFill patternType="none"/></fill>',
   '<fill><patternFill patternType="gray125"/></fill>',
   '<fill><patternFill patternType="solid"><fgColor rgb="FF1F5F8B"/><bgColor indexed="64"/></patternFill></fill>',
   '<fill><patternFill patternType="solid"><fgColor rgb="FFE8EDF2"/><bgColor indexed="64"/></patternFill></fill>',
   '<fill><patternFill patternType="solid"><fgColor rgb="FFFFF6D6"/><bgColor indexed="64"/></patternFill></fill>',
+  '<fill><patternFill patternType="solid"><fgColor rgb="FF1F4E5C"/><bgColor indexed="64"/></patternFill></fill>',
 ];
 const BORDERS = [
   '<border><left/><right/><top/><bottom/><diagonal/></border>',
@@ -48,6 +50,7 @@ export const STYLE = {
   note: { font: 5, wrap: 1 },
   bold: { font: 1 },
   head: { font: 2, fill: 2, border: 1, wrap: 1, v: 'center' },
+  headTeal: { font: 2, fill: 5, border: 1, wrap: 1, v: 'center' },
   cell: { border: 1, wrap: 1, v: 'top' },
   num: { border: 1, v: 'top' },
   money: { border: 1, fmt: MONEY, v: 'top' },
@@ -134,6 +137,7 @@ function sheetXml(sheet, styles) {
     ? `<dataValidations count="${sheet.validations.length}">${sheet.validations.map((d) => `<dataValidation type="list" allowBlank="1" showInputMessage="1" showErrorMessage="1" sqref="${d.ref}"><formula1>"${esc(d.list)}"</formula1></dataValidation>`).join('')}</dataValidations>`
     : '';
   const hl = links.length ? `<hyperlinks>${links.map((l, i) => `<hyperlink ref="${l.ref}" r:id="rId${i + 1}"/>`).join('')}</hyperlinks>` : '';
+  const drawing = sheet.images?.length ? `<drawing r:id="rId${links.length + 1}"/>` : '';
   const xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
     + '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
     + '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>'
@@ -146,6 +150,7 @@ function sheetXml(sheet, styles) {
     + merges + vals + hl
     + '<pageMargins left="0.5" right="0.5" top="0.6" bottom="0.6" header="0.3" footer="0.3"/>'
     + `<pageSetup paperSize="9" orientation="${sheet.landscape === false ? 'portrait' : 'landscape'}" fitToWidth="1" fitToHeight="0"/>`
+    + drawing
     + '</worksheet>';
   return { xml, links };
 }
@@ -165,6 +170,8 @@ export async function buildXlsx({ sheets }) {
   const used = new Set();
   const names = sheets.map((s) => safeName(s.name, used));
   const parts = sheets.map((s) => sheetXml(s, styles));
+  let mediaN = 0;
+  const mediaByKey = new Map(); // a picture used twice (small and large) is stored once
 
   const files = [];
   const W = 'http://schemas.openxmlformats.org/officeDocument/2006';
@@ -176,7 +183,9 @@ export async function buildXlsx({ sheets }) {
       + '<Default Extension="xml" ContentType="application/xml"/>'
       + '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
       + '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+      + '<Default Extension="jpeg" ContentType="image/jpeg"/><Default Extension="png" ContentType="image/png"/>'
       + sheets.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')
+      + sheets.map((s, i) => (s.images?.length ? `<Override PartName="/xl/drawings/drawing${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>` : '')).join('')
       + '</Types>',
   });
   files.push({
@@ -201,13 +210,44 @@ export async function buildXlsx({ sheets }) {
   });
   parts.forEach((p, i) => {
     files.push({ name: `xl/worksheets/sheet${i + 1}.xml`, data: p.xml });
-    if (p.links.length) {
+    const imgs = sheets[i].images || [];
+    if (p.links.length || imgs.length) {
       files.push({
         name: `xl/worksheets/_rels/sheet${i + 1}.xml.rels`,
         data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
           + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
           + p.links.map((l, k) => `<Relationship Id="rId${k + 1}" Type="${W}/relationships/hyperlink" Target="${esc(l.url)}" TargetMode="External"/>`).join('')
+          + (imgs.length ? `<Relationship Id="rId${p.links.length + 1}" Type="${W}/relationships/drawing" Target="../drawings/drawing${i + 1}.xml"/>` : '')
           + '</Relationships>',
+      });
+    }
+    if (imgs.length) {
+      const rels = [];
+      const anchors = imgs.map((im, k) => {
+        const ext = /png/i.test(im.type || '') ? 'png' : 'jpeg';
+        let name = im.key != null ? mediaByKey.get(`${im.key}.${ext}`) : null;
+        if (!name) {
+          name = `image${++mediaN}.${ext}`;
+          if (im.key != null) mediaByKey.set(`${im.key}.${ext}`, name);
+          files.push({ name: `xl/media/${name}`, data: im.bytes });
+        }
+        rels.push(`<Relationship Id="rId${k + 1}" Type="${W}/relationships/image" Target="../media/${name}"/>`);
+        const E = 9525; // EMU per pixel
+        return `<xdr:oneCellAnchor><xdr:from><xdr:col>${im.col}</xdr:col><xdr:colOff>${Math.round((im.dx || 0) * E)}</xdr:colOff><xdr:row>${im.row}</xdr:row><xdr:rowOff>${Math.round((im.dy || 0) * E)}</xdr:rowOff></xdr:from>`
+          + `<xdr:ext cx="${Math.round(im.wPx * E)}" cy="${Math.round(im.hPx * E)}"/>`
+          + `<xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${k + 2}" name="Picture ${k + 1}"${im.descr ? ` descr="${esc(im.descr)}"` : ''}/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr>`
+          + `<xdr:blipFill><a:blip xmlns:r="${W}/relationships" r:embed="rId${k + 1}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>`
+          + `<xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${Math.round(im.wPx * E)}" cy="${Math.round(im.hPx * E)}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>`;
+      });
+      files.push({
+        name: `xl/drawings/drawing${i + 1}.xml`,
+        data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+          + '<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">'
+          + anchors.join('') + '</xdr:wsDr>',
+      });
+      files.push({
+        name: `xl/drawings/_rels/drawing${i + 1}.xml.rels`,
+        data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + rels.join('') + '</Relationships>',
       });
     }
   });

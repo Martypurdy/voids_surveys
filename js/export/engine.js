@@ -4,7 +4,7 @@
 //
 // To add a document type (repair survey, quote, invoice, RAMS…): write docs/<name>.js with a model builder (for
 // Word) and a workbook builder (for Excel), then add it to modelFor / workbookFor and formatChoices below.
-import { isPrice, isPlan, isInspection, todayLocal } from '../model.js';
+import { isPrice, isPlan, isInspection, isRepair, todayLocal } from '../model.js';
 import { fileBase } from '../properties.js';
 import { buildXlsx } from './xlsx.js';
 import { buildDocx } from './docx.js';
@@ -26,6 +26,13 @@ export function formatChoices(job) {
       ['docx', 'To edit the wording or add your own letter around it.'],
     ]);
   }
+  if (isRepair(job)) {
+    return pick([
+      ['pdf', 'The survey laid out like your template, with small pictures in the schedule and large photos at the end – to send and keep.'],
+      ['docx', 'An editable copy in the same layout, with the same small and large pictures.'],
+      ['xlsx', 'The schedule, materials and photos as sheets you can sort, filter and add to.'],
+    ]);
+  }
   if (isPlan(job)) {
     return pick([
       ['pdf', 'The plan drawn to scale with its key – ready to print or send.'],
@@ -41,7 +48,7 @@ export function formatChoices(job) {
 }
 
 /** The editable format that suits a document best (added to its pack next to the PDF). */
-export const bestEditable = (job) => (isInspection(job) ? 'docx' : 'xlsx');
+export const bestEditable = (job) => (isInspection(job) || isRepair(job) ? 'docx' : 'xlsx');
 
 export const exportFilename = (job, format) => `${fileBase(job)} - ${todayLocal()}.${FORMATS[format].ext}`;
 
@@ -82,7 +89,8 @@ async function pdfPagesAsImages(blob, scale = 1.6) {
 }
 
 /** The workbook description for a document (Excel). */
-export async function workbookFor(job, { includeCode = false } = {}) {
+export async function workbookFor(job, { includeCode = false, onProgress = () => {} } = {}) {
+  if (isRepair(job)) return (await import('./docs/repair.js')).repairWorkbook(job, { loadImage: photoLoader(onProgress) });
   if (isPrice(job)) return (await import('./docs/costing.js')).costingWorkbook(job);
   if (isPlan(job)) return (await import('./docs/plan.js')).planWorkbook(job);
   const m = await import('./docs/inspection.js');
@@ -91,6 +99,7 @@ export async function workbookFor(job, { includeCode = false } = {}) {
 
 /** The document description for a document (Word). */
 export async function modelFor(job, { includeCode = false, onProgress = () => {} } = {}) {
+  if (isRepair(job)) return (await import('./docs/repair.js')).repairModel(job);
   if (isPrice(job)) return (await import('./docs/costing.js')).costingModel(job);
   if (isPlan(job)) {
     const { buildPdf } = await import('./pdf.js');
@@ -110,7 +119,7 @@ export async function exportDocument(job, format, { includeCode = false, onProgr
     blob = await buildPdf(job, { includeCode, onProgress });
   } else if (format === 'xlsx') {
     onProgress('Building the spreadsheet…');
-    blob = await buildXlsx(await workbookFor(job, { includeCode }));
+    blob = await buildXlsx(await workbookFor(job, { includeCode, onProgress }));
   } else if (format === 'docx') {
     onProgress('Building the document…');
     blob = await buildDocx(await modelFor(job, { includeCode, onProgress }), { loadImage: photoLoader(onProgress) });

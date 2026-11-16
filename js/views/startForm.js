@@ -35,7 +35,12 @@ export const GROUPS = [
     ],
   },
   { key: 'repair', emoji: '🛠️', title: 'Repair job sheet', text: 'Job details, materials used, photos and completion.' },
-  { key: 'inspect', emoji: '📋', title: 'Property inspection', text: 'Tenancy, estate and compliance inspections.' },
+  {
+    key: 'inspect', emoji: '📋', title: 'Property inspection', text: 'Repair surveys, and tenancy, estate and compliance inspections.',
+    forms: [
+      { form: 'repair', emoji: '🛠️', title: 'Property repair survey', text: 'Condition, causation and recommended repairs, with photos and a materials list.' },
+    ],
+  },
 ];
 
 /** Card contents: emoji, title (+ Coming soon), description, and + or ›. */

@@ -1,7 +1,7 @@
 // Sign off (both forms): Ready to let asks about appliances to be maintained (Yes pops
 // up the appliance list, then photos and notes). Both forms end with a signature.
 import { scheduleSave } from '../db.js';
-import { APPLIANCES, fmtDateTime, nowISO, isRtl } from '../model.js';
+import { APPLIANCES, fmtDateTime, nowISO, isRtl, isRepair } from '../model.js';
 import { h, multiSelect, worksButton, textField, yesNo, confirmDialog } from '../ui.js';
 import { captureSignature } from '../signature.js';
 import { photoField } from '../photos.js';
@@ -91,6 +91,11 @@ export default async function signoff(root, { id }) {
           question),
         listSlot,
         more,
+      ] : isRepair(job) ? [
+        h('h2', null, 'Additional notes'),
+        h('div', { class: 'card card-body' },
+          textField('Additional notes', job.repair.notes, (v) => { job.repair.notes = v; save(); }, { multiline: true, autocapitalize: 'sentences', placeholder: 'Anything else to record' })),
+        h('p', { class: 'hint' }, 'Sign to confirm the survey is complete and accurate. The signature appears at the end of the report.'),
       ] : h('p', { class: 'hint' }, 'Sign to confirm the survey is complete and accurate. The signature appears at the end of the PDF report.'),
       h('h2', null, 'Signature'),
       h('div', { class: 'card card-body' },

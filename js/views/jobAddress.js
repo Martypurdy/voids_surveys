@@ -1,6 +1,6 @@
 // Screen: address – postcode lookup, address, GPS, navigate, surveyor.
 import { scheduleSave } from '../db.js';
-import { jobTitle, fmtDateTime, isPrice, isPlan } from '../model.js';
+import { jobTitle, fmtDateTime, isPrice, isPlan, isRepair } from '../model.js';
 import { h, textField, toast, confirmDialog } from '../ui.js';
 import { lookupPostcode, lookupStreet, formatPostcode, getPosition, directionsUrl, pinUrl, demoAddress, isDemoPostcode } from '../geo.js';
 import { surveyorField } from '../surveyors.js';
@@ -146,13 +146,13 @@ export default async function jobAddress(root, { id }) {
 
   // Materials & labour costing: customer (with their own address – they may not live at
   // the project address) and job reference at the top.
-  const refBox = isPrice(job) ? customerBox(job, save, updateDerived) : null;
+  const refBox = isPrice(job) || isRepair(job) ? customerBox(job, save, updateDerived) : null;
 
   root.append(
     ...jobChrome(job, 'address'),
     h('div', { class: 'content' },
-      refBox ? [h('h2', null, 'Customer / job reference'), refBox] : null,
-      h('h2', null, isPrice(job) ? 'Project address' : 'Address'),
+      refBox ? [h('h2', null, isRepair(job) ? 'Tenant / contact and job number' : 'Customer / job reference'), refBox] : null,
+      h('h2', null, isPrice(job) ? 'Project address' : isRepair(job) ? 'Property address' : 'Address'),
       h('div', { class: 'input-row' }, postcodeField, lookupBtn),
       h('p', { class: 'hint' }, 'Look up finds the street and town for the postcode. Check it and add the house number – you can edit the address freely.'),
       addressField,
@@ -179,11 +179,13 @@ async function addressForPostcode(postcode) {
 
 /** Costing: customer name, the customer's own address (postcode look-up) and job reference. */
 function customerBox(job, save, onChange) {
-  const p = job.pricing;
+  const rep = isRepair(job);
+  const p = rep ? job.repair : job.pricing;
   const ca = p.customerAddress;
-  const pcField = textField('Customer postcode', ca.postcode, (v) => { ca.postcode = v; save(); }, { autocapitalize: 'characters', enterkeyhint: 'search', placeholder: 'e.g. LS1 1UR' });
+  const who = rep ? 'Tenant / contact' : 'Customer';
+  const pcField = textField(`${who} postcode`, ca.postcode, (v) => { ca.postcode = v; save(); }, { autocapitalize: 'characters', enterkeyhint: 'search', placeholder: 'e.g. LS1 1UR' });
   const pcInput = pcField.querySelector('input');
-  const addrField = textField('Customer address', ca.text, (v) => { ca.text = v; save(); }, { multiline: true, autocapitalize: 'words', placeholder: 'House number and street\nTown\nPostcode' });
+  const addrField = textField(`${who} address`, ca.text, (v) => { ca.text = v; save(); }, { multiline: true, autocapitalize: 'words', placeholder: 'House number and street\nTown\nPostcode' });
   const addrBox = addrField.querySelector('textarea');
   addrBox.rows = 4;
   const setAddress = (postcode, text) => {
@@ -197,13 +199,13 @@ function customerBox(job, save, onChange) {
     type: 'button',
     class: 'btn-primary',
     onclick: async () => {
-      if (!ca.postcode.trim()) return toast('Type the customer’s postcode first');
+      if (!ca.postcode.trim()) return toast(`Type the ${who.toLowerCase()}’s postcode first`);
       lookBtn.disabled = true;
       lookBtn.textContent = 'Looking up…';
       try {
         const found = await addressForPostcode(ca.postcode);
         const current = ca.text.trim();
-        if (current && current !== found.text && !(await confirmDialog(`Replace the customer address with “${found.text.split('\n').filter(Boolean).join(', ')}”?`, { title: 'Replace address?', ok: 'Replace', danger: false }))) return;
+        if (current && current !== found.text && !(await confirmDialog(`Replace the ${who.toLowerCase()} address with “${found.text.split('\n').filter(Boolean).join(', ')}”?`, { title: 'Replace address?', ok: 'Replace', danger: false }))) return;
         setAddress(found.postcode, found.text);
         addrBox.focus();
         addrBox.setSelectionRange(0, 0);
@@ -226,16 +228,16 @@ function customerBox(job, save, onChange) {
     class: 'btn-small',
     onclick: async () => {
       const a = job.address;
-      if (!a.text.trim() && !a.postcode.trim()) return toast('Fill in the project address below first');
-      if (ca.text.trim() && ca.text.trim() !== a.text.trim() && !(await confirmDialog('Replace the customer address with the project address?', { title: 'Replace address?', ok: 'Replace', danger: false }))) return;
+      if (!a.text.trim() && !a.postcode.trim()) return toast(rep ? 'Fill in the property address below first' : 'Fill in the project address below first');
+      if (ca.text.trim() && ca.text.trim() !== a.text.trim() && !(await confirmDialog(`Replace the ${who.toLowerCase()} address with the ${rep ? 'property' : 'project'} address?`, { title: 'Replace address?', ok: 'Replace', danger: false }))) return;
       setAddress(a.postcode, a.text);
-      toast('Customer address set to the project address');
+      toast(`${who} address set to the ${rep ? 'property' : 'project'} address`);
     },
-  }, 'Same as project address');
+  }, rep ? 'Same as property address' : 'Same as project address');
   return h('div', { class: 'card card-body ref-box' },
-    textField('Customer', p.customer, (v) => { p.customer = v; save(); onChange(); }, { autocapitalize: 'words', placeholder: 'Customer or client name' }),
+    textField(who, p.customer, (v) => { p.customer = v; save(); onChange(); }, { autocapitalize: 'words', placeholder: rep ? 'Name and phone number' : 'Customer or client name' }),
     h('div', { class: 'input-row' }, pcField, lookBtn),
     addrField,
     h('div', { class: 'btn-row' }, sameBtn),
-    textField('Job reference', p.ref, (v) => { p.ref = v; save(); onChange(); }, { autocapitalize: 'characters', placeholder: 'e.g. Job number or order ref' }));
+    textField(rep ? 'Job / work order no.' : 'Job reference', p.ref, (v) => { p.ref = v; save(); onChange(); }, { autocapitalize: 'characters', placeholder: 'e.g. Job number or order ref' }));
 }

@@ -49,6 +49,7 @@ export const FORMS = {
   rtl: { title: 'Ready to let', pdfTitle: 'Ready to Let Inspection', file: 'Ready to let' },
   price: { title: 'Materials & labour', pdfTitle: 'Materials & Labour Costing', file: 'Materials and labour' },
   plan: { title: 'Floor plan', pdfTitle: 'Floor Plan', file: 'Floor plan' },
+  repair: { title: 'Property repair survey', pdfTitle: 'Property Repair Survey', file: 'Repair survey', emoji: '🛠️' },
 };
 // 'plan' = Designer floor plan (kitchen, bathroom or whole property – job.plan.kind).
 const PLAN_SECTIONS = [
@@ -78,12 +79,34 @@ export const newDelivery = () => ({ id: uid(), supplier: '', cost: '', leadTime:
 export const newMaterialLine = () => ({ id: uid(), item: '', supplier: '', code: '', qty: '', unit: '', price: '', markup: '', markupType: '%', url: '' });
 /** basis: 'item' | 'hour' | 'day'. */
 export const newLabourLine = () => ({ id: uid(), item: '', basis: 'hour', qty: '', rate: '', markup: '', markupType: '%' });
+// 'repair' = Property repair survey (Property inspection on the home screen): project details, the reason for the
+// visit, a schedule of repairs (location, condition, causation, rectification, photos) and a materials list.
+const REPAIR_SECTIONS = [
+  ['address', 'Address', ''],
+  ['visit', 'Visit', 'visit'],
+  ['repairs', 'Repairs', 'repairs'],
+  ['repmat', 'Materials', 'repair-materials'],
+  ['signoff', 'Sign off', 'signoff'],
+];
+export const isRepair = (job) => job.form === 'repair';
+export const REPAIR_REASONS = [['defect', 'Defect'], ['upgrade', 'Upgrade']];
+export const OCCUPANCY = [['void', 'Void'], ['occupied', 'Occupied']];
+/** A line of the schedule of repairs. photos: photo ids. */
+export const newRepairRow = () => ({ id: uid(), location: '', condition: '', causation: '', fix: '', photos: [] });
+/** A material needed for the repairs; rowId is the schedule row it came from ('' = added by hand). */
+export const newRepairMaterial = (rowId = '') => ({ id: uid(), rowId, item: '', qty: '', unit: '' });
+/** Repair survey. customer: the tenant / contact, with their own address (they may not live at the property). */
+export const newRepair = () => ({
+  ref: '', customer: '', customerAddress: { postcode: '', text: '' },
+  date: todayLocal(), propertyType: '', occupancy: '', weather: '', access: '',
+  reason: '', brief: '', rows: [newRepairRow()], materials: [], notes: '',
+});
 const RTL_SECTIONS = SECTIONS.filter(([k]) => k !== 'materials');
 /** Sign off signature (both forms). image: PNG data URL; date: ISO time signed. */
 export const newSignature = () => ({ name: '', image: '', date: '' });
 export const isRtl = (job) => job.form === 'rtl';
 /** The tabs for this job's form. */
-export const sectionsOf = (job) => (isRtl(job) ? RTL_SECTIONS : isPrice(job) ? PRICE_SECTIONS : isPlan(job) ? PLAN_SECTIONS : SECTIONS);
+export const sectionsOf = (job) => (isRtl(job) ? RTL_SECTIONS : isPrice(job) ? PRICE_SECTIONS : isPlan(job) ? PLAN_SECTIONS : isRepair(job) ? REPAIR_SECTIONS : SECTIONS);
 export const formOf = (job) => (isPlan(job) ? { ...FORMS.plan, ...PLAN_KINDS[job.plan?.kind || 'property'] } : FORMS[job.form] || FORMS.void);
 
 /** Ready to let: key types to record (fobs count as communal key / fob). */
@@ -205,6 +228,14 @@ export function upgradeJob(job) {
     // Plans finished before the Room dimensions tab existed stay complete.
     if (job.progress?.plan === 'complete' && !job.progress.dimensions) job.progress.dimensions = 'complete';
   }
+  if (isRepair(job)) {
+    const d = newRepair();
+    job.repair = { ...d, ...(job.repair || {}) };
+    job.repair.customerAddress = { postcode: '', text: '', ...(job.repair.customerAddress || {}) };
+    for (const k of ['rows', 'materials']) if (!Array.isArray(job.repair[k])) job.repair[k] = [];
+    job.repair.rows.forEach((r) => { if (!Array.isArray(r.photos)) r.photos = []; });
+    if (!job.repair.rows.length) job.repair.rows.push(newRepairRow());
+  }
   if (isPrice(job)) {
     job.pricing = { ...newPricing(), ...(job.pricing || {}) };
     for (const k of ['materials', 'labour', 'deliveries']) if (!Array.isArray(job.pricing[k])) job.pricing[k] = [];
@@ -237,6 +268,7 @@ export function newJob({ surveyor = '', form = 'void', planKind = 'property' } =
     ...(form === 'rtl' ? { rtl: newRtl() } : {}),
     ...(form === 'price' ? { pricing: newPricing() } : {}),
     ...(form === 'plan' ? { plan: newPlan(planKind) } : {}),
+    ...(form === 'repair' ? { repair: newRepair() } : {}),
     signature: newSignature(),
     id: uid(),
     created: t,
@@ -371,6 +403,7 @@ export function photoLists(job) {
     job.legionella?.photos || [],
     job.rtl?.voucher?.photos || [],
     job.rtl?.appliances?.photos || [],
+    ...(job.repair?.rows || []).map((r) => r.photos),
   ];
 }
 
@@ -419,6 +452,7 @@ export function jobTitle(job) {
   const title = [first, pc && !squash(first).includes(squash(pc)) ? pc : ''].filter(Boolean).join(', ');
   if (title) return title;
   if (isPrice(job)) return [job.pricing?.ref, job.pricing?.customer].filter((s) => s?.trim()).join(' – ') || 'New costing';
+  if (isRepair(job)) return 'New repair survey';
   if (isPlan(job)) return `New ${(PLAN_KINDS[job.plan?.kind] || PLAN_KINDS.property).title.toLowerCase()}`;
   return 'New survey';
 }

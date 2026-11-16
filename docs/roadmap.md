@@ -40,11 +40,14 @@ Before each phase, show a short plan and wait for an OK.
   and product links stay clickable.
 
 ## Phase 3 – Repair survey
-- Landscape, spreadsheet-style layout.
-- Property details and client details, both with postcode lookup (api.postcodes.io).
-- Reason for visit (defect or upgrade).
-- Open sheet of rows: Defect/Upgrade | Causation | Recommended fix | Photos.
-- Each row can drop across into a Materials section; materials build a running list.
+- [x] Lives under **Property inspection** on the home screen (the form is called Property repair survey). Tabs: Address, Visit, Repairs, Materials, Sign off. Built from the paper template the user supplied (project details, purpose of visit, schedule of repairs, additional notes and sign-off).
+- [x] Landscape, spreadsheet-style layout: the Repairs tab is a table on tablets and desktops and a stack of cards on a phone; PDF and Word print landscape.
+- [x] Property details and tenant / contact details, both with postcode look-up (api.postcodes.io). Plus job / work order no., date, surveyor, property type, occupancy, weather and access arrangements.
+- [x] Reason for visit (defect or upgrade) and the brief of the issue as reported.
+- [x] Open sheet of rows: Location / element | Current condition | Suggested causation | Recommended rectification | Images. Rows are numbered; there is always an empty row at the bottom.
+- [x] Each row can drop across into a Materials section ("→ Materials"); materials build a running list that says which repair each line came from.
+- [x] Small numbered thumbnails in the schedule, with large, numbered photos at the end of the PDF, Word and Excel exports. Follow-up box left out (not wanted).
+- [x] Exports through the Phase 2 engine: PDF, Word, Excel (Excel and Word writers now place pictures); packs hold the PDF plus the Word copy.
 
 ## Phase 4 – Materials & costing
 - Paste a supplier URL to auto-fill description and price.
