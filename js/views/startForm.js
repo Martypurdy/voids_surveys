@@ -34,7 +34,8 @@ export const GROUPS = [
       { form: 'plan:property', emoji: '🏠', title: 'Whole property plan', text: 'Every room and floor with measurements, doors, windows, fuse board and water main.' },
     ],
   },
-  { key: 'repair', emoji: '🛠️', title: 'Repair job sheet', text: 'Job details, materials used, photos and completion.' },
+  { key: 'safety', emoji: '🦺', title: 'Health and safety', text: 'Risk assessments, method statements (RAMS) and CDM paperwork.' },
+  { key: 'calcs', emoji: '🔢', title: 'Calculators', text: 'Concrete, bricks, flooring, tiles, paint, screws and more – with a materials list.' },
   {
     key: 'inspect', emoji: '📋', title: 'Property inspection', text: 'Repair surveys, and tenancy, estate and compliance inspections.',
     forms: [

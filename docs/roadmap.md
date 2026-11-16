@@ -60,6 +60,7 @@ Before each phase, show a short plan and wait for an OK.
 - Materials + labour costs total automatically.
 
 ## Phase 5 – RAMS & CDM
+- [x] "Health and safety" button on the home screen (shows "Coming soon" until this phase is built).
 - Risk assessment and method statement (RAMS), pre-filled from the repair survey
   (address, job description).
 - Common hazards pick list (working at height, dust, asbestos, etc.).
@@ -91,7 +92,7 @@ Before each phase, show a short plan and wait for an OK.
   totals by HMRC category, profit summary, and all receipt images.
 
 ## Phase 9 – Calculators
-- "Calculators" button on the home screen: a separate feature set.
+- [x] "Calculators" button on the home screen (shows "Coming soon" until this phase is built): a separate feature set.
 - Each calculation can carry client and project location details (same postcode
   lookup as elsewhere), linked to a property/entry folder.
 - Every calculator has a wastage option (% or extra quantity) and an
