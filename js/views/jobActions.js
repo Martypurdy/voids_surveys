@@ -36,7 +36,7 @@ export async function jobActions(job) {
       { label: '🗜 Pack (zip: entry, photos and PDF)', value: 'pack', class: 'btn-primary' },
       { label: '✎ Rename (nature of the file)', value: 'rename' },
       { label: '📁 Move to another property', value: 'move' },
-      { label: isPrice(job) ? 'Delete costing' : isInspection(job) || job.form === 'repair' ? 'Delete survey' : job.form === 'rams' ? 'Delete RAMS pack' : 'Delete plan', value: 'delete', class: 'btn-danger' },
+      { label: isPrice(job) ? 'Delete costing' : isInspection(job) || job.form === 'repair' ? 'Delete survey' : job.form === 'rams' ? 'Delete RAMS pack' : job.form === 'calc' ? 'Delete calculation' : 'Delete plan', value: 'delete', class: 'btn-danger' },
       { label: 'Cancel', value: null },
     ].filter(Boolean),
   });

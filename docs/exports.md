@@ -10,6 +10,7 @@ the formats with the one that suits the document best first, and a one-line reas
 | Floor plan (Designer) | PDF (drawn to scale) | Excel (schedules), Word |
 | Property repair survey | PDF (your template layout) | Word, Excel |
 | RAMS pack | PDF (print, sign and send) | Word, Excel |
+| Calculation | PDF | Excel (results and materials), Word |
 
 A pack (zip) holds the PDF plus the best editable copy: Excel for costings and plans, Word for inspections, repair surveys and RAMS packs.
 

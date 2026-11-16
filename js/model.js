@@ -6,6 +6,7 @@ export const CONDITIONS = ['Good', 'Fair', 'Poor', 'N/A'];
 
 import { AREA_PRESETS, defaultFeatures } from './data/features.js';
 import { HAZARDS, CORE_HAZARD_KEYS } from './data/hazards.js';
+import { calcByKey, defaultsFor } from './calc/calculators.js';
 import { newPlan, PLAN_KINDS, upgradePlanItem, refreshDepths, DEFAULT_SETTINGS } from './plan.js';
 
 export const ROOM_PRESETS = AREA_PRESETS.rooms;
@@ -50,6 +51,7 @@ export const FORMS = {
   rtl: { title: 'Ready to let', pdfTitle: 'Ready to Let Inspection', file: 'Ready to let' },
   price: { title: 'Materials & labour', pdfTitle: 'Materials & Labour Costing', file: 'Materials and labour' },
   plan: { title: 'Floor plan', pdfTitle: 'Floor Plan', file: 'Floor plan' },
+  calc: { title: 'Calculation', pdfTitle: 'Calculation', file: 'Calculation' },
   rams: { title: 'RAMS pack', pdfTitle: 'RAMS & CDM Pack', file: 'RAMS pack', emoji: '🦺' },
   repair: { title: 'Property repair survey', pdfTitle: 'Property Repair Survey', file: 'Repair survey', emoji: '🛠️' },
 };
@@ -141,13 +143,29 @@ export const newRams = () => ({
   },
   risks: [], dynamics: [], methods: [], briefings: [], notes: '',
 });
+// 'calc' = a calculation from the Calculators button (concrete, bricks, tiles…): optional client and location,
+// the calculator itself, and a materials list. job.calc.kind says which calculator.
+const CALC_SECTIONS = [
+  ['address', 'Address', ''],
+  ['calculate', 'Calculate', 'calculate'],
+  ['calcmat', 'Materials', 'calc-materials'],
+];
+export const isCalc = (job) => job.form === 'calc';
+export const newCalcLine = () => ({ id: uid(), item: '', qty: '', unit: '' });
+/** A calculation: the inputs, assumptions and wastage (remembered from last time), the materials list and client details. */
+export const newCalc = (kind = 'concrete') => ({
+  kind: calcByKey(kind).key, ...defaultsFor(kind), materials: [],
+  ref: '', customer: '', customerAddress: { postcode: '', text: '' }, notes: '',
+});
 const RTL_SECTIONS = SECTIONS.filter(([k]) => k !== 'materials');
 /** Sign off signature (both forms). image: PNG data URL; date: ISO time signed. */
 export const newSignature = () => ({ name: '', image: '', date: '' });
 export const isRtl = (job) => job.form === 'rtl';
 /** The tabs for this job's form. */
-export const sectionsOf = (job) => (isRtl(job) ? RTL_SECTIONS : isPrice(job) ? PRICE_SECTIONS : isPlan(job) ? PLAN_SECTIONS : isRepair(job) ? REPAIR_SECTIONS : isRams(job) ? RAMS_SECTIONS : SECTIONS);
-export const formOf = (job) => (isPlan(job) ? { ...FORMS.plan, ...PLAN_KINDS[job.plan?.kind || 'property'] } : FORMS[job.form] || FORMS.void);
+export const sectionsOf = (job) => (isRtl(job) ? RTL_SECTIONS : isPrice(job) ? PRICE_SECTIONS : isPlan(job) ? PLAN_SECTIONS : isRepair(job) ? REPAIR_SECTIONS : isRams(job) ? RAMS_SECTIONS : isCalc(job) ? CALC_SECTIONS : SECTIONS);
+export const formOf = (job) => (isPlan(job) ? { ...FORMS.plan, ...PLAN_KINDS[job.plan?.kind || 'property'] }
+  : isCalc(job) ? { ...FORMS.calc, title: `${calcByKey(job.calc?.kind).title} calculation`, pdfTitle: `${calcByKey(job.calc?.kind).title} Calculation`, emoji: calcByKey(job.calc?.kind).emoji }
+  : FORMS[job.form] || FORMS.void);
 
 /** Ready to let: key types to record (fobs count as communal key / fob). */
 export const RTL_KEY_TYPES = ['Front door', 'Back door', 'Patio door', 'French doors', 'Window keys', 'Shed', 'Gate', 'Garage', 'Post box', 'Meter box', 'Communal key / fob'];
@@ -268,6 +286,16 @@ export function upgradeJob(job) {
     // Plans finished before the Room dimensions tab existed stay complete.
     if (job.progress?.plan === 'complete' && !job.progress.dimensions) job.progress.dimensions = 'complete';
   }
+  if (isCalc(job)) {
+    const d = newCalc(job.calc?.kind);
+    const defaults = defaultsFor(d.kind, { useMemory: false });
+    job.calc = { ...d, ...(job.calc || {}), kind: d.kind };
+    job.calc.inputs = { ...defaults.inputs, ...(job.calc.inputs || {}) };
+    job.calc.assumptions = { ...defaults.assumptions, ...(job.calc.assumptions || {}) };
+    job.calc.wastage = { ...defaults.wastage, ...(job.calc.wastage || {}) };
+    job.calc.customerAddress = { postcode: '', text: '', ...(job.calc.customerAddress || {}) };
+    if (!Array.isArray(job.calc.materials)) job.calc.materials = [];
+  }
   if (isRams(job)) {
     const d = newRams();
     job.rams = { ...d, ...(job.rams || {}) };
@@ -328,6 +356,7 @@ export function newJob({ surveyor = '', form = 'void', planKind = 'property' } =
     ...(form === 'plan' ? { plan: newPlan(planKind) } : {}),
     ...(form === 'repair' ? { repair: newRepair() } : {}),
     ...(form === 'rams' ? { rams: newRams() } : {}),
+    ...(form === 'calc' ? { calc: newCalc(planKind) } : {}),
     signature: newSignature(),
     id: uid(),
     created: t,
@@ -514,6 +543,7 @@ export function jobTitle(job) {
   if (isPrice(job)) return [job.pricing?.ref, job.pricing?.customer].filter((s) => s?.trim()).join(' – ') || 'New costing';
   if (isRepair(job)) return 'New repair survey';
   if (isRams(job)) return 'New RAMS pack';
+  if (isCalc(job)) return `New ${calcByKey(job.calc?.kind).title.toLowerCase()} calculation`;
   if (isPlan(job)) return `New ${(PLAN_KINDS[job.plan?.kind] || PLAN_KINDS.property).title.toLowerCase()}`;
   return 'New survey';
 }

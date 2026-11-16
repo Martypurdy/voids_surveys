@@ -1,6 +1,6 @@
 // Service worker: precache the app shell, serve it cache-first so the app works offline.
 // Bump VERSION whenever any file below changes, so devices pick up the update.
-const VERSION = 'v85';
+const VERSION = 'v86';
 const CACHE = `voids-${VERSION}`;
 
 const ASSETS = [
@@ -57,6 +57,10 @@ const ASSETS = [
   'js/repair.js',
   'js/raLibrary.js',
   'js/rams.js',
+  'js/calc/calculators.js',
+  'js/export/docs/calc.js',
+  'js/views/calcView.js',
+  'js/views/calcMaterials.js',
   'js/data/hazards.js',
   'js/export/docs/rams.js',
   'js/views/ramsUi.js',

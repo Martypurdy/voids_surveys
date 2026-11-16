@@ -1,5 +1,5 @@
 // PDF report (jsPDF, loaded on demand from /vendor).
-import { addressLines, jobTitle, fmtDate, fmtDateTime, slug, todayLocal, allPhotoIds, worksSummary, roomStatus, roomAreas, serviceTitle, hasMeterDoor, isRtl, isPrice, isPlan, isRepair, isRams, formOf, textLines } from '../model.js';
+import { addressLines, jobTitle, fmtDate, fmtDateTime, slug, todayLocal, allPhotoIds, worksSummary, roomStatus, roomAreas, serviceTitle, hasMeterDoor, isRtl, isPrice, isPlan, isRepair, isRams, isCalc, formOf, textLines } from '../model.js';
 import { usedRows, usedMaterials, rowNumbers, materialSource, repairPhotos, rowPhotoNumbers } from '../repair.js';
 import { fileBase } from '../properties.js';
 import { ITEMS, roomFigures, floorArea, planArea, metres, sqm, openingGeometry, bounds, legend, cornerPoints, cabinetNumbers, cabinetText, frontEdge, cornerLabelPoint, blindGeometry, endPanels, panelLines, refreshPosts, refreshDepths, settingsLine, cabinetShapes, badgePoint, featureTags, describeFeature, serviceInfo } from '../plan.js';
@@ -365,8 +365,8 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
 
   // ---------- cover ----------
   onProgress('Building report…');
-  font(20, 'bold', isRepair(job) || isRams(job) ? TEAL : BRAND);
-  doc.text(isRepair(job) || isRams(job) ? formOf(job).pdfTitle.toUpperCase() : formOf(job).pdfTitle, M, y + 7);
+  font(20, 'bold', isRepair(job) || isRams(job) || isCalc(job) ? TEAL : BRAND);
+  doc.text(isRepair(job) || isRams(job) || isCalc(job) ? formOf(job).pdfTitle.toUpperCase() : formOf(job).pdfTitle, M, y + 7);
   font(9, 'bold', [120, 128, 136]);
   doc.text('PropertyPad', W - M, y + 6, { align: 'right' });
   y += 13;
@@ -374,6 +374,11 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
   // Materials & labour costing has its own, table-based report.
   if (isPrice(job)) {
     priceReport();
+    return finish();
+  }
+  // Calculations: the same description Word uses.
+  if (isCalc(job)) {
+    await modelReport((await import('./docs/calc.js')).calcModel(job));
     return finish();
   }
   // RAMS pack: the same description Word uses, drawn as tables.

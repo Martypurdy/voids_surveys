@@ -92,31 +92,12 @@ Before each phase, show a short plan and wait for an OK.
   totals by HMRC category, profit summary, and all receipt images.
 
 ## Phase 9 – Calculators
-- [x] "Calculators" button on the home screen (shows "Coming soon" until this phase is built): a separate feature set.
-- Each calculation can carry client and project location details (same postcode
-  lookup as elsewhere), linked to a property/entry folder.
-- Every calculator has a wastage option (% or extra quantity) and an
-  "Add to materials list" button that pushes results into that folder's materials list,
-  ready for links and prices to be added later.
-- Remember the user's last-used sizes and settings per calculator.
-- Show all formulas and assumptions on screen so users can check them.
+- [x] "Calculators" button on the home screen: pick a calculator and it opens as a **calculation** (a small entry filed in a property folder, or "No address yet"). Tabs: Address (optional client and location with postcode look-up), Calculate, Materials.
+- [x] Every calculator has a wastage option (a percentage added to everything, or a fixed extra on the main item). Anything bought in packs rounds up to whole packs afterwards.
+- [x] "Add to materials list" puts the results on the calculation's Materials tab, ready for links and prices in Phase 4; "Send to…" copies the list into a repair survey or costing at the same property.
+- [x] The last-used sizes, assumptions and wastage are remembered per calculator (on the device).
+- [x] Formulas and assumptions are shown on screen ("How this is worked out", editable assumptions), and in the exports.
+- [x] Exports through the Phase 2 engine: PDF, Word, Excel (values and formula text, not live formulas).
 
-Calculators (starter set - full list by trade to be expanded later):
-- Concrete: length x width x depth -> m3, plus bags of pre-mix or cement/sand/aggregate
-  by chosen mix ratio.
-- Bricks & blocks: wall length x height, user enters brick/block size and mortar joint
-  thickness -> units, mortar volume, bags of cement and sand by mix ratio
-  (e.g. 1:4, 1:5, 1:6). Optional openings to deduct.
-- Laminate / flooring: room size + plank size -> planks; planks per pack -> packs;
-  optional underlay rolls and beading/scotia lengths.
-- Screw converter: imperial gauge and inch length (e.g. 3/4" x 6) <-> metric
-  diameter x length in mm, both directions.
-- Unit converter: length, area, volume, weight.
-- Tiles: area + tile size + joint -> tiles, boxes, adhesive and grout.
-- Paint: area, coats, coverage -> litres and tins.
-- Plasterboard & plaster: area -> boards, screws, skim plaster bags.
-- Stud wall: length x height, stud centres -> studs, noggins, head/sole plates.
-- Insulation: area + depth -> rolls or boards.
-- Aggregates: area x depth -> tonnes / bulk bags.
-- Roof tiles: roof area + gauge/cover -> tiles, battens.
-- Fall / gradient: length and fall -> ratio and %, or the reverse.
+Calculators built (13): Concrete; Bricks and blocks; Laminate and flooring; Screw converter; Unit converter; Tiles; Paint; Plasterboard and plaster; Stud wall; Insulation; Aggregates; Roof tiles; Fall and gradient. Defaults are typical figures, shown and editable; results are estimates. Each was tested against figures worked out separately (`docs/calculators.md`).
+- [ ] Later: more calculators by trade (list to be expanded); live-formula Excel; copy a result between two calculations.

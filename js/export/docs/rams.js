@@ -51,8 +51,8 @@ export function ramsModel(job) {
   if (cppGrid.length || present.length) {
     const s = { band: 'CONSTRUCTION PHASE PLAN (CDM 2015)', grid: cppGrid };
     if (present.length) s.table = { headFill: ACCENT, headColor: 'FFFFFF', cols: [{ title: 'Main dangers on site', w: 2 }, { title: 'How they will be controlled', w: 4 }], rows: present.map((d) => [d.hazard, d.controls]) };
-    if (notifiable(cpp)) s.paras = ['This job is large enough to be notifiable to the HSE (form F10) and needs a fuller plan than this simple one.'];
     sections.push(s);
+    if (notifiable(cpp)) sections.push({ paras: ['This job is large enough to be notifiable to the HSE (form F10) and needs a fuller plan than this simple one.'] });
   }
 
   // ----- risk assessments -----

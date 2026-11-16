@@ -1,7 +1,7 @@
 // Property-first structure (pure helpers). A property is the permanent file for an address; every
 // inspection, repair, plan or costing done there is an entry in it. The property record holds a small
 // summary of each entry, so the front screen and the timeline never have to load whole jobs.
-import { formOf, sectionsOf, completedCount, textLines, squash, isPlan, isPrice, isRepair, isRams, fmtDate, uid, nowISO } from './model.js';
+import { formOf, sectionsOf, completedCount, textLines, squash, isPlan, isPrice, isRepair, isRams, isCalc, fmtDate, uid, nowISO } from './model.js';
 import { planArea, sqm } from './plan.js';
 import { sheetTotals, gbp, isBlankLine } from './pricing.js';
 
@@ -32,7 +32,7 @@ export function addressTitle(a) {
 export const natureOf = (job) => (job.nature || '').trim() || formOf(job).title;
 /** The form an entry summary belongs to (for its emoji and title). */
 export const entryForm = (e) => {
-  const f = formOf({ form: e.form, plan: { kind: e.kind } });
+  const f = formOf({ form: e.form, plan: { kind: e.kind }, calc: { kind: e.kind } });
   return { ...f, emoji: f.emoji || { rtl: '🔑', price: '🧮', repair: '🛠️', rams: '🦺' }[e.form] || '🏠' }; // only plan forms carry an emoji of their own
 };
 
@@ -50,6 +50,10 @@ export function entryMeta(job) {
     const p = job.pricing;
     const n = [...p.materials, ...p.labour].filter((l) => !isBlankLine(l)).length;
     return `📄 ${n} line${n === 1 ? '' : 's'} · 💷 ${gbp(sheetTotals(p).gross)}${p.vat === 'none' ? '' : ' inc VAT'}`;
+  }
+  if (isCalc(job)) {
+    const n = job.calc.materials.filter((m) => (m.item || '').trim()).length;
+    return `🔢 ${n} material line${n === 1 ? '' : 's'}`;
   }
   if (isRams(job)) {
     const r = job.rams;
@@ -69,7 +73,7 @@ export function entrySummary(job) {
   return {
     id: job.id,
     form: job.form || 'void',
-    kind: isPlan(job) ? job.plan?.kind || 'property' : '',
+    kind: isPlan(job) ? job.plan?.kind || 'property' : isCalc(job) ? job.calc?.kind || '' : '',
     nature: (job.nature || '').trim(),
     created: job.created,
     updated: job.updated,
@@ -78,7 +82,7 @@ export function entrySummary(job) {
     started: Object.keys(job.progress || {}).length > 0,
     lastExported: job.lastExported || null,
     meta: entryMeta(job),
-    ref: isPrice(job) ? [job.pricing?.ref, job.pricing?.customer].filter((s) => s && s.trim()).join(' ') : isRepair(job) ? [job.repair?.ref, job.repair?.customer].filter((s) => s && s.trim()).join(' ') : isRams(job) ? [job.rams?.ref, job.rams?.customer].filter((s) => s && s.trim()).join(' ') : '',
+    ref: isPrice(job) ? [job.pricing?.ref, job.pricing?.customer].filter((s) => s && s.trim()).join(' ') : isRepair(job) ? [job.repair?.ref, job.repair?.customer].filter((s) => s && s.trim()).join(' ') : isRams(job) ? [job.rams?.ref, job.rams?.customer].filter((s) => s && s.trim()).join(' ') : isCalc(job) ? [job.calc?.ref, job.calc?.customer].filter((s) => s && s.trim()).join(' ') : '',
   };
 }
 

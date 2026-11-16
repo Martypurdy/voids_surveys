@@ -1,6 +1,7 @@
 // Starting a new entry (inspection, costing, plan…) inside a property.
 import { saveJob, saveProperty, getProperty, requestPersist } from '../db.js';
-import { newJob, isPlan } from '../model.js';
+import { newJob, isPlan, isCalc } from '../model.js';
+import { CALCS } from '../calc/calculators.js';
 import { newProperty } from '../properties.js';
 import { h, choose } from '../ui.js';
 import { go } from '../router.js';
@@ -40,7 +41,10 @@ export const GROUPS = [
       { form: 'rams', emoji: '🦺', title: 'RAMS pack', text: 'Construction phase plan, risk assessments, method statements and a briefing record for one job.' },
     ],
   },
-  { key: 'calcs', emoji: '🔢', title: 'Calculators', text: 'Concrete, bricks, flooring, tiles, paint, screws and more – with a materials list.' },
+  {
+    key: 'calcs', emoji: '🔢', title: 'Calculators', text: 'Concrete, bricks, flooring, tiles, paint, screws and more – with a materials list.',
+    forms: CALCS.map((c) => ({ form: `calc:${c.key}`, emoji: c.emoji, title: c.title, text: c.text })),
+  },
   {
     key: 'inspect', emoji: '📋', title: 'Property inspection', text: 'Repair surveys, and tenancy, estate and compliance inspections.',
     forms: [
@@ -58,7 +62,7 @@ export const cardInner = (f, ready, go = '+') => [
   ready ? h('span', { class: 'form-go', 'aria-hidden': 'true' }, go) : null];
 
 /** Where an entry opens: plans start on Room dimensions, everything else on its Address tab. */
-export const entryPath = (job) => (isPlan(job) ? `/job/${job.id}/dimensions` : `/job/${job.id}`);
+export const entryPath = (job) => (isPlan(job) ? `/job/${job.id}/dimensions` : isCalc(job) ? `/job/${job.id}/calculate` : `/job/${job.id}`);
 
 /**
  * Create an entry (choice is a form key, e.g. 'void' or 'plan:kitchen') in a property. With no property it
