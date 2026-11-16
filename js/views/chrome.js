@@ -35,7 +35,7 @@ function tabs(job, active) {
 }
 
 /** Header + tabs for a job screen; marks `section` as started on first visit. */
-export function jobChrome(job, section, { back = '#/', title } = {}) {
+export function jobChrome(job, section, { back = job.propertyId ? `#/property/${job.propertyId}` : '#/', title } = {}) {
   if (!sectionState(job, section)) {
     job.progress[section] = 'started';
     scheduleSave(job);
@@ -49,7 +49,8 @@ export function jobChrome(job, section, { back = '#/', title } = {}) {
         class: 'icon-btn',
         'aria-label': 'Export / survey actions',
         onclick: async () => {
-          if ((await jobActions(job)) === 'deleted') go('/');
+          const r = await jobActions(job);
+          if (r === 'deleted' || r === 'moved') go(job.propertyId ? `/property/${job.propertyId}` : '/');
         },
       }, icon(ICONS.share)),
     }),
@@ -104,12 +105,12 @@ export function completeFooter(job, section, { check } = {}) {
               { label: 'Stay on this page', value: null },
             ].filter(Boolean),
           });
-          if (v === 'close') return go('/');
+          if (v === 'close') return go(job.propertyId ? `/property/${job.propertyId}` : '/');
           if (v === 'email') {
             const { emailReport } = await import('../export/email.js');
             await emailReport(job);
           }
-          if (v === 'export' && (await jobActions(job)) === 'deleted') return go('/');
+          if (v === 'export' && ['deleted', 'moved'].includes(await jobActions(job))) return go(job.propertyId ? `/property/${job.propertyId}` : '/');
           document.querySelector('.tabs')?.refresh?.();
           render();
         },

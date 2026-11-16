@@ -1,13 +1,12 @@
-// Screen 1: home – branded header, quick stats, start a new form, and the
-// surveys on this device (search / filter once there are a few).
-import { listJobs, saveJob, requestPersist, storageInfo } from '../db.js';
-import { newJob, jobTitle, backupStatus, fmtDate, allPhotoIds, sectionsOf, completedCount, sectionState, formOf, isRtl, isPrice, isPlan } from '../model.js';
-import { planArea, sqm } from '../plan.js';
-import { h, icon, ICONS, torchButton, choose } from '../ui.js';
-import { sheetTotals, gbp, isBlankLine } from '../pricing.js';
+// Screen 1: home – properties. Search by postcode, address or reference; tap a property to see
+// everything done there (newest first) and to start a new entry.
+import { listProperties, storageInfo } from '../db.js';
+import { fmtDate } from '../model.js';
+import { addressTitle, entryForm, matches } from '../properties.js';
+import { h, icon, ICONS, torchButton } from '../ui.js';
 import { go, refresh } from '../router.js';
-import { jobActions } from './jobActions.js';
 import { getLastSurveyor } from '../surveyors.js';
+import { addPropertyDialog } from './addressEditor.js';
 
 // App logo (house on a notepad), drawn on the white square in the header.
 const LOGO_SVG = '<svg viewBox="8 8 84 84" aria-hidden="true"><rect x="23" y="21" width="54" height="63" rx="7" fill="#eef4f9"/>'
@@ -19,65 +18,8 @@ function logo() {
   el.innerHTML = LOGO_SVG;
   return el;
 }
-const FILTER_KEY = 'voids.homeFilter';
 
-/**
- * Home screen buttons. A group opens a pop-up of its forms (form = the job's form key);
- * forms without one show what's planned.
- */
-const GROUPS = [
-  {
-    key: 'voids', emoji: '🏠', title: 'Empty home inspections', text: 'Empty home inspection and Ready to let forms.',
-    forms: [
-      { form: 'void', emoji: '🏠', title: 'Empty home inspection', text: 'Rooms, defects, security, services, materials and a PDF report.' },
-      { form: 'rtl', emoji: '🔑', title: 'Ready to let', text: 'Works complete check, keys, services, gifted items and sign off.' },
-    ],
-  },
-  {
-    key: 'pricing', emoji: '💷', title: 'Pricing', text: 'Materials & labour calculator. Quotes and invoices coming soon.',
-    forms: [
-      { form: 'price', emoji: '🧮', title: 'Materials & labour', text: 'Cost materials and labour line by line – markup, VAT and running totals.' },
-      { emoji: '📝', title: 'Quote', text: 'Turn a costing into a quote for the customer.' },
-      { emoji: '🧾', title: 'Invoice', text: 'Turn a quote into an invoice.' },
-    ],
-  },
-  {
-    key: 'designer', emoji: '📐', title: 'Designer', text: 'Kitchen, bathroom and whole property floor plans.',
-    forms: [
-      { form: 'plan:kitchen', emoji: '🍳', title: 'Kitchen plan', text: 'Room size, doors, windows, units, sink, hob and appliances.' },
-      { form: 'plan:bathroom', emoji: '🛁', title: 'Bathroom plan', text: 'Room size, doors, windows, bath, shower, WC and basin.' },
-      { form: 'plan:property', emoji: '🏠', title: 'Whole property plan', text: 'Every room and floor with measurements, doors, windows, fuse board and water main.' },
-    ],
-  },
-  { key: 'repair', emoji: '🛠️', title: 'Repair job sheet', text: 'Job details, materials used, photos and completion.' },
-  { key: 'inspect', emoji: '📋', title: 'Property inspection', text: 'Tenancy, estate and compliance inspections.' },
-];
-
-/** Card contents: emoji, title (+ Coming soon), description, and + or ›. */
-const cardInner = (f, ready, go = '+') => [
-  h('span', { class: 'form-emoji', 'aria-hidden': 'true' }, f.emoji),
-  h('span', { class: 'form-text' },
-    h('span', { class: 'form-title' }, f.title, ready ? null : h('span', { class: 'soon-pill' }, 'Coming soon')),
-    h('span', { class: 'form-desc' }, f.text)),
-  ready ? h('span', { class: 'form-go', 'aria-hidden': 'true' }, go) : null];
-
-/** Pop-up listing a group's forms; tapping one starts it. */
-async function pickForm(g) {
-  const form = await choose({
-    title: `${g.emoji} ${g.title}`,
-    message: 'Choose a form to start.',
-    buttons: [
-      ...g.forms.map((f) => (f.form
-        ? { label: cardInner(f, true), value: f.form, class: 'form-card form-card-ready' }
-        : { label: cardInner(f, false), value: '__soon', class: 'form-card form-card-soon' })),
-      { label: 'Cancel', value: null },
-    ],
-  });
-  if (form === '__soon') return pickForm(g);
-  if (form) createJob(form);
-}
-
-const isDone = (job) => completedCount(job) === sectionsOf(job).length;
+const PAGE = 50; // properties shown at a time (the list can run to thousands)
 
 function greeting() {
   const hr = new Date().getHours();
@@ -87,11 +29,11 @@ function greeting() {
 }
 
 export default async function jobList(root) {
-  const jobs = await listJobs();
+  const props = (await listProperties()).sort((a, b) => (b.last || '').localeCompare(a.last || ''));
 
   const importInput = h('input', {
     type: 'file',
-    accept: '.json,.txt,application/json,text/plain', // backups shared from a phone arrive as .txt
+    accept: '.json,.txt,.zip,application/json,application/zip,text/plain', // backups shared from a phone arrive as .txt
     hidden: true,
     onchange: async (e) => {
       const file = e.target.files[0];
@@ -104,133 +46,81 @@ export default async function jobList(root) {
   });
 
   // ---------- Hero ----------
-  const inProgress = jobs.filter((j) => !isDone(j)).length;
-  const complete = jobs.length - inProgress;
-  const photos = jobs.reduce((n, j) => n + allPhotoIds(j).length, 0);
-  const stat = (n, label, kind) => h('div', { class: `hero-stat hero-stat-${kind}` },
-    h('strong', null, String(n)), h('span', null, label));
+  const entries = props.reduce((n, p) => n + p.entries.length, 0);
+  const inProgress = props.reduce((n, p) => n + p.entries.filter((e) => e.done < e.total).length, 0);
+  const stat = (n, label, kind) => h('div', { class: `hero-stat hero-stat-${kind}` }, h('strong', null, String(n)), h('span', null, label));
   const hero = h('header', { class: 'hero' },
     h('div', { class: 'hero-top' },
       logo(),
-      h('div', { class: 'hero-brand' },
-        h('h1', null, 'PropertyPad'),
-        h('span', null, 'Surveys & site forms')),
-      h('button', { type: 'button', class: 'hero-btn hero-icon', onclick: () => importInput.click(), 'aria-label': 'Import a survey file', title: 'Import a survey file' }, icon(ICONS.import)),
+      h('div', { class: 'hero-brand' }, h('h1', null, 'PropertyPad'), h('span', null, 'Surveys & site forms')),
+      h('button', { type: 'button', class: 'hero-btn hero-icon', onclick: () => importInput.click(), 'aria-label': 'Import a survey file or pack', title: 'Import a survey file or pack' }, icon(ICONS.import)),
       importInput,
       torchButton('hero-btn hero-icon torch-btn'),
       h('a', { class: 'hero-btn hero-icon', href: '#/settings', 'aria-label': 'Settings' }, icon(ICONS.settings))),
-    h('p', { class: 'hero-hello' }, greeting(), h('span', null,
-      new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }))),
+    h('p', { class: 'hero-hello' }, greeting(), h('span', null, new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }))),
     h('div', { class: 'hero-stats' },
-      stat(inProgress, 'In progress', 'progress'),
-      stat(complete, 'Complete', 'done'),
-      stat(photos, `Photo${photos === 1 ? '' : 's'}`, 'photos')));
+      stat(props.length, `Propert${props.length === 1 ? 'y' : 'ies'}`, 'progress'),
+      stat(entries, entries === 1 ? 'Entry' : 'Entries', 'done'),
+      stat(inProgress, 'In progress', 'photos')));
 
-  // ---------- New form ----------
-  const formCard = (g) => h(g.forms ? 'button' : 'div', {
-    type: g.forms ? 'button' : null,
-    class: `form-card${g.forms ? ' form-card-ready form-card-group' : ''}`,
-    dataset: { group: g.key },
-    onclick: g.forms ? () => pickForm(g) : null,
-    'aria-disabled': g.forms ? null : 'true',
-  }, cardInner(g, Boolean(g.forms), '›'));
-
-  // ---------- Surveys ----------
-  let filter = 'all';
-  try { filter = localStorage.getItem(FILTER_KEY) || 'all'; } catch { /* storage blocked */ }
+  // ---------- Properties ----------
   let query = '';
+  let shown = PAGE;
   const listEl = h('div', { class: 'job-list' });
-  const chipsEl = h('div', { class: 'chips home-chips', role: 'group', 'aria-label': 'Show surveys' });
+  const countEl = h('p', { class: 'hint prop-count' });
   const renderList = () => {
-    const q = query.trim().toLowerCase();
-    const shown = jobs.filter((j) => (filter === 'all' || (filter === 'done') === isDone(j))
-      && (!q || `${jobTitle(j)} ${j.address.text} ${j.surveyor} ${j.pricing?.customer || ''} ${j.pricing?.ref || ''}`.toLowerCase().includes(q)));
-    chipsEl.replaceChildren(...[['all', `All ${jobs.length}`], ['progress', `In progress ${inProgress}`], ['done', `Complete ${complete}`]]
-      .map(([k, label]) => h('button', {
-        type: 'button',
-        'aria-pressed': String(filter === k),
-        onclick: () => {
-          filter = k;
-          try { localStorage.setItem(FILTER_KEY, k); } catch { /* storage blocked */ }
-          renderList();
-        },
-      }, label)));
-    listEl.replaceChildren(...(shown.length ? shown.map(jobCard)
-      : [h('p', { class: 'empty' }, q ? 'No surveys match your search.' : 'Nothing here yet.')]));
+    const found = props.filter((p) => matches(p, query));
+    const page = found.slice(0, shown);
+    countEl.textContent = query.trim() ? `${found.length} match${found.length === 1 ? '' : 'es'}` : '';
+    listEl.replaceChildren(...(page.length ? page.map(propertyCard) : [h('p', { class: 'empty' }, 'No property matches your search.')]),
+      ...(found.length > shown
+        ? [h('button', { type: 'button', class: 'btn-block', onclick: () => { shown += PAGE; renderList(); } }, `Show more (${found.length - shown} more)`)]
+        : []));
   };
   const search = h('input', {
     type: 'search',
-    placeholder: '🔍 Search by address, customer or surveyor…',
-    'aria-label': 'Search surveys',
-    oninput: (e) => { query = e.target.value; renderList(); },
+    placeholder: '🔍 Search postcode, address or reference…',
+    'aria-label': 'Search properties',
+    oninput: (e) => { query = e.target.value; shown = PAGE; renderList(); },
   });
-  if (jobs.length) renderList();
+  if (props.length) renderList();
 
   root.append(
     hero,
     h('div', { class: 'content home' },
-      h('h2', { class: 'home-h' }, 'Start a new form'),
-      h('div', { class: 'form-grid' }, GROUPS.map(formCard)),
-
-      h('h2', { class: 'home-h' }, 'Your forms'),
-      jobs.length
-        ? [jobs.length > 3 ? search : null, jobs.length > 1 ? chipsEl : null, listEl]
+      h('button', {
+        type: 'button',
+        class: 'btn-primary btn-big btn-block',
+        onclick: async () => {
+          const p = await addPropertyDialog();
+          if (p) go(`/property/${p.id}`);
+        },
+      }, '＋ Add property'),
+      h('h2', { class: 'home-h' }, 'Properties'),
+      props.length
+        ? [search, countEl, listEl]
         : h('div', { class: 'home-empty' },
-          h('span', { 'aria-hidden': 'true' }, '📝'),
-          h('strong', null, 'Nothing here yet'),
-          h('span', null, 'Tap a button above to start your first form.')),
+          h('span', { 'aria-hidden': 'true' }, '🏠'),
+          h('strong', null, 'No properties yet'),
+          h('span', null, 'Tap “Add property”, then start an inspection, plan or costing inside it.')),
       footnote()));
 }
 
-async function createJob(choice) {
-  const [form, planKind] = choice.split(':'); // e.g. 'plan:kitchen'
-  const job = newJob({ surveyor: getLastSurveyor(), form, planKind });
-  await saveJob(job);
-  // Ask the browser to keep our data (helps against eviction, esp. on iOS).
-  requestPersist();
-  go(isPlan(job) ? `/job/${job.id}/dimensions` : `/job/${job.id}`);
-}
-
-function jobCard(job) {
-  const status = backupStatus(job);
-  const nPhotos = allPhotoIds(job).length;
-  const SECTIONS = sectionsOf(job);
-  const done = completedCount(job);
-  const state = done === SECTIONS.length ? 'done' : done || Object.keys(job.progress || {}).length ? 'progress' : 'new';
-  const pct = Math.round((done / SECTIONS.length) * 100);
-  return h('div', { class: 'card job-card', dataset: { state, form: job.form || 'void' } },
-    h('a', { href: `#/job/${job.id}` },
+/** A property: address, reference, how many entries, what kinds, and when it was last worked on. */
+function propertyCard(p) {
+  const n = p.entries.length;
+  const open = p.entries.filter((e) => e.done < e.total).length;
+  const state = !n ? 'new' : open ? 'progress' : 'done';
+  const kinds = new Map();
+  for (const e of p.entries) { const f = entryForm(e); kinds.set(f.emoji, (kinds.get(f.emoji) || 0) + 1); }
+  return h('div', { class: 'card job-card', dataset: { state } },
+    h('a', { href: `#/property/${p.id}` },
       h('div', { class: 'job-head' },
-        h('div', { class: 'job-title' }, jobTitle(job)),
-        h('span', { class: 'job-pill' }, state === 'done' ? '✓ Complete' : state === 'progress' ? 'In progress' : 'New')),
-      h('div', { class: 'job-sub' }, [(isRtl(job) ? '🔑 ' : isPrice(job) ? '🧮 ' : isPlan(job) ? `${formOf(job).emoji} ` : '🏠 ') + formOf(job).title, isPrice(job) ? job.pricing.customer : '', job.surveyor].filter(Boolean).join(' · ')),
-      h('div', { class: 'job-progress' },
-        h('div', { class: 'progress', 'aria-hidden': 'true' }, SECTIONS.map(([k]) => h('span', { dataset: { state: sectionState(job, k) || 'todo' } }))),
-        h('span', { class: 'job-pct' }, `${pct}%`)),
-      h('div', { class: 'job-meta' },
-        isPlan(job) ? planMeta(job) : isPrice(job) ? priceMeta(job) : `📅 ${fmtDate(job.created)} · 🚪 ${job.rooms.length} room${job.rooms.length === 1 ? '' : 's'} · 📷 ${nPhotos}`),
-      status.stale ? h('span', { class: 'warn' }, '⚠ ', status.text) : null),
-    h('button', {
-      type: 'button',
-      class: 'icon-btn',
-      'aria-label': `Actions for ${jobTitle(job)}`,
-      onclick: async () => {
-        if (await jobActions(job)) refresh();
-      },
-    }, icon(ICONS.more)));
-}
-
-/** Floor plan card: date, rooms and floor area. */
-function planMeta(job) {
-  const rooms = job.plan.floors.reduce((n, f) => n + f.rooms.length, 0);
-  return `📅 ${fmtDate(job.created)} · 📐 ${rooms} room${rooms === 1 ? '' : 's'} · ${sqm(planArea(job.plan))}`;
-}
-
-/** Costing card: date, number of lines and the total. */
-function priceMeta(job) {
-  const p = job.pricing;
-  const n = [...p.materials, ...p.labour].filter((l) => !isBlankLine(l)).length;
-  return `📅 ${fmtDate(job.created)} · 📄 ${n} line${n === 1 ? '' : 's'} · 💷 ${gbp(sheetTotals(p).gross)}${p.vat === 'none' ? '' : ' inc VAT'}`;
+        h('div', { class: 'job-title' }, addressTitle(p.address)),
+        h('span', { class: 'job-pill' }, `${n} entr${n === 1 ? 'y' : 'ies'}`)),
+      p.ref ? h('div', { class: 'job-sub' }, `Ref ${p.ref}`) : null,
+      n ? h('div', { class: 'job-sub' }, [...kinds].map(([emoji, c]) => `${emoji} ${c}`).join('  ·  ')) : null,
+      h('div', { class: 'job-meta' }, n ? `📅 Last activity ${fmtDate(p.last)}${open ? ` · ${open} in progress` : ''}` : 'Nothing done here yet')));
 }
 
 function footnote() {

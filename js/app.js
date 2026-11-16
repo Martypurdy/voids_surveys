@@ -1,6 +1,6 @@
 // Entry point: routes, autosave flushing, service worker.
 import { route, start } from './router.js';
-import { flushSave } from './db.js';
+import { flushSave, adoptOrphans } from './db.js';
 import { toast } from './ui.js';
 import { findUrl, setPendingLink } from './linkfill.js';
 
@@ -11,6 +11,7 @@ document.addEventListener('contextmenu', (e) => {
 });
 
 route('/', () => import('./views/jobList.js'));
+route('/property/:id', () => import('./views/propertyPage.js'));
 route('/settings', () => import('./views/settings.js'));
 route('/settings/:tab', () => import('./views/settings.js'));
 route('/job/:id', () => import('./views/jobAddress.js'));
@@ -44,7 +45,10 @@ route('/job/:id/plan', () => import('./views/planEditor.js'), { mode: 'layout' }
   }
 }
 
-start(document.getElementById('app'));
+// File any entries that are not in a property yet (existing jobs, imports), then show the first screen.
+adoptOrphans()
+  .catch((e) => console.error('Filing entries into properties failed', e))
+  .then(() => start(document.getElementById('app')));
 
 // Make sure pending edits hit IndexedDB if the app is backgrounded or closed.
 document.addEventListener('visibilitychange', () => {

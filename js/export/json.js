@@ -1,5 +1,7 @@
 // .json job file: full backup / transfer, photos embedded as base64.
-import { getJob, saveJob, deleteJob, putPhotos } from '../db.js';
+import { getJob, saveJob, deleteJob, putPhotos, getProperty, findOrCreateProperty } from '../db.js';
+import { fileBase } from '../properties.js';
+import { isZip } from './zip.js';
 import { SCHEMA, formOf, allPhotoIds, remapPhotoIds, uid, nowISO, slug, jobTitle, todayLocal, newKeySafe, upgradeJob, photoLists } from '../model.js';
 import { loadPhotos, makeThumb } from '../photos.js';
 import { choose, toast, busy } from '../ui.js';
@@ -23,7 +25,7 @@ function base64ToBlob(b64, type) {
 }
 
 export function jsonFilename(job) {
-  return `PropertyPad backup - ${formOf(job).file} - ${slug(jobTitle(job))} - ${todayLocal()}.json`;
+  return `${fileBase(job)} - backup - ${todayLocal()}.json`;
 }
 
 /** Build the backup file. The key safe code is blanked unless includeCode. */
@@ -61,17 +63,29 @@ function validate(data) {
 }
 
 /**
- * Import a job file chosen by the user. If the job already exists on this
- * device, asks whether to replace it or keep both. Returns the job or null.
+ * Import a file chosen by the user: a .json backup, or a .zip pack (one entry or a whole property).
+ * Every entry is filed under its property (the one at that address, or a new one). If an entry
+ * already exists on this device, asks whether to replace it or keep both. Returns the last job or null.
  */
 export async function importJobFile(file) {
-  let data;
+  let datas;
   try {
-    data = validate(JSON.parse(await file.text()));
+    if (await isZip(file)) {
+      const { readPack } = await import('./pack.js');
+      datas = (await readPack(file)).map(validate);
+    } else {
+      datas = [validate(JSON.parse(await file.text()))];
+    }
   } catch (e) {
     toast(e instanceof SyntaxError ? 'That isn’t a PropertyPad backup file' : e.message);
     return null;
   }
+  let last = null;
+  for (const data of datas) last = (await importData(data)) || last;
+  return last;
+}
+
+async function importData(data) {
   const job = data.job;
 
   const existing = await getJob(job.id);
@@ -100,11 +114,17 @@ export async function importJobFile(file) {
 
   const progress = busy('Importing…');
   try {
+    // File it under its property: the one it came from if that is here, else the one at its address.
+    const known = job.propertyId ? await getProperty(job.propertyId) : null;
+    const prop = known || await findOrCreateProperty(job.address || {});
+    job.propertyId = prop.id;
+    job.address = structuredClone(prop.address);
+
     const recs = [];
     for (let i = 0; i < data.photos.length; i++) {
       progress.update(`Importing photo ${i + 1} of ${data.photos.length}…`);
       const p = data.photos[i];
-      const blob = base64ToBlob(p.data, p.type || 'image/jpeg');
+      const blob = p.blob || base64ToBlob(p.data, p.type || 'image/jpeg');
       recs.push({ id: p.id, jobId: job.id, blob, thumb: await makeThumb(blob), w: p.w, h: p.h, created: p.created || nowISO() });
     }
     // Drop references to photos that weren't in the file.

@@ -1257,3 +1257,12 @@ body.no-scroll { overflow: hidden; }
 .plan-svg .cab-carcass.dashed { stroke-dasharray: 4 3; }
 .plan-svg .cab-carcass.dashed { fill: none; }
 .plan-svg .cab-door.dashed { fill: none; stroke: var(--plan-wall); stroke-width: .8; }
+.prop-card { margin: 0 0 6px; }
+.prop-title { display: block; font-size: 1.15rem; }
+.prop-lines, .prop-ref { color: var(--muted); margin-top: 2px; }
+.prop-actions { display: flex; gap: 8px; margin-top: 10px; }
+.timeline { display: flex; flex-direction: column; gap: 10px; }
+.timeline .job-card { margin: 0; }
+.timeline-year { margin: 16px 0 4px; font-size: .95rem; letter-spacing: .05em; color: var(--muted); }
+.prop-count { margin: 0 0 8px; }
+.timeline .job-title, .job-list .job-title { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }

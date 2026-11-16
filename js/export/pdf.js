@@ -1,5 +1,6 @@
 // PDF report (jsPDF, loaded on demand from /vendor).
 import { addressLines, jobTitle, fmtDate, fmtDateTime, slug, todayLocal, allPhotoIds, worksSummary, roomStatus, roomAreas, serviceTitle, hasMeterDoor, isRtl, isPrice, isPlan, formOf } from '../model.js';
+import { fileBase } from '../properties.js';
 import { ITEMS, roomFigures, floorArea, planArea, metres, sqm, openingGeometry, bounds, legend, cornerPoints, cabinetNumbers, cabinetText, frontEdge, cornerLabelPoint, blindGeometry, endPanels, panelLines, refreshPosts, refreshDepths, settingsLine, cabinetShapes, badgePoint, featureTags, describeFeature, serviceInfo } from '../plan.js';
 import { sheetTotals, lineTotals, isBlankLine, gbp, money, LABOUR_BASIS } from '../pricing.js';
 import { UNITS, defectInfo, isSorCode, qtyText as unitQty } from '../data/parts.js';
@@ -30,7 +31,7 @@ function loadJsPDF() {
 }
 
 export function pdfFilename(job) {
-  return `${formOf(job).file} - ${slug(jobTitle(job))} - ${todayLocal()}.pdf`;
+  return `${fileBase(job)} - ${todayLocal()}.pdf`;
 }
 
 // The built-in PDF fonts only cover Latin-1, so normalise common "smart" characters.

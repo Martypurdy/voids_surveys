@@ -7,14 +7,16 @@ Before each phase, show a short plan and wait for an OK.
 # Void Surveys – Roadmap
 
 ## Phase 1 – Property-based structure
-- Front screen lists PROPERTIES, not jobs. Search bar: postcode, address or reference.
-- Each property has a newest-first timeline of everything done there.
-- Each entry (void inspection, repair survey, kitchen plan, etc.) is its own folder
+- [x] Front screen lists PROPERTIES, not jobs. Search bar: postcode, address or reference.
+- [x] Each property has a newest-first timeline of everything done there.
+- [x] Each entry (void inspection, repair survey, kitchen plan, etc.) is its own folder
   inside the property, holding the entry plus everything linked to it
   (photos, materials list, quote, invoice, RAMS).
-- Must scale to thousands of properties.
-- Migrate existing void inspection jobs into this structure without data loss.
-- Export a whole entry folder as one pack (zip).
+- [x] Must scale to thousands of properties.
+- [x] Migrate existing void inspection jobs into this structure without data loss.
+- [x] Export a whole entry folder as one pack (zip). Also built: the whole property file as one zip (a folder per entry, oldest first), and Import for packs.
+- [x] Entries are named "first line of address, postcode – nature of file" (e.g. 12 Demo Street, AB1 2CD – Empty home works); the nature can be renamed. Used for pack, PDF and backup file names.
+- [ ] Later: archive old entries to a pack and remove them from the device, to free storage (photos are the bulk).
 
 ## Phase 2 – Export engine (shared by everything)
 - Every document exports to PDF, Word (.docx) and Excel (.xlsx).

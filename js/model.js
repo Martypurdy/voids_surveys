@@ -1,6 +1,6 @@
 // Job data model, presets and helpers. Pure functions – no DOM, no storage.
 
-export const SCHEMA = 1;
+export const SCHEMA = 2; // 2: jobs belong to a property (propertyId) and may carry a 'nature' label
 
 export const CONDITIONS = ['Good', 'Fair', 'Poor', 'N/A'];
 
@@ -150,6 +150,8 @@ export const completedCount = (job) => sectionsOf(job).filter(([k]) => job.progr
 /** Bring a job saved by an older version up to the current shape (in place). */
 export function upgradeJob(job) {
   job.form ??= 'void';
+  job.propertyId ??= null; // the property this entry belongs to (set when it is filed)
+  job.nature ??= ''; // what the file is about, e.g. "Empty home works" (blank = the form's name)
   if (isRtl(job)) {
     const d = newRtl();
     job.rtl = { ...d, ...(job.rtl || {}) };
@@ -398,8 +400,8 @@ export function normalizeAddress(a = {}) {
   return a;
 }
 
-const squash = (s) => (s || '').replace(/\s+/g, '').toUpperCase();
-const textLines = (a) => (a.text || '').split('\n').map((s) => s.trim()).filter(Boolean);
+export const squash = (s) => (s || '').replace(/\s+/g, '').toUpperCase();
+export const textLines = (a) => (a.text || '').split('\n').map((s) => s.trim()).filter(Boolean);
 
 /** Address as lines, with the postcode appended if the box doesn't already contain it. */
 export function addressLines(a) {

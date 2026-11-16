@@ -1,7 +1,9 @@
 // Per-job actions dialog: PDF report, .json backup, delete.
-import { deleteJob, flushSave } from '../db.js';
-import { jobTitle, backupStatus, fmtDateTime, isPrice, isInspection } from '../model.js';
-import { h, choose, confirmDialog, toast, busy } from '../ui.js';
+import { deleteJob, flushSave, saveJob, moveEntry } from '../db.js';
+import { jobTitle, backupStatus, fmtDateTime, isPrice, isInspection, formOf } from '../model.js';
+import { entryName, addressTitle } from '../properties.js';
+import { h, choose, confirmDialog, toast, busy, textField } from '../ui.js';
+import { pickProperty } from './pickProperty.js';
 import { offerFile } from '../export/deliver.js';
 
 /**
@@ -23,13 +25,16 @@ export async function jobActions(job) {
       : null);
 
   const action = await choose({
-    title: jobTitle(job),
+    title: entryName(job),
     content,
     buttons: [
       { label: '👁 Preview report', value: 'preview', class: 'btn-primary' },
       isInspection(job) ? { label: '📧 Email report', value: 'email', class: 'btn-primary' } : null,
       { label: 'Export PDF report', value: 'pdf', class: 'btn-primary' },
       { label: 'Backup file (.json)', value: 'json', class: 'btn-primary' },
+      { label: '🗜 Pack (zip: entry, photos and PDF)', value: 'pack', class: 'btn-primary' },
+      { label: '✎ Rename (nature of the file)', value: 'rename' },
+      { label: '📁 Move to another property', value: 'move' },
       { label: isPrice(job) ? 'Delete costing' : isInspection(job) ? 'Delete survey' : 'Delete plan', value: 'delete', class: 'btn-danger' },
       { label: 'Cancel', value: null },
     ].filter(Boolean),
@@ -73,6 +78,44 @@ export async function jobActions(job) {
       console.error(e);
       progress.close();
       toast(`Report failed: ${e.message}`);
+    }
+    return null;
+  }
+
+  if (action === 'rename') {
+    let nature = job.nature || '';
+    const ok = await choose({
+      title: 'Rename',
+      message: `The file is called “${addressTitle(job.address)} – …”. Say what it is, for example “Empty home works”. Leave it blank to use “${formOf(job).title}”.`,
+      content: textField('Nature of the file', nature, (t) => { nature = t; }, { placeholder: formOf(job).title }),
+      buttons: [{ label: 'Save', value: 'save', class: 'btn-primary btn-big' }, { label: 'Cancel', value: null }],
+    });
+    if (ok !== 'save') return null;
+    job.nature = nature.trim();
+    await saveJob(job);
+    toast('Renamed');
+    return 'changed';
+  }
+
+  if (action === 'move') {
+    const to = await pickProperty({ title: 'Move to which property?', exclude: [job.propertyId] });
+    if (!to) return null;
+    await moveEntry(job, to.id);
+    toast(`Moved to ${addressTitle(to.address)}`);
+    return 'moved';
+  }
+
+  if (action === 'pack') {
+    const progress = busy('Building the pack…');
+    try {
+      const { buildEntryPack } = await import('../export/pack.js');
+      const { blob, filename } = await buildEntryPack(job, { includeCode, onProgress: progress.update });
+      progress.close();
+      await offerFile(blob, filename, 'Pack ready');
+    } catch (e) {
+      console.error(e);
+      progress.close();
+      toast(`Pack failed: ${e.message}`);
     }
     return null;
   }
