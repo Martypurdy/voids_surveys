@@ -4,6 +4,7 @@ import { jobTitle, backupStatus, fmtDateTime, isPrice, isInspection, formOf } fr
 import { entryName, addressTitle } from '../properties.js';
 import { h, choose, confirmDialog, toast, busy, textField } from '../ui.js';
 import { pickProperty } from './pickProperty.js';
+import { exportChooser } from './exportChooser.js';
 import { offerFile } from '../export/deliver.js';
 
 /**
@@ -30,7 +31,7 @@ export async function jobActions(job) {
     buttons: [
       { label: '👁 Preview report', value: 'preview', class: 'btn-primary' },
       isInspection(job) ? { label: '📧 Email report', value: 'email', class: 'btn-primary' } : null,
-      { label: 'Export PDF report', value: 'pdf', class: 'btn-primary' },
+      { label: '⬇ Export… (PDF, Word or Excel)', value: 'export', class: 'btn-primary' },
       { label: 'Backup file (.json)', value: 'json', class: 'btn-primary' },
       { label: '🗜 Pack (zip: entry, photos and PDF)', value: 'pack', class: 'btn-primary' },
       { label: '✎ Rename (nature of the file)', value: 'rename' },
@@ -64,20 +65,21 @@ export async function jobActions(job) {
     return null;
   }
 
-  if (action === 'pdf' && isInspection(job) && !job.legionella?.done
-    && !(await confirmDialog('Legionella flush not recorded – export anyway?', { ok: 'Export anyway' }))) return null;
-
-  if (action === 'pdf') {
-    const progress = busy('Building report…');
+  if (action === 'export') {
+    const format = await exportChooser(job);
+    if (!format) return null;
+    if (isInspection(job) && !job.legionella?.done
+      && !(await confirmDialog('Legionella flush not recorded – export anyway?', { ok: 'Export anyway' }))) return null;
+    const progress = busy('Building…');
     try {
-      const { buildPdf, pdfFilename } = await import('../export/pdf.js');
-      const blob = await buildPdf(job, { includeCode, onProgress: progress.update });
+      const { exportDocument } = await import('../export/engine.js');
+      const { blob, filename } = await exportDocument(job, format, { includeCode, onProgress: progress.update });
       progress.close();
-      await offerFile(blob, pdfFilename(job), 'Report ready');
+      await offerFile(blob, filename, 'Export ready');
     } catch (e) {
       console.error(e);
       progress.close();
-      toast(`Report failed: ${e.message}`);
+      toast(`Export failed: ${e.message}`);
     }
     return null;
   }

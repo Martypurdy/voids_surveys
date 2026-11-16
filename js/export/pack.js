@@ -37,6 +37,14 @@ async function entryFiles(job, folder, { includeCode = false, onProgress = () =>
   } catch (e) {
     console.warn('The report could not be added to the pack', e);
   }
+  try {
+    const { exportDocument, bestEditable } = await import('./engine.js'); // Excel for costings and plans, Word for inspections
+    onProgress('Adding the editable copy…');
+    const r = await exportDocument(job, bestEditable(job), { includeCode, onProgress });
+    files.push({ name: `${folder}/${safe(r.filename)}`, data: r.blob });
+  } catch (e) {
+    console.warn('The editable copy could not be added to the pack', e);
+  }
   return files;
 }
 

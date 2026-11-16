@@ -1367,3 +1367,5 @@ a.form-card { text-decoration: none; color: inherit; }
   .split-detail { min-width: 0; max-width: 760px; }
 }
 .props input[type="search"], .split-list input[type="search"] { margin-bottom: 10px; }
+.export-opt { display: flex; flex-direction: column; gap: 2px; text-align: left; }
+.export-opt small { font-weight: 400; opacity: .85; white-space: normal; line-height: 1.3; }

@@ -684,7 +684,7 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
     const pad = 1.5, size = 8.5, lh = lineH(size);
     const drawRow = (cells, { header = false, total = false } = {}) => {
       font(size, header || total ? 'bold' : 'normal');
-      const wrapped = cells.map((c, i) => doc.splitTextToSize(clean(c), cols[i][1] - pad * 2));
+      const wrapped = cells.map((c, i) => doc.splitTextToSize(clean(c && typeof c === 'object' ? c.t : c), cols[i][1] - pad * 2));
       const rowH = Math.max(...wrapped.map((l) => l.length)) * lh + pad * 2;
       if (y + rowH > BOTTOM) {
         doc.addPage();
@@ -702,7 +702,13 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
       let x = M;
       wrapped.forEach((lines, i) => {
         const right = cols[i][2] === 'right';
+        const url = cells[i] && typeof cells[i] === 'object' && /^https?:\/\//i.test(cells[i].url || '') ? cells[i].url : null;
+        if (url) {
+          doc.setTextColor(5, 99, 193); // a product link: blue, and tapping the cell opens the page
+          doc.link(x, y, cols[i][1], rowH, { url });
+        }
         lines.forEach((line, k) => doc.text(line, right ? x + cols[i][1] - pad : x + pad, y + pad + lh * (k + 0.75), right ? { align: 'right' } : undefined));
+        if (url) doc.setTextColor(0, 0, 0);
         x += cols[i][1];
       });
       y += rowH;
@@ -1091,7 +1097,7 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
       heading('Materials');
       gridTable(
         [['Item', 44], ['Supplier', 26], ['Code / SKU', 22], ['Qty', 12, 'right'], ['Unit', 16], ['Price', 19, 'right'], ['Markup', 18, 'right'], ['Total', 23, 'right']],
-        mats.map((l) => [l.item, l.supplier, l.code, qtyOf(l), l.unit, l.price === '' ? '' : gbp(lineTotals({ ...l, qty: 1, markup: '' }).cost), markupText(l), gbp(lineTotals(l).total)]),
+        mats.map((l) => [l.url ? { t: l.item || l.url, url: l.url } : l.item, l.supplier, l.code, qtyOf(l), l.unit, l.price === '' ? '' : gbp(lineTotals({ ...l, qty: 1, markup: '' }).cost), markupText(l), gbp(lineTotals(l).total)]),
         [['Materials total', '', '', '', '', gbp(t.materials.cost), gbp(t.materials.markup), gbp(t.materials.total)]]);
     }
     if (mats.length || p.deliveries.length) {

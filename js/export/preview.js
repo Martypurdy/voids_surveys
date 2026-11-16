@@ -4,7 +4,7 @@ import { h, toast, trackOverlay } from '../ui.js';
 import { deliverFile } from './deliver.js';
 
 let libPromise = null;
-function loadPdfJs() {
+export function loadPdfJs() {
   if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
   libPromise ||= new Promise((resolve, reject) => {
     const s = document.createElement('script');

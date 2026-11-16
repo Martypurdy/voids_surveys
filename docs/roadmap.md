@@ -34,9 +34,9 @@ Before each phase, show a short plan and wait for an OK.
 - [ ] Later: archive old entries to a pack and remove them from the device, to free storage (photos are the bulk).
 
 ## Phase 2 – Export engine (shared by everything)
-- Every document exports to PDF, Word (.docx) and Excel (.xlsx).
-- Offer the most suitable format first for each document type.
-- Excel exports contain LIVE formulas (line totals, subtotal, VAT, grand total),
+- [x] Every document exports to PDF, Word (.docx) and Excel (.xlsx). Built for the documents that exist today (costing, inspection reports, floor plans); later phases plug into the same engine (see docs/exports.md).
+- [x] Offer the most suitable format first for each document type.
+- [x] Excel exports contain LIVE formulas (line totals, subtotal, VAT, grand total),
   and product links stay clickable.
 
 ## Phase 3 – Repair survey
