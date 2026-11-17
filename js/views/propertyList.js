@@ -78,6 +78,7 @@ function propertyCard(p, { selected = false, onPick = null } = {}) {
     h('a', { href: `#/property/${p.id}`, onclick: onPick ? (e) => { e.preventDefault(); onPick(p.id); } : null },
       h('div', { class: 'job-head' },
         h('div', { class: 'job-title' }, addressTitle(p.address)),
+        n > 1 ? h('span', { class: 'job-folder', 'aria-hidden': 'true', title: 'Property pack: several entries' }, '📁') : null,
         h('span', { class: 'job-pill' }, `${n} entr${n === 1 ? 'y' : 'ies'}`)),
       p.ref ? h('div', { class: 'job-sub' }, `Ref ${p.ref}`) : null,
       !hasAddress(p.address) && n ? h('div', { class: 'job-sub' }, p.entries.map((e) => e.nature || entryForm(e).title).join(', ')) : null,

@@ -938,7 +938,7 @@ body.no-scroll { overflow: hidden; }
 .job-card[data-state="new"] { border-left-color: var(--primary); }
 .job-head { display: flex; align-items: center; gap: 8px; }
 .job-head .job-title { flex: 1; min-width: 0; font-size: 1.05rem; }
-.job-pill { flex: none; padding: 2px 9px; border-radius: 999px; font-size: .74rem; font-weight: 700; background: var(--surface-2); color: var(--muted); }
+.job-pill { flex: none; padding: 3px 10px; border-radius: 999px; font-size: .86rem; font-weight: 700; background: var(--surface-2); color: var(--muted); }
 .job-card[data-state="progress"] .job-pill { background: var(--started-bg); color: var(--started-ink); }
 .job-card[data-state="done"] .job-pill { background: var(--done-bg); color: var(--done-ink); }
 .job-progress { display: flex; align-items: center; gap: 8px; }
@@ -1271,7 +1271,7 @@ body.no-scroll { overflow: hidden; }
 .job-list.compact .job-card { border-left-width: 4px; border-radius: 12px; }
 .job-list.compact .job-card > a { padding: 9px 10px; }
 .job-list.compact .job-head .job-title { font-size: .95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; }
-.job-list.compact .job-pill { padding: 1px 8px; font-size: .68rem; }
+.job-list.compact .job-pill { padding: 2px 9px; font-size: .78rem; }
 .job-list.compact .job-sub { font-size: .76rem; line-height: 1.25; }
 .job-list.compact .job-progress { gap: 6px; }
 .job-list.compact .progress { margin: 4px 0 3px; }
@@ -1627,3 +1627,5 @@ a.form-card { text-decoration: none; color: inherit; }
 
 /* Room list: complete but no photos */
 .room-nophoto { flex: none; width: 24px; height: 24px; border-radius: 50%; background: #e8820c; color: #fff; font-weight: 800; font-size: .95rem; line-height: 24px; text-align: center; margin-left: auto; margin-right: 4px; }
+.job-folder { flex: none; font-size: 1.15rem; line-height: 1; margin-left: auto; }
+.job-head .job-folder + .job-pill { margin-left: 0; }
