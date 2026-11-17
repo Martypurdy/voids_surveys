@@ -195,7 +195,7 @@ const ROOM_BASE = ['ceiling', 'walls', 'floor', 'woodwork', 'door', 'window', 'e
 /** Features a new room / area / the Security screen starts with. */
 export function defaultFeatures(name, kind) {
   const t = roomType(name);
-  if (kind === 'security') return ['frontdoor', 'reardoor', 'sidedoor', 'winsec'];
+  if (kind === 'security') return ['frontdoor', 'winsec'];
   if (kind === 'externals') {
     if (/exterior|building|outside of/.test(t)) return ['roof', 'chimney', 'gutters', 'downpipes', 'fascias', 'extwalls', 'drainage'];
     if (/garden|yard/.test(t)) return ['paths', 'lawn', 'bushes', 'trees'];
