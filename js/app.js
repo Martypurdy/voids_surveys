@@ -13,6 +13,7 @@ document.addEventListener('contextmenu', (e) => {
 route('/', () => import('./views/jobList.js'));
 route('/properties', () => import('./views/propertyList.js'));
 route('/property/:id', () => import('./views/propertyPage.js'));
+route('/manage', () => import('./views/manage.js'));
 route('/settings', () => import('./views/settings.js'));
 route('/settings/:tab', () => import('./views/settings.js'));
 route('/job/:id', () => import('./views/jobAddress.js'));

@@ -115,3 +115,9 @@ Calculators built (13): Concrete; Bricks and blocks; Laminate and flooring; Scre
 - [x] Linked both ways ("Moved on to Ready to let" / "Started from an inspection"); pressing the button again warns and offers to open the one already started.
 - [x] Ready to let Address tab: "Start from an inspection" lists the inspections at the property and fills only the blanks.
 - Notes: code in `js/startRtl.js` and `js/views/rtlStart.js`; photos are copied as the new form's own records.
+
+## Select and clear out (batch export and delete)
+- [x] Properties and history › "Select, export or clear out many" opens a list of every entry on the device (search, type, status and age filters, Select all, tick boxes).
+- [x] Export the ticked entries as one zip (or several parts when there are many photos): entry data and photos for each, optional PDF reports and key safe codes; importable again with Import.
+- [x] Export, then remove: asks to check the file saved, then deletes the entries, their photos and any address left empty. Or Delete on its own, always with a confirmation.
+- Later idea: a rule that checks an entry is backed up to a storage location and removes it from the device after a set period (needs the automatic storage push first).

@@ -53,7 +53,7 @@ export async function buildPropertyList({ selectedId = null, onPick = null } = {
     }, '＋ Add property'),
     h('p', { class: 'hint' }, 'Quick jobs started from the home screen appear here too, under “No address yet”, until you give them an address.'),
     props.length
-      ? [search, countEl, listEl]
+      ? [h('a', { class: 'btn btn-block', href: '#/manage' }, '🗂 Select, export or clear out many'), search, countEl, listEl]
       : h('div', { class: 'home-empty' },
         h('span', { 'aria-hidden': 'true' }, '🏠'),
         h('strong', null, 'No properties yet'),

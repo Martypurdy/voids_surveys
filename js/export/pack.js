@@ -18,7 +18,7 @@ its photos (photos/) and the PDF report. To put it back into PropertyPad, use th
 button on the front screen and choose this .zip file.
 `;
 
-async function entryFiles(job, folder, { includeCode = false, onProgress = () => {} } = {}) {
+async function entryFiles(job, folder, { includeCode = false, reports = true, onProgress = () => {} } = {}) {
   const copy = structuredClone(job);
   if (!includeCode && copy.keySafe) copy.keySafe.code = '';
   const files = [];
@@ -30,6 +30,7 @@ async function entryFiles(job, folder, { includeCode = false, onProgress = () =>
     files.push({ name: `${folder}/${file}`, data: rec.blob });
   });
   files.push({ name: `${folder}/entry.json`, data: JSON.stringify({ app: APP, schema: SCHEMA, kind: 'entry-pack', exported: nowISO(), codeIncluded: includeCode, job: copy, photos }, null, 1) });
+  if (!reports) return files; // a bulk backup: the entry and its photos are enough to restore it
   try {
     onProgress('Building the report…');
     const { buildPdf } = await import('./pdf.js');
@@ -72,6 +73,40 @@ export async function buildPropertyPack(p, { includeCode = false, onProgress = (
     files.push(...await entryFiles(job, folder, { includeCode, onProgress }));
   }
   return { blob: await zipFiles(files), filename: `${top} - ${todayLocal()}.zip` };
+}
+
+/**
+ * Many entries as one or more zips (a backup you can import again). A new zip is started when the photos so far pass
+ * maxBytes, so a big clear-out does not need all the device's memory at once. jobs: full job objects.
+ * Returns [{ blob, filename }].
+ */
+export async function buildBatchPacks(jobs, { includeCode = false, reports = false, maxBytes = 120e6, onProgress = () => {} } = {}) {
+  const top = `PropertyPad backup ${todayLocal()}`;
+  const parts = [];
+  let files = [];
+  let bytes = 0;
+  const used = new Set();
+  const flush = () => { if (files.length) { parts.push(files); files = []; bytes = 0; } };
+  for (let i = 0; i < jobs.length; i++) {
+    onProgress(`Packing ${i + 1} of ${jobs.length}…`);
+    const job = jobs[i];
+    let folder = `${safe(addressTitle(job.address))} - ${(job.created || '').slice(0, 10)} - ${safe(natureOf(job))}`.slice(0, 150);
+    if (used.has(folder)) folder += ` (${job.id.slice(0, 4)})`;
+    used.add(folder);
+    const f = await entryFiles(job, folder, { includeCode, reports });
+    const size = f.reduce((n, x) => n + (x.data?.size ?? x.data?.length ?? 0), 0);
+    if (files.length && bytes + size > maxBytes) flush();
+    files.push(...f);
+    bytes += size;
+  }
+  flush();
+  const out = [];
+  for (let i = 0; i < parts.length; i++) {
+    onProgress(parts.length > 1 ? `Zipping part ${i + 1} of ${parts.length}…` : 'Zipping…');
+    const n = parts.length > 1 ? ` (part ${i + 1} of ${parts.length})` : '';
+    out.push({ blob: await zipFiles([...parts[i], { name: 'README.txt', data: README }]), filename: `${top}${n}.zip` });
+  }
+  return out;
 }
 
 /** Read a pack: every entry in it as backup-shaped data, photos attached as blobs. */
