@@ -20,11 +20,11 @@ export const GROUPS = [
     ],
   },
   {
-    key: 'pricing', emoji: '💷', title: 'Pricing', text: 'Materials & labour calculator. Quotes and invoices coming soon.',
+    key: 'pricing', emoji: '💷', title: 'Pricing', text: 'Materials & labour costings, quotes and invoices.',
     forms: [
       { form: 'price', emoji: '🧮', title: 'Materials & labour', text: 'Cost materials and labour line by line – markup, VAT and running totals.' },
-      { emoji: '📝', title: 'Quote', text: 'Turn a costing into a quote for the customer.' },
-      { emoji: '🧾', title: 'Invoice', text: 'Turn a quote into an invoice.' },
+      { form: 'quote', emoji: '📝', title: 'Quote', text: 'A quote for the customer, from scratch or from a costing.' },
+      { form: 'invoice', emoji: '🧾', title: 'Invoice', text: 'An invoice for the customer, from scratch or from a quote.' },
     ],
   },
   {
@@ -63,7 +63,7 @@ export const cardInner = (f, ready, go = '+') => [
   ready ? h('span', { class: 'form-go', 'aria-hidden': 'true' }, go) : null];
 
 /** Where an entry opens: plans start on Room dimensions, everything else on its Address tab. */
-export const entryPath = (job) => (isPlan(job) ? `/job/${job.id}/dimensions` : isCalc(job) ? `/job/${job.id}/calculate` : `/job/${job.id}`);
+export const entryPath = (job) => (job.form === 'quote' || job.form === 'invoice' ? `/job/${job.id}/items` : isPlan(job) ? `/job/${job.id}/dimensions` : isCalc(job) ? `/job/${job.id}/calculate` : `/job/${job.id}`);
 
 /**
  * Create an entry (choice is a form key, e.g. 'void' or 'plan:kitchen') in a property. With no property it
@@ -79,6 +79,7 @@ export async function createEntry(choice, propertyId) {
   const job = newJob({ surveyor: getLastSurveyor(), form, planKind });
   job.propertyId = p.id;
   job.address = structuredClone(p.address);
+  if (form === 'quote' || form === 'invoice') await (await import('../docs/create.js')).initDoc(job); // company, number and dates
   await saveJob(job);
   requestPersist(); // ask the browser to keep our data (helps against eviction, esp. on iOS)
   return job;

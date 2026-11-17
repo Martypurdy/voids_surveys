@@ -1562,3 +1562,17 @@ a.form-card { text-decoration: none; color: inherit; }
   .rv-overlay[data-drop="left"] .rv-main { box-shadow: inset 8px 0 0 var(--primary); }
   .rv-overlay[data-drop="right"] .rv-main { box-shadow: inset -8px 0 0 var(--primary); }
 }
+
+/* ----- Quotes and invoices ----- */
+.doc-biz { margin-bottom: 12px; }
+.doc-cols { display: flex; flex-direction: column; gap: 12px; margin: 12px 0; }
+.doc-totals { display: flex; flex-direction: column; gap: 6px; }
+.doc-trow { display: flex; justify-content: space-between; gap: 12px; }
+.doc-total { border-top: 2px solid var(--primary); padding-top: 6px; font-size: 1.15rem; }
+.rep-out { justify-content: center; }
+.rep-out-val { font-weight: 700; white-space: nowrap; }
+.biz-docs { margin: 8px 0; border: 1px solid var(--border); border-radius: 12px; padding: 4px 12px; }
+.biz-docs > summary { padding: 10px 0; font-weight: 600; cursor: pointer; }
+.biz-docs-body { display: flex; flex-direction: column; gap: 6px; padding-bottom: 8px; }
+@media (min-width: 900px) { .doc-cols { flex-direction: row; align-items: flex-start; } .doc-cols > * { flex: 1 1 0; } }
+@media (min-width: 900px) { .rep-sheet.lst .rep-out { padding-top: 8px; align-items: flex-end; } }

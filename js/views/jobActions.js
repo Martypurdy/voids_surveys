@@ -1,6 +1,6 @@
 // Per-job actions dialog: PDF report, .json backup, delete.
 import { deleteJob, flushSave, saveJob, moveEntry } from '../db.js';
-import { jobTitle, backupStatus, fmtDateTime, isPrice, isInspection, formOf } from '../model.js';
+import { jobTitle, backupStatus, fmtDateTime, isPrice, isInspection, isQuote, isInvoice, formOf } from '../model.js';
 import { entryName, addressTitle } from '../properties.js';
 import { h, choose, confirmDialog, toast, busy, textField } from '../ui.js';
 import { pickProperty } from './pickProperty.js';
@@ -31,12 +31,14 @@ export async function jobActions(job) {
     buttons: [
       { label: '👁 Preview report', value: 'preview', class: 'btn-primary' },
       isInspection(job) ? { label: '📧 Email report', value: 'email', class: 'btn-primary' } : null,
+      isPrice(job) ? { label: '📝 Make a quote from this costing', value: 'mkquote', class: 'btn-primary' } : null,
+      isQuote(job) ? { label: job.doc.invoiceId ? '🧾 Open its invoice' : '🧾 Make an invoice from this quote', value: 'mkinvoice', class: 'btn-primary' } : null,
       { label: '⬇ Export… (PDF, Word or Excel)', value: 'export', class: 'btn-primary' },
       { label: 'Backup file (.json)', value: 'json', class: 'btn-primary' },
       { label: '🗜 Pack (zip: entry, photos and PDF)', value: 'pack', class: 'btn-primary' },
       { label: '✎ Rename (nature of the file)', value: 'rename' },
       { label: '📁 Move to another property', value: 'move' },
-      { label: isPrice(job) ? 'Delete costing' : isInspection(job) || job.form === 'repair' ? 'Delete survey' : job.form === 'rams' ? 'Delete RAMS pack' : job.form === 'calc' ? 'Delete calculation' : 'Delete plan', value: 'delete', class: 'btn-danger' },
+      { label: isPrice(job) ? 'Delete costing' : isInspection(job) || job.form === 'repair' ? 'Delete survey' : job.form === 'rams' ? 'Delete RAMS pack' : job.form === 'calc' ? 'Delete calculation' : isQuote(job) ? 'Delete quote' : isInvoice(job) ? 'Delete invoice' : 'Delete plan', value: 'delete', class: 'btn-danger' },
       { label: 'Cancel', value: null },
     ].filter(Boolean),
   });
@@ -82,6 +84,20 @@ export async function jobActions(job) {
       toast(`Export failed: ${e.message}`);
     }
     return null;
+  }
+
+  if (action === 'mkquote') {
+    const { quoteFromCosting } = await import('../docs/create.js');
+    const q = await quoteFromCosting(job);
+    toast(`Quote ${q.doc.number} made from this costing`);
+    return `goto:/job/${q.id}/items`;
+  }
+  if (action === 'mkinvoice') {
+    if (job.doc.invoiceId) return `goto:/job/${job.doc.invoiceId}/items`;
+    const { invoiceFromQuote } = await import('../docs/create.js');
+    const inv = await invoiceFromQuote(job);
+    toast(`Invoice ${inv.doc.number} made from this quote`);
+    return `goto:/job/${inv.id}/items`;
   }
 
   if (action === 'rename') {
@@ -145,6 +161,7 @@ export async function jobActions(job) {
     const ok = await confirmDialog(`Delete “${jobTitle(job)}” and all its photos from this device? This can’t be undone.`);
     if (!ok) return null;
     await deleteJob(job.id);
+    if (isInvoice(job)) await (await import('../accounts/store.js')).removeIncomeFor(job.id); // its income goes with it
     toast('Survey deleted');
     return 'deleted';
   }

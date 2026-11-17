@@ -51,6 +51,8 @@ export const FORMS = {
   rtl: { title: 'Ready to let', pdfTitle: 'Ready to Let Inspection', file: 'Ready to let' },
   price: { title: 'Materials & labour', pdfTitle: 'Materials & Labour Costing', file: 'Materials and labour' },
   plan: { title: 'Floor plan', pdfTitle: 'Floor Plan', file: 'Floor plan' },
+  quote: { title: 'Quote', pdfTitle: 'Quote', file: 'Quote', emoji: '📝' },
+  invoice: { title: 'Invoice', pdfTitle: 'Invoice', file: 'Invoice', emoji: '🧾' },
   calc: { title: 'Calculation', pdfTitle: 'Calculation', file: 'Calculation' },
   rams: { title: 'RAMS pack', pdfTitle: 'RAMS & CDM Pack', file: 'RAMS pack', emoji: '🦺' },
   repair: { title: 'Property repair survey', pdfTitle: 'Property Repair Survey', file: 'Repair survey', emoji: '🛠️' },
@@ -157,13 +159,38 @@ export const newCalc = (kind = 'concrete') => ({
   kind: calcByKey(kind).key, ...defaultsFor(kind), materials: [],
   ref: '', customer: '', customerAddress: { postcode: '', text: '' }, notes: '',
 });
+// 'quote' and 'invoice' = documents for a customer (Pricing on the home screen): the client, the items and the terms. job.doc holds it.
+// They carry the company they are from (businessId) and a number from that company's sequence.
+const DOC_SECTIONS = [
+  ['address', 'Address', ''],
+  ['items', 'Items', 'items'],
+  ['terms', 'Terms', 'terms'],
+];
+export const isDoc = (job) => job.form === 'quote' || job.form === 'invoice';
+export const isQuote = (job) => job.form === 'quote';
+export const isInvoice = (job) => job.form === 'invoice';
+export const QUOTE_STATUSES = [['draft', 'Draft'], ['sent', 'Sent'], ['accepted', 'Accepted'], ['declined', 'Declined']];
+export const INVOICE_STATUSES = [['draft', 'Draft'], ['sent', 'Sent'], ['paid', 'Paid']];
+export const newDocLine = () => ({ id: uid(), item: '', qty: '', unit: '', price: '' });
+/**
+ * A quote or invoice. vat: 'plus' (VAT added to the prices) or 'none'. discount is a £ amount or a % (discountType). deposit: what has
+ * already been paid (invoices). due: when an invoice is due, or how long a quote is valid until. quoteId / invoiceId / sourceId link
+ * an invoice to the quote it came from, a quote to its invoice, and either to the costing it was made from.
+ */
+export const newDoc = (kind = 'quote') => ({
+  kind: kind === 'invoice' ? 'invoice' : 'quote', businessId: '', number: '', numberAuto: false, issued: todayLocal(), due: '', status: 'draft', paidDate: '',
+  customer: '', customerAddress: { postcode: '', text: '' }, ref: '',
+  lines: [newDocLine()], vat: 'none', vatRate: '20', discount: '', discountType: '£', deposit: '',
+  notes: '', terms: '', payment: '', quoteId: '', invoiceId: '', sourceId: '',
+});
 const RTL_SECTIONS = SECTIONS.filter(([k]) => k !== 'materials');
 /** Sign off signature (both forms). image: PNG data URL; date: ISO time signed. */
 export const newSignature = () => ({ name: '', image: '', date: '' });
 export const isRtl = (job) => job.form === 'rtl';
 /** The tabs for this job's form. */
-export const sectionsOf = (job) => (isRtl(job) ? RTL_SECTIONS : isPrice(job) ? PRICE_SECTIONS : isPlan(job) ? PLAN_SECTIONS : isRepair(job) ? REPAIR_SECTIONS : isRams(job) ? RAMS_SECTIONS : isCalc(job) ? CALC_SECTIONS : SECTIONS);
+export const sectionsOf = (job) => (isRtl(job) ? RTL_SECTIONS : isPrice(job) ? PRICE_SECTIONS : isPlan(job) ? PLAN_SECTIONS : isRepair(job) ? REPAIR_SECTIONS : isRams(job) ? RAMS_SECTIONS : isCalc(job) ? CALC_SECTIONS : isDoc(job) ? DOC_SECTIONS : SECTIONS);
 export const formOf = (job) => (isPlan(job) ? { ...FORMS.plan, ...PLAN_KINDS[job.plan?.kind || 'property'] }
+  : isDoc(job) ? { ...FORMS[job.form], title: `${FORMS[job.form].title}${job.doc?.number ? ` ${job.doc.number}` : ''}` }
   : isCalc(job) ? { ...FORMS.calc, title: `${calcByKey(job.calc?.kind).title} calculation`, pdfTitle: `${calcByKey(job.calc?.kind).title} Calculation`, emoji: calcByKey(job.calc?.kind).emoji }
   : FORMS[job.form] || FORMS.void);
 
@@ -286,6 +313,12 @@ export function upgradeJob(job) {
     // Plans finished before the Room dimensions tab existed stay complete.
     if (job.progress?.plan === 'complete' && !job.progress.dimensions) job.progress.dimensions = 'complete';
   }
+  if (isDoc(job)) {
+    const d = newDoc(job.form);
+    job.doc = { ...d, ...(job.doc || {}), kind: d.kind };
+    job.doc.customerAddress = { postcode: '', text: '', ...(job.doc.customerAddress || {}) };
+    if (!Array.isArray(job.doc.lines) || !job.doc.lines.length) job.doc.lines = [newDocLine()];
+  }
   if (isCalc(job)) {
     const d = newCalc(job.calc?.kind);
     const defaults = defaultsFor(d.kind, { useMemory: false });
@@ -357,6 +390,7 @@ export function newJob({ surveyor = '', form = 'void', planKind = 'property' } =
     ...(form === 'repair' ? { repair: newRepair() } : {}),
     ...(form === 'rams' ? { rams: newRams() } : {}),
     ...(form === 'calc' ? { calc: newCalc(planKind) } : {}),
+    ...(form === 'quote' || form === 'invoice' ? { doc: newDoc(form) } : {}),
     signature: newSignature(),
     id: uid(),
     created: t,
@@ -544,6 +578,7 @@ export function jobTitle(job) {
   if (isRepair(job)) return 'New repair survey';
   if (isRams(job)) return 'New RAMS pack';
   if (isCalc(job)) return `New ${calcByKey(job.calc?.kind).title.toLowerCase()} calculation`;
+  if (isDoc(job)) return job.doc?.number ? `${FORMS[job.form].title} ${job.doc.number}` : `New ${job.form}`;
   if (isPlan(job)) return `New ${(PLAN_KINDS[job.plan?.kind] || PLAN_KINDS.property).title.toLowerCase()}`;
   return 'New survey';
 }

@@ -22,6 +22,8 @@ export function sheetEditor({ job, items, make, cols, onChange = () => {}, photo
   const textCols = cols.filter((c) => !c.kind || c.kind === 'text');
   const isBlank = (it) => textCols.every((c) => blankText(it[c.k])) && !(photos && it.photos?.length) && cols.every((c) => c.kind !== 'sign' || !it[c.k]);
   let nums = new Map();
+  const outs = []; // read-only columns (kind 'out', with fmt(item)): worked out from the row, updated as you type
+  const updateOuts = () => { for (const o of outs) o.el.textContent = o.fmt(o.item); };
 
   const ensureSpare = () => {
     const last = items[items.length - 1];
@@ -32,6 +34,7 @@ export function sheetEditor({ job, items, make, cols, onChange = () => {}, photo
     let n = 0;
     for (const it of items) if (!isBlank(it)) nums.set(it.id, ++n); else nums.delete(it.id);
     for (const el of sheet.querySelectorAll('.rep-num')) { const v = nums.get(el.dataset.id); el.textContent = v ? String(v) : '+'; }
+    updateOuts();
   };
 
   const rowEl = (it) => {
@@ -41,6 +44,12 @@ export function sheetEditor({ job, items, make, cols, onChange = () => {}, photo
       renumber();
     };
     const cells = cols.map((c) => {
+      if (c.kind === 'out') {
+        const span = h('span', { class: 'rep-out-val' });
+        outs.push({ el: span, fmt: c.fmt, item: it });
+        span.textContent = c.fmt(it);
+        return h('div', { class: 'rep-cell rep-out' }, h('span', { class: 'rep-lbl' }, c.label), span);
+      }
       if (c.kind === 'check') {
         const box = h('input', { type: 'checkbox', checked: Boolean(it[c.k]), 'aria-label': c.label, onchange: (e) => { it[c.k] = e.target.checked; onChange(); } });
         return h('label', { class: 'rep-cell rep-check' }, h('span', { class: 'rep-lbl' }, c.label), box);
@@ -86,6 +95,7 @@ export function sheetEditor({ job, items, make, cols, onChange = () => {}, photo
   const render = () => {
     while (items.length < minRows) items.push(make()); // always at least minRows lines to fill in
     ensureSpare();
+    outs.length = 0;
     sheet.replaceChildren(
       h('div', { class: 'rep-head', 'aria-hidden': 'true' }, numbered ? h('span', null, 'No.') : null, cols.map((c) => h('span', null, c.label)), photos ? h('span', null, 'Photos') : null, h('span', null, '')),
       ...items.map(rowEl));
@@ -104,6 +114,7 @@ export function sheetEditor({ job, items, make, cols, onChange = () => {}, photo
   }, addLabel);
   const wrap = h('div', { class: 'lst-wrap' }, sheet, h('div', { class: 'btn-row' }, add));
   wrap.refresh = render;
+  wrap.refreshOuts = updateOuts;
   return wrap;
 }
 

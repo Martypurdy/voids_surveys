@@ -4,15 +4,18 @@ import { h, toast, choose, busy, pageHeader, confirmDialog } from '../ui.js';
 import { openCamera, cameraSupported } from '../camera.js';
 import { allCategories, UNSORTED, categoryOf, currentTaxYear, taxYearStart, taxYearLabel, monthLabel } from '../accounts/hmrc.js';
 import { listReceipts, newReceipt, deleteReceipt, storeReceiptImage, categoryForSupplier, knownSuppliers, getSettings, setSettings, getRules, forgetRule, loadCustomCategories, addCustomCategory, removeCustomCategory,
-  loadBusinesses, getBusinesses, businessOf, currentBusiness, selectBusiness, addBusiness, updateBusiness, removeBusiness, BUSINESS_COLORS, inkFor } from '../accounts/store.js';
-import { yearTotals, receiptParts, receiptsInYear, money } from '../accounts/totals.js';
+  pruneIncome, loadBusinesses, getBusinesses, businessOf, currentBusiness, selectBusiness, addBusiness, updateBusiness, removeBusiness, BUSINESS_COLORS, inkFor } from '../accounts/store.js';
+import { yearTotals, receiptParts, receiptsInYear, money, incomeInYear, incomeSum } from '../accounts/totals.js';
 import { parseReceiptText } from '../accounts/parse.js';
 import { reviewReceipt } from './receiptReview.js';
+import { manageBusinesses as openBusinessDialog } from './businessDialog.js';
+import { getJob } from '../db.js';
 
 export default async function accounts(root) {
   const settings = getSettings();
   await loadCustomCategories();
   await loadBusinesses();
+  await pruneIncome(getJob); // income follows its invoice: gone if the invoice is deleted or no longer paid
   let biz = currentBusiness();
   let allReceipts = await listReceipts();
   const mine = () => allReceipts.filter((r) => businessOf(r) === biz.id);
@@ -128,6 +131,24 @@ export default async function accounts(root) {
     return [h('div', { class: 'acc-filters' }, catSel, search), listEl];
   }
 
+  // ---------- income tab: paid invoices ----------
+  function incomeTab() {
+    const list = incomeInYear(receipts, year).sort((a, b) => b.date.localeCompare(a.date));
+    if (!list.length) return [h('p', { class: 'hint' }, 'No paid invoices in this tax year yet. Mark an invoice as Paid (with the date) and it appears here.')];
+    let month = '';
+    const els = [];
+    for (const r of list) {
+      const m = r.date.slice(0, 7);
+      if (m !== month) { month = m; els.push(h('h3', { class: 'acc-month' }, monthLabel(m))); }
+      const p = receiptParts(r, vatRegistered());
+      els.push(h('a', { class: 'acc-row', href: `#/job/${r.invoiceId}/terms` },
+        h('span', { class: 'acc-date' }, r.date.slice(8, 10) + '/' + r.date.slice(5, 7)),
+        h('span', { class: 'acc-what' }, h('strong', null, r.supplier || 'Customer'), h('small', null, r.notes || 'Invoice')),
+        h('span', { class: 'acc-amt' }, money(p.total), p.vat ? h('small', null, `VAT ${money(p.vat)}`) : null)));
+    }
+    return [h('p', { class: 'hint' }, 'Paid invoices. Tap one to open it; change or un-mark it there.'), h('div', { class: 'acc-list' }, els)];
+  }
+
   // ---------- totals tab ----------
   function totalsTab() {
     const t = yearTotals(receipts, year, { vatRegistered: vatRegistered() });
@@ -204,73 +225,9 @@ export default async function accounts(root) {
   };
 
   async function manageBusinesses() {
-    const content = h('div', null);
-    let editing = null;
-    let color = BUSINESS_COLORS[getBusinesses().length % BUSINESS_COLORS.length];
-    const paint = () => {
-      const list = getBusinesses();
-      const name = h('input', { type: 'text', placeholder: 'e.g. Smith Plumbing Ltd, or Kitchen job at 12 High St', value: editing ? editing.name : '', autocapitalize: 'words', 'aria-label': 'Business name' });
-      const vat = h('input', { type: 'checkbox', checked: editing ? editing.vatRegistered : false });
-      const swatches = h('div', { class: 'biz-swatches', role: 'group', 'aria-label': 'Colour' });
-      const picker = h('input', { type: 'color', value: color, 'aria-label': 'Pick any colour', oninput: (e) => { color = e.target.value; paintSwatches(); } });
-      const paintSwatches = () => swatches.replaceChildren(...BUSINESS_COLORS.map((c) => h('button', { type: 'button', class: 'biz-swatch', style: `background:${c}`, 'aria-label': c, 'aria-pressed': String(color.toLowerCase() === c), onclick: () => { color = c; picker.value = c; paintSwatches(); } })), picker);
-      paintSwatches();
-      const save = h('button', { type: 'button', class: 'btn-primary', onclick: async () => {
-        try {
-          if (editing) await updateBusiness(editing.id, { name: name.value, color, vatRegistered: vat.checked });
-          else { const b = await addBusiness({ name: name.value, color, vatRegistered: vat.checked }); selectBusiness(b.id); }
-          biz = currentBusiness();
-          editing = null;
-          color = BUSINESS_COLORS[getBusinesses().length % BUSINESS_COLORS.length];
-          receipts = mine();
-          paintBiz();
-          paint();
-          render();
-        } catch (err) { toast(err.message); }
-      } }, editing ? 'Save changes' : 'Add business');
-      content.replaceChildren(
-        h('p', { class: 'hint' }, 'Add each company, contractor or project you keep records for. Pick a colour: the top bar takes it, so you can see at a glance who you are adding to.'),
-        ...list.map((b) => h('div', { class: 'biz-row' },
-          h('span', { class: 'biz-dot', style: `background:${b.color}` }),
-          h('span', { class: 'biz-name' }, b.name),
-          h('button', { type: 'button', class: 'btn-small', onclick: () => { editing = b; color = b.color; paint(); } }, 'Edit'),
-          list.length > 1 ? h('button', { type: 'button', class: 'btn-small btn-danger', onclick: () => removeIt(b, paint) }, 'Remove') : null)),
-        h('div', { class: 'biz-form' },
-          h('strong', null, editing ? `Edit “${editing.name}”` : 'Add a company or project'),
-          h('label', { class: 'field' }, h('span', { class: 'field-label' }, 'Name'), name),
-          h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Colour'), swatches),
-          h('label', { class: 'rv-check' }, vat, h('span', null, 'VAT registered')),
-          h('div', { class: 'btn-row' }, save, editing ? h('button', { type: 'button', onclick: () => { editing = null; paint(); } }, 'Cancel edit') : null)));
-    };
-    async function removeIt(b, repaint) {
-      const count = allReceipts.filter((r) => businessOf(r) === b.id).length;
-      const others = getBusinesses().filter((x) => x.id !== b.id);
-      let moveTo = others[0].id;
-      if (count) {
-        const pick = await choose({
-          title: `Remove “${b.name}”?`,
-          message: `It has ${count} receipt${count === 1 ? '' : 's'}. What should happen to them?`,
-          buttons: [
-            ...others.map((o) => ({ label: `Move them to “${o.name}”`, value: `move:${o.id}`, class: 'btn-primary' })),
-            { label: 'Delete the receipts and their pictures', value: 'delete', class: 'btn-danger' },
-            { label: 'Cancel', value: null },
-          ],
-        });
-        if (!pick) return;
-        moveTo = pick.startsWith('move:') ? pick.slice(5) : '';
-      } else if (!(await confirmDialog(`Remove “${b.name}”?`, { ok: 'Remove' }))) return;
-      try {
-        await removeBusiness(b.id, moveTo);
-        if (biz.id === b.id) { selectBusiness(null); biz = currentBusiness(); }
-        allReceipts = await listReceipts();
-        receipts = mine();
-        paintBiz();
-        repaint();
-        render();
-      } catch (err) { toast(err.message); }
-    }
-    paint();
-    await choose({ title: 'Companies and projects', content, buttons: [{ label: 'Done', value: 'done', class: 'btn-primary' }] });
+    await openBusinessDialog();
+    await loadBusinesses();
+    biz = currentBusiness();
     allReceipts = await listReceipts();
     receipts = mine();
     paintBiz();
@@ -285,12 +242,15 @@ export default async function accounts(root) {
     vatBox.checked = vatRegistered();
     const list = receiptsInYear(receipts, year);
     const t = yearTotals(receipts, year, { vatRegistered: vatRegistered() });
+    const inc = incomeSum(incomeInYear(receipts, year), vatRegistered());
     summary.replaceChildren(
       h('div', { class: 'acc-stat' }, h('strong', null, String(t.count)), h('span', null, t.count === 1 ? 'receipt' : 'receipts')),
       h('div', { class: 'acc-stat' }, h('strong', null, money(t.total)), h('span', null, vatRegistered() ? 'spent (excl. VAT)' : 'spent')),
-      vatRegistered() ? h('div', { class: 'acc-stat' }, h('strong', null, money(t.vat)), h('span', null, 'VAT to reclaim')) : null);
-    const seg = h('div', { class: 'segmented', role: 'group', 'aria-label': 'View' }, [['receipts', 'Receipts'], ['totals', 'Totals']].map(([k, label]) => h('button', { type: 'button', 'aria-pressed': String(tab === k), onclick: () => { tab = k; render(); } }, label)));
-    body.replaceChildren(seg, ...(tab === 'receipts' ? receiptsTab(list) : totalsTab()));
+      vatRegistered() ? h('div', { class: 'acc-stat' }, h('strong', null, money(t.vat)), h('span', null, 'VAT to reclaim')) : null,
+      inc.count ? h('div', { class: 'acc-stat acc-income' }, h('strong', null, money(inc.net)), h('span', null, vatRegistered() ? 'income (excl. VAT)' : 'income')) : null,
+      inc.count ? h('div', { class: 'acc-stat' }, h('strong', null, money(inc.net - t.total)), h('span', null, 'income less spending')) : null);
+    const seg = h('div', { class: 'segmented', role: 'group', 'aria-label': 'View' }, [['receipts', 'Receipts'], ['income', 'Income'], ['totals', 'Totals']].map(([k, label]) => h('button', { type: 'button', 'aria-pressed': String(tab === k), onclick: () => { tab = k; render(); } }, label)));
+    body.replaceChildren(seg, ...(tab === 'receipts' ? receiptsTab(list) : tab === 'income' ? incomeTab() : totalsTab()));
   }
 
   root.append(

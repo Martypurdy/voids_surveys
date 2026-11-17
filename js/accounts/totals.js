@@ -44,4 +44,19 @@ export function yearTotals(receipts, start, { vatRegistered = false } = {}) {
   return { months, rows: rows.filter((r) => r.total !== 0 || r.vat !== 0 || Object.keys(r.byMonth).length), monthTotals, total, vat, gross, count: list.length };
 }
 
+/** Paid invoices (income) in a tax year. */
+export const incomeInYear = (receipts, start) => receipts.filter((r) => r.kind === 'income' && taxYearStart(r.date) === start);
+/** Income in pence: without VAT when VAT registered (the VAT belongs to HMRC), otherwise the full amount. */
+export function incomeSum(list, vatRegistered) {
+  let net = 0, vat = 0, gross = 0;
+  for (const r of list) {
+    const total = pence(r.total);
+    const v = vatRegistered && r.vatOn ? Math.min(pence(r.vat), total) : 0;
+    net += total - v;
+    vat += v;
+    gross += total;
+  }
+  return { net, vat, gross, count: list.length };
+}
+
 export const money = (p) => `£${(p / 100).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

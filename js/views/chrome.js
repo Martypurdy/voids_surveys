@@ -55,6 +55,7 @@ export function jobChrome(job, section, { back = `#${homeOf(job)}`, title } = {}
         onclick: async () => {
           const r = await jobActions(job);
           if (r === 'deleted' || r === 'moved') go(homeOf(job));
+          else if (typeof r === 'string' && r.startsWith('goto:')) go(r.slice(5));
         },
       }, icon(ICONS.share)),
     }),

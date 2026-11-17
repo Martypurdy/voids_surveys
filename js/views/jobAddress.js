@@ -1,6 +1,7 @@
 // Screen: address – postcode lookup, address, GPS, navigate, surveyor.
 import { scheduleSave } from '../db.js';
-import { jobTitle, fmtDateTime, isPrice, isPlan, isRepair, isRams, isCalc } from '../model.js';
+import { jobTitle, fmtDateTime, isPrice, isPlan, isRepair, isRams, isCalc, isDoc } from '../model.js';
+import { businessBar } from '../docs/ui.js';
 import { ramsDetails } from './ramsStart.js';
 import { h, textField, toast, confirmDialog } from '../ui.js';
 import { lookupPostcode, lookupStreet, formatPostcode, getPosition, directionsUrl, pinUrl, demoAddress, isDemoPostcode } from '../geo.js';
@@ -147,14 +148,17 @@ export default async function jobAddress(root, { id }) {
 
   // Materials & labour costing: customer (with their own address – they may not live at
   // the project address) and job reference at the top.
-  const refBox = isPrice(job) || isRepair(job) || isRams(job) || isCalc(job) ? customerBox(job, save, updateDerived) : null;
+  const refBox = isPrice(job) || isRepair(job) || isRams(job) || isCalc(job) || isDoc(job) ? customerBox(job, save, updateDerived) : null;
+  const chrome = jobChrome(job, 'address');
+  const docBar = isDoc(job) ? await businessBar(job, chrome[0]) : null; // quotes and invoices: the company bar, in its colour
 
   root.append(
-    ...jobChrome(job, 'address'),
+    ...chrome,
     h('div', { class: 'content' },
+      docBar,
       isRams(job) ? [h('h2', null, 'The job'), ramsDetails(job, save, updateDerived)] : null,
-      refBox ? [h('h2', null, isRepair(job) ? 'Tenant / contact and job number' : isRams(job) || isCalc(job) ? 'Client or tenant and job number' : 'Customer / job reference'), refBox] : null,
-      h('h2', null, isPrice(job) ? 'Project address' : isRepair(job) || isRams(job) || isCalc(job) ? 'Property address' : 'Address'),
+      refBox ? [h('h2', null, isRepair(job) ? 'Tenant / contact and job number' : isRams(job) || isCalc(job) ? 'Client or tenant and job number' : isDoc(job) ? 'Client' : 'Customer / job reference'), refBox] : null,
+      h('h2', null, isPrice(job) ? 'Project address' : isDoc(job) ? 'Site address (where the work is)' : isRepair(job) || isRams(job) || isCalc(job) ? 'Property address' : 'Address'),
       h('div', { class: 'input-row' }, postcodeField, lookupBtn),
       h('p', { class: 'hint' }, 'Look up finds the street and town for the postcode. Check it and add the house number – you can edit the address freely.'),
       addressField,
@@ -181,10 +185,10 @@ async function addressForPostcode(postcode) {
 
 /** Costing: customer name, the customer's own address (postcode look-up) and job reference. */
 function customerBox(job, save, onChange) {
-  const rep = isRepair(job) || isRams(job) || isCalc(job);
-  const p = isRepair(job) ? job.repair : isRams(job) ? job.rams : isCalc(job) ? job.calc : job.pricing;
+  const rep = isRepair(job) || isRams(job) || isCalc(job) || isDoc(job);
+  const p = isRepair(job) ? job.repair : isRams(job) ? job.rams : isCalc(job) ? job.calc : isDoc(job) ? job.doc : job.pricing;
   const ca = p.customerAddress;
-  const who = isRams(job) || isCalc(job) ? 'Client / tenant' : rep ? 'Tenant / contact' : 'Customer';
+  const who = isDoc(job) ? 'Client' : isRams(job) || isCalc(job) ? 'Client / tenant' : rep ? 'Tenant / contact' : 'Customer';
   const pcField = textField(`${who} postcode`, ca.postcode, (v) => { ca.postcode = v; save(); }, { autocapitalize: 'characters', enterkeyhint: 'search', placeholder: 'e.g. LS1 1UR' });
   const pcInput = pcField.querySelector('input');
   const addrField = textField(`${who} address`, ca.text, (v) => { ca.text = v; save(); }, { multiline: true, autocapitalize: 'words', placeholder: 'House number and street\nTown\nPostcode' });
@@ -241,5 +245,5 @@ function customerBox(job, save, onChange) {
     h('div', { class: 'input-row' }, pcField, lookBtn),
     addrField,
     h('div', { class: 'btn-row' }, sameBtn),
-    textField(isRams(job) || isCalc(job) ? 'Job number' : rep ? 'Job / work order no.' : 'Job reference', p.ref, (v) => { p.ref = v; save(); onChange(); }, { autocapitalize: 'characters', placeholder: 'e.g. Job number or order ref' }));
+    textField(isDoc(job) ? 'Client reference or PO number' : isRams(job) || isCalc(job) ? 'Job number' : rep ? 'Job / work order no.' : 'Job reference', p.ref, (v) => { p.ref = v; save(); onChange(); }, { autocapitalize: 'characters', placeholder: 'e.g. Job number or order ref' }));
 }

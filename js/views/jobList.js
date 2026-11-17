@@ -74,7 +74,7 @@ export default async function jobList(root) {
     const pct = e.total ? Math.round((e.done / e.total) * 100) : 0;
     const title = hasAddress(p.address) ? `${addressTitle(p.address)} – ${e.nature || f.title}` : `${e.nature || f.title} – no address yet`;
     return h('div', { class: 'card job-card', dataset: { state: e.done || e.started ? 'progress' : 'new', form: e.form } },
-      h('a', { href: e.form === 'plan' ? `#/job/${e.id}/dimensions` : e.form === 'calc' ? `#/job/${e.id}/calculate` : `#/job/${e.id}` },
+      h('a', { href: e.form === 'plan' ? `#/job/${e.id}/dimensions` : e.form === 'calc' ? `#/job/${e.id}/calculate` : e.form === 'quote' || e.form === 'invoice' ? `#/job/${e.id}/items` : `#/job/${e.id}` },
         h('div', { class: 'job-head' },
           h('div', { class: 'job-title' }, title),
           h('span', { class: 'job-pill' }, e.done || e.started ? 'In progress' : 'New')),

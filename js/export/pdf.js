@@ -1,5 +1,5 @@
 // PDF report (jsPDF, loaded on demand from /vendor).
-import { addressLines, jobTitle, fmtDate, fmtDateTime, slug, todayLocal, allPhotoIds, worksSummary, roomStatus, roomAreas, serviceTitle, hasMeterDoor, isRtl, isPrice, isPlan, isRepair, isRams, isCalc, formOf, textLines } from '../model.js';
+import { addressLines, jobTitle, fmtDate, fmtDateTime, slug, todayLocal, allPhotoIds, worksSummary, roomStatus, roomAreas, serviceTitle, hasMeterDoor, isRtl, isPrice, isPlan, isRepair, isRams, isCalc, isDoc, formOf, textLines } from '../model.js';
 import { usedRows, usedMaterials, rowNumbers, materialSource, repairPhotos, rowPhotoNumbers } from '../repair.js';
 import { fileBase } from '../properties.js';
 import { ITEMS, roomFigures, floorArea, planArea, metres, sqm, openingGeometry, bounds, legend, cornerPoints, cabinetNumbers, cabinetText, frontEdge, cornerLabelPoint, blindGeometry, endPanels, panelLines, refreshPosts, refreshDepths, settingsLine, cabinetShapes, badgePoint, featureTags, describeFeature, serviceInfo } from '../plan.js';
@@ -362,6 +362,12 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
       para(`-  ${t.name}${q ? `  ${q}` : ''}`, { size: 10, x: M + 4, width: CW - 4 });
     }
   };
+
+  // Quotes and invoices have their own page layout (no cover).
+  if (isDoc(job)) {
+    await docReport();
+    return finish();
+  }
 
   // ---------- cover ----------
   onProgress('Building report…');
@@ -1384,6 +1390,128 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
     } else {
       detailRows([['Signature', 'Not signed']]);
     }
+  }
+
+  // ---------- Quote / invoice (hoisted) ----------
+  // A page for the customer: the company's name and details on its colour, the number and dates, who it is for, the items, the totals,
+  // how to pay (invoices) and the terms. Cost and markup never appear.
+  async function docReport() {
+    const { documentParts } = await import('./docs/document.js');
+    const { hexToRgb, shadeRgb, inkRgb } = await import('../docs/colors.js');
+    const { lineAmount, fmtMoney: fm } = await import('../docs/money.js');
+    const { money: moneyOf } = await import('../pricing.js');
+    const p = await documentParts(job);
+    const { d, biz, isInvoice, lines, t } = p;
+    const base = hexToRgb(biz.color), dark = shadeRgb(biz.color, 0.55), ink = inkRgb(biz.color);
+    const has = (v) => String(v ?? '').trim() !== '';
+    const date = (v) => (has(v) ? fmtDate(v) : '');
+
+    // header band
+    doc.setFillColor(...base);
+    doc.rect(M, y, CW, 20, 'F');
+    font(17, 'bold', ink);
+    doc.text(doc.splitTextToSize(clean(biz.name), CW - 62)[0] || '', M + 4, y + 12.8);
+    font(20, 'bold', ink);
+    doc.text(p.label.toUpperCase(), W - M - 4, y + 13.2, { align: 'right' });
+    y += 26;
+
+    // from (left) and the number and dates (right)
+    const top = y;
+    let ly = top;
+    font(9, 'normal', [60, 66, 72]);
+    for (const l of String(p.from).split('\n').filter(has)) for (const w of doc.splitTextToSize(clean(l), 92)) { doc.text(w, M, ly + 3.2); ly += 4.4; }
+    let ry = top;
+    const meta = [[`${p.label} number`, d.number], ['Date', date(d.issued)], [p.dueLabel, date(d.due)], ['Reference', d.ref], isInvoice && d.status === 'paid' ? ['Paid', date(d.paidDate)] : null].filter((r) => r && has(r[1]));
+    for (const [k, v] of meta) {
+      font(8.5, 'bold', dark);
+      doc.text(clean(k).toUpperCase(), W - M - 62, ry + 3.2);
+      font(10, 'normal', [20, 24, 28]);
+      doc.text(doc.splitTextToSize(clean(v), 40)[0] || '', W - M, ry + 3.4, { align: 'right' });
+      ry += 5.6;
+    }
+    y = Math.max(ly, ry) + 5;
+
+    // who it is for, and where the work is
+    const block = (x, w, title, text) => {
+      font(8.5, 'bold', dark);
+      doc.text(title, x, y + 3);
+      let by = y + 7.5;
+      font(10.5, 'normal', [20, 24, 28]);
+      String(text).split('\n').filter(has).forEach((l, i) => { for (const s of doc.splitTextToSize(clean(l), w)) { if (i === 0) font(10.5, 'bold', [20, 24, 28]); else font(10, 'normal', [40, 46, 52]); doc.text(s, x, by); by += 4.8; } });
+      return by;
+    };
+    const b1 = block(M, 85, 'BILL TO', p.billTo || '-');
+    const b2 = has(p.site) ? block(M + 95, 85, 'SITE ADDRESS', p.site) : y;
+    y = Math.max(b1, b2) + 4;
+
+    // items
+    const cols = [['Description', 88], ['Qty', 16, 'right'], ['Unit', 22], ['Price', 26, 'right'], ['Amount', 28, 'right']];
+    const pad = 1.8, size = 9.5, lh = lineH(size);
+    const head = () => {
+      ensure(18);
+      doc.setFillColor(...dark);
+      doc.rect(M, y, CW, 7.5, 'F');
+      font(9, 'bold', [255, 255, 255]);
+      let x = M;
+      for (const [label, w, al] of cols) { doc.text(label, al === 'right' ? x + w - pad : x + pad, y + 5.1, al === 'right' ? { align: 'right' } : undefined); x += w; }
+      y += 7.5;
+    };
+    head();
+    for (const l of lines) {
+      font(size, 'normal');
+      const cells = [l.item || '', has(l.qty) ? l.qty : '1', l.unit || '', fm(Math.round(moneyOf(l.price) * 100)), fm(lineAmount(l))];
+      const wrapped = cells.map((c, i) => doc.splitTextToSize(clean(c), cols[i][1] - pad * 2));
+      const rowH = Math.max(8, Math.max(...wrapped.map((w) => w.length)) * lh + pad * 2);
+      if (y + rowH > BOTTOM) { doc.addPage(); y = M; head(); }
+      doc.setDrawColor(205, 210, 216);
+      doc.setLineWidth(0.2);
+      doc.line(M, y + rowH, M + CW, y + rowH);
+      let x = M;
+      wrapped.forEach((ls, i) => {
+        font(size, 'normal', [20, 24, 28]);
+        ls.forEach((s, k) => doc.text(s, cols[i][2] === 'right' ? x + cols[i][1] - pad : x + pad, y + pad + lh * (k + 0.78), cols[i][2] === 'right' ? { align: 'right' } : undefined));
+        x += cols[i][1];
+      });
+      y += rowH;
+    }
+    y += 4;
+
+    // totals, to the right
+    const totalLine = (label, value, { bold = false, big = false, rgb = [20, 24, 28] } = {}) => {
+      const sz = big ? 12.5 : 10;
+      ensure(lineH(sz) + 3);
+      font(sz, bold ? 'bold' : 'normal', rgb);
+      doc.text(label, W - M - 38, y + lineH(sz) * 0.78, { align: 'right' });
+      doc.text(value, W - M - pad, y + lineH(sz) * 0.78, { align: 'right' });
+      y += lineH(sz) + 1.6;
+    };
+    totalLine('Subtotal', fm(t.subtotal));
+    if (t.discount) totalLine(d.discountType === '%' ? `Discount (${d.discount}%)` : 'Discount', `-${fm(t.discount)}`);
+    if (d.vat === 'plus') totalLine(`VAT at ${t.rate}%`, fm(t.vat));
+    doc.setDrawColor(...dark);
+    doc.setLineWidth(0.4);
+    doc.line(W - M - 80, y, W - M, y);
+    y += 1.5;
+    totalLine('Total', fm(t.total), { bold: true, big: !(isInvoice && t.paid), rgb: dark });
+    if (isInvoice && t.paid) {
+      totalLine('Already paid', `-${fm(t.paid)}`);
+      totalLine('Balance due', fm(t.due), { bold: true, big: true, rgb: dark });
+    }
+    y += 4;
+
+    // words
+    const words = (title, text) => {
+      if (!has(text)) return;
+      ensure(18);
+      font(8.5, 'bold', dark);
+      doc.text(title, M, y + 3);
+      y += 6.5;
+      para(text, { size: 9.5 });
+      y += 3;
+    };
+    words('NOTES', d.notes);
+    if (isInvoice) words('HOW TO PAY', p.payment);
+    words('TERMS', d.terms);
   }
 
   // ---------- RAMS pack and other model-based documents (hoisted) ----------

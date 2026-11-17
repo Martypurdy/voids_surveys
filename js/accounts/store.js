@@ -8,7 +8,9 @@
 // "income" is for invoices (Phase 7) so they can slot in without changing the data. Anything finance-related that is added later
 // (invoices, quotes, mileage…) carries a businessId the same way.
 //
-// A business (company or project): { id, name, color (hex), vatRegistered }. There is always at least one.
+// A business (company or project): { id, name, color (hex), vatRegistered, plus the details printed on quotes and invoices: address,
+// phone, email, vatNumber, companyNumber, bank, terms, quotePrefix, invoicePrefix, nextQuote, nextInvoice, payDays, validDays }.
+// There is always at least one.
 import { createStore, get, set, del, values } from '../../vendor/idb-keyval.js';
 import { putPhoto, deletePhotos } from '../db.js';
 import { resizeImage, makeThumb } from '../photos.js';
@@ -44,6 +46,10 @@ export function inkFor(hex) {
   return L > 0.4 ? '#111' : '#fff';
 }
 
+/** The details a business prints on its quotes and invoices, with their starting values. */
+export const BUSINESS_DETAIL_DEFAULTS = { address: '', phone: '', email: '', vatNumber: '', companyNumber: '', bank: '', terms: '', quotePrefix: 'Q-', invoicePrefix: 'INV-', nextQuote: 1, nextInvoice: 1, payDays: 14, validDays: 30 };
+const withDefaults = (b) => ({ ...BUSINESS_DETAIL_DEFAULTS, ...b });
+
 /** Load the businesses (making a first one, with the VAT setting you had before, if there are none). */
 export async function loadBusinesses() {
   let list = (await get(BIZ, store)) || [];
@@ -51,8 +57,8 @@ export async function loadBusinesses() {
     list = [{ id: uid(), name: 'My business', color: BUSINESS_COLORS[0], vatRegistered: Boolean(readSettings().vatRegistered) }];
     await set(BIZ, list, store);
   }
-  BUSINESSES = list;
-  return list;
+  BUSINESSES = list.map(withDefaults); // older records gain the document details
+  return BUSINESSES;
 }
 export const getBusinesses = () => BUSINESSES;
 /** The business a receipt belongs to; receipts from before businesses existed belong to the first one. */
@@ -66,11 +72,20 @@ export const selectBusiness = (id) => setSettings({ businessId: id });
 const cleanName = (n) => String(n ?? '').trim().replace(/\s+/g, ' ').slice(0, 60);
 const cleanColor = (c) => (/^#[0-9a-f]{6}$/i.test(c || '') ? c.toLowerCase() : BUSINESS_COLORS[0]);
 
-export async function addBusiness({ name, color, vatRegistered = false }) {
+const DETAIL_TEXT = ['address', 'phone', 'email', 'vatNumber', 'companyNumber', 'bank', 'terms', 'quotePrefix', 'invoicePrefix'];
+const DETAIL_NUM = { nextQuote: [1, 999999], nextInvoice: [1, 999999], payDays: [0, 365], validDays: [0, 365] };
+/** Copy the document details from a patch, cleaned. */
+function applyDetails(b, patch) {
+  for (const k of DETAIL_TEXT) if (patch[k] != null) b[k] = String(patch[k]).slice(0, k === 'bank' || k === 'terms' || k === 'address' ? 600 : 60).replace(/\r/g, '');
+  for (const [k, [lo, hi]] of Object.entries(DETAIL_NUM)) if (patch[k] != null && patch[k] !== '') { const n = Math.round(Number(patch[k])); if (Number.isFinite(n)) b[k] = Math.max(lo, Math.min(hi, n)); }
+}
+
+export async function addBusiness({ name, color, vatRegistered = false, ...details }) {
   const n = cleanName(name);
   if (!n) throw new Error('Type the business name first');
   if (BUSINESSES.some((b) => b.name.toLowerCase() === n.toLowerCase())) throw new Error(`You already have “${n}”`);
-  const b = { id: uid(), name: n, color: cleanColor(color || BUSINESS_COLORS[BUSINESSES.length % BUSINESS_COLORS.length]), vatRegistered: Boolean(vatRegistered) };
+  const b = withDefaults({ id: uid(), name: n, color: cleanColor(color || BUSINESS_COLORS[BUSINESSES.length % BUSINESS_COLORS.length]), vatRegistered: Boolean(vatRegistered) });
+  applyDetails(b, details);
   BUSINESSES = [...BUSINESSES, b];
   await set(BIZ, BUSINESSES, store);
   return b;
@@ -86,8 +101,33 @@ export async function updateBusiness(id, patch) {
   }
   if (patch.color != null) b.color = cleanColor(patch.color);
   if (patch.vatRegistered != null) b.vatRegistered = Boolean(patch.vatRegistered);
+  applyDetails(b, patch);
   await set(BIZ, BUSINESSES, store);
   return b;
+}
+
+// ---------- quote and invoice numbers (per business) ----------
+const pad4 = (n) => String(n).padStart(4, '0');
+export const documentNumber = (b, kind) => (kind === 'invoice' ? `${b.invoicePrefix}${pad4(b.nextInvoice)}` : `${b.quotePrefix}${pad4(b.nextQuote)}`);
+/** Take the business's next number for a quote or invoice (and move its counter on). */
+export async function takeNumber(businessId, kind) {
+  const b = BUSINESSES.find((x) => x.id === businessId) || BUSINESSES[0];
+  if (!b) return '';
+  const n = documentNumber(b, kind);
+  if (kind === 'invoice') b.nextInvoice += 1; else b.nextQuote += 1;
+  await set(BIZ, BUSINESSES, store);
+  return n;
+}
+/** Give a number back when it is the last one issued (so changing a document's company leaves no gap). */
+export async function releaseNumber(businessId, kind, number) {
+  const b = BUSINESSES.find((x) => x.id === businessId);
+  if (!b) return;
+  const prefix = kind === 'invoice' ? b.invoicePrefix : b.quotePrefix;
+  const next = kind === 'invoice' ? b.nextInvoice : b.nextQuote;
+  if (number === `${prefix}${pad4(next - 1)}` && next > 1) {
+    if (kind === 'invoice') b.nextInvoice -= 1; else b.nextQuote -= 1;
+    await set(BIZ, BUSINESSES, store);
+  }
 }
 /** Remove a business. Its receipts are moved to moveTo, or deleted (with their pictures) when moveTo is empty. The last one cannot be removed. */
 export async function removeBusiness(id, moveTo = '') {
@@ -214,4 +254,33 @@ export async function knownSuppliers(businessId = currentBusiness()?.id || '') {
   for (const r of await listReceipts()) if (businessOf(r) === businessId && r.supplier?.trim()) names.set(supplierKey(r.supplier), r.supplier.trim());
   for (const v of Object.values(await getRules(businessId))) if (v.name) names.set(supplierKey(v.name), v.name);
   return [...names.values()];
+}
+
+// ---------- income (paid invoices) ----------
+// A paid invoice is kept in the accountancy data as a record of kind 'income' with the id 'inv-<invoice job id>'. It follows the invoice:
+// marking the invoice paid creates it, changing it updates it, and un-marking (or deleting the invoice) removes it.
+const incomeId = (jobId) => `inv-${jobId}`;
+export async function syncIncome(job, totals) {
+  const doc = job.doc;
+  const id = incomeId(job.id);
+  if (!doc || doc.kind !== 'invoice' || doc.status !== 'paid' || !/^\d{4}-\d{2}-\d{2}$/.test(doc.paidDate || '')) {
+    await del(id, store);
+    return null;
+  }
+  const rec = (await get(id, store)) || newReceipt({ id, kind: 'income', source: 'invoice' });
+  Object.assign(rec, {
+    id, kind: 'income', source: 'invoice', date: doc.paidDate, supplier: doc.customer || 'Customer', total: totals.total / 100, vat: totals.vat ? totals.vat / 100 : null,
+    vatOn: totals.vat > 0, category: '', notes: `Invoice ${doc.number}`, businessId: doc.businessId, invoiceId: job.id, propertyId: job.propertyId || '', photoId: '',
+  });
+  await saveReceipt(rec);
+  return rec;
+}
+export const removeIncomeFor = (jobId) => del(incomeId(jobId), store);
+/** Drop income records whose invoice no longer exists or is no longer paid (call when the accountancy screen opens). */
+export async function pruneIncome(getJobById) {
+  for (const r of await listReceipts()) {
+    if (r.kind !== 'income' || !r.invoiceId) continue;
+    const job = await getJobById(r.invoiceId);
+    if (!job?.doc || job.doc.status !== 'paid') await del(r.id, store);
+  }
 }

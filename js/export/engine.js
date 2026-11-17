@@ -4,7 +4,7 @@
 //
 // To add a document type (repair survey, quote, invoice, RAMS…): write docs/<name>.js with a model builder (for
 // Word) and a workbook builder (for Excel), then add it to modelFor / workbookFor and formatChoices below.
-import { isPrice, isPlan, isInspection, isRepair, isRams, isCalc, todayLocal } from '../model.js';
+import { isPrice, isPlan, isInspection, isRepair, isRams, isCalc, isDoc, todayLocal } from '../model.js';
 import { fileBase } from '../properties.js';
 import { buildXlsx } from './xlsx.js';
 import { buildDocx } from './docx.js';
@@ -24,6 +24,13 @@ export function formatChoices(job) {
       ['xlsx', 'Live formulas: change a quantity, price, markup or the VAT and every total updates. Product links stay clickable.'],
       ['pdf', 'To send to the customer – looks the same on every device.'],
       ['docx', 'To edit the wording or add your own letter around it.'],
+    ]);
+  }
+  if (isDoc(job)) {
+    return pick([
+      ['pdf', 'The document for your customer: your company details and colour, the items, VAT and totals.'],
+      ['xlsx', 'The items and totals with live formulas: change a quantity, price or the VAT and every total updates.'],
+      ['docx', 'An editable copy to change the wording or add a covering letter.'],
     ]);
   }
   if (isCalc(job)) {
@@ -62,7 +69,7 @@ export function formatChoices(job) {
 }
 
 /** The editable format that suits a document best (added to its pack next to the PDF). */
-export const bestEditable = (job) => (isInspection(job) || isRepair(job) || isRams(job) ? 'docx' : 'xlsx'); // costings, plans and calculations: Excel
+export const bestEditable = (job) => (isInspection(job) || isRepair(job) || isRams(job) ? 'docx' : 'xlsx'); // costings, plans, calculations, quotes and invoices: Excel
 
 export const exportFilename = (job, format) => `${fileBase(job)} - ${todayLocal()}.${FORMATS[format].ext}`;
 
@@ -107,6 +114,7 @@ export async function workbookFor(job, { includeCode = false, onProgress = () =>
   if (isRepair(job)) return (await import('./docs/repair.js')).repairWorkbook(job, { loadImage: photoLoader(onProgress) });
   if (isRams(job)) return (await import('./docs/rams.js')).ramsWorkbook(job);
   if (isCalc(job)) return (await import('./docs/calc.js')).calcWorkbook(job);
+  if (isDoc(job)) { const m = await import('./docs/document.js'); return m.documentWorkbook(await m.documentParts(job)); }
   if (isPrice(job)) return (await import('./docs/costing.js')).costingWorkbook(job);
   if (isPlan(job)) return (await import('./docs/plan.js')).planWorkbook(job);
   const m = await import('./docs/inspection.js');
@@ -118,6 +126,7 @@ export async function modelFor(job, { includeCode = false, onProgress = () => {}
   if (isRepair(job)) return (await import('./docs/repair.js')).repairModel(job);
   if (isRams(job)) return (await import('./docs/rams.js')).ramsModel(job);
   if (isCalc(job)) return (await import('./docs/calc.js')).calcModel(job);
+  if (isDoc(job)) { const m = await import('./docs/document.js'); return m.documentModel(await m.documentParts(job), job); }
   if (isPrice(job)) return (await import('./docs/costing.js')).costingModel(job);
   if (isPlan(job)) {
     const { buildPdf } = await import('./pdf.js');

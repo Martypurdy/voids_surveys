@@ -126,7 +126,9 @@ export function buildDetail(p) {
         'aria-label': `Actions for ${entryName(e)}`,
         onclick: async () => {
           const job = await getJob(e.id);
-          if (job && await jobActions(job)) refresh();
+          const r = job && await jobActions(job);
+          if (typeof r === 'string' && r.startsWith('goto:')) go(r.slice(5));
+          else if (r) refresh();
         },
       }, icon(ICONS.more)));
   };

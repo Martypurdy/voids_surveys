@@ -85,8 +85,14 @@ Before each phase, show a short plan and wait for an OK.
 - Notes: the scanner files (about 7 MB per device) are in `vendor/tesseract/` and cached on first use, not at install (see `docs/accounts.md`).
 
 ## Phase 7 – Quotes & invoices
-- Quote and invoice templates, exportable as PDF, Word and Excel.
-- Can sit inside an entry folder and feed income into the accountancy data.
+- [x] Quote and Invoice forms under Pricing on the home screen. Each sits in a property folder (or "No address yet") with tabs Address, Items, Terms.
+- [x] Each document is from one of your companies (the same coloured Company / project bar as Accountancy, and the top bar takes its colour). Businesses now hold the details printed on documents: address, contact, VAT and company number, bank details, standard terms, number prefixes and next numbers, payment days.
+- [x] Make a quote from a Materials & labour costing (the customer sees cost plus markup, never the cost or markup); make an invoice from a quote (linked both ways, quote marked Accepted).
+- [x] Items with quantity, unit and price; VAT (none or added at a rate), discount (£ or %), and an amount already paid / deposit; totals worked out as you type.
+- [x] Statuses (quote: Draft, Sent, Accepted, Declined; invoice: Draft, Sent, Paid, and Overdue automatically past the due date). Numbers are per company and can be typed over.
+- [x] Marking an invoice Paid (with the date) adds it to Accountancy as income for its company (new Income tab, income and income-less-spending in the summary); it follows the invoice if the amount changes, and goes if the invoice is un-paid or deleted.
+- [x] Exports through the Phase 2 engine: PDF (the company's colour and details, items, totals, how to pay, terms), Word, and Excel with live formulas. Packs hold the PDF plus the Excel copy.
+- Notes: credit notes, recurring invoices, a logo image and sending by email are not included (share sheet as for the other reports). See `docs/documents.md`.
 
 ## Phase 8 – Accountant pack
 - One download per tax year: spreadsheet of all receipts and invoices,
