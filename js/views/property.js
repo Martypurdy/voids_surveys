@@ -3,9 +3,9 @@
 import { scheduleSave } from '../db.js';
 import {
   PROPERTY_TYPES, PROPERTY_STYLES,
-  CLEARANCE_OPTIONS, CLEARANCE_HINTS, CLEARANCE_BY, isRtl,
+  CLEARANCE_OPTIONS, CLEARANCE_HINTS, CLEARANCE_OWNERS, syncClearance, ownerLabel, isRtl,
 } from '../model.js';
-import { h, textField, selectField, multiSelect, worksButton } from '../ui.js';
+import { h, textField, selectField, worksButton, toast } from '../ui.js';
 import { photoField } from '../photos.js';
 import { loadJobOr404, jobChrome, completeFooter } from './chrome.js';
 
@@ -44,25 +44,33 @@ export default async function property(root, { id }) {
   syncVisibility();
 
   // ----- Clearance -----
-  const list = h('div', { class: 'works-list' });
+  // Pick Operative (orange) or Contractor (red), then tap tasks: each turns that colour. Tap again to clear it.
+  let mode = '';
+  const list = h('div', { class: 'alloc' });
   const renderList = () => {
-    const detail = [w.clearance.join(', '), w.clearanceBy.length ? `by ${w.clearanceBy.join(' / ')}` : '']
-      .filter(Boolean).join(' – ');
+    const who = w.clearanceWho;
     list.replaceChildren(
-      worksButton('Clearance / clean', detail || 'Tap to choose',
-        Boolean(w.clearance.length || w.clearanceBy.length), async () => {
-          const r = await multiSelect({
-            title: 'Clearance / clean',
-            groups: [
-              { label: 'Clearance / clean needed', options: CLEARANCE_OPTIONS, hints: CLEARANCE_HINTS, selected: w.clearance },
-              { label: 'Carried out by', options: CLEARANCE_BY, selected: w.clearanceBy },
-            ],
-          });
-          if (!r) return;
-          [w.clearance, w.clearanceBy] = r;
+      h('div', { class: 'alloc-who', role: 'group', 'aria-label': 'Who does the task' },
+        ...CLEARANCE_OWNERS.map(([k, label]) => h('button', {
+          type: 'button', class: `alloc-mode alloc-${k}`, 'aria-pressed': String(mode === k),
+          onclick: () => { mode = mode === k ? '' : k; renderList(); },
+        }, label))),
+      h('p', { class: 'hint' }, mode
+        ? `Now tap each task ${ownerLabel(mode)} will do. Tap a task again to clear it.`
+        : 'Tap Operative or Contractor first, then tap the tasks they will do.'),
+      h('div', { class: 'works-list' }, ...CLEARANCE_OPTIONS.map((t) => {
+        const owner = who[t];
+        const on = t in who;
+        const btn = worksButton(t, [CLEARANCE_HINTS[t], owner ? ownerLabel(owner) : ''].filter(Boolean).join(' – '), on, () => {
+          if (!mode) { toast('Tap Operative or Contractor first'); return; }
+          if (who[t] === mode) delete who[t]; else who[t] = mode;
+          syncClearance(w);
           save();
           renderList();
-        }, { chevron: '›' }));
+        });
+        if (owner) btn.dataset.owner = owner;
+        return btn;
+      })));
   };
   renderList();
 

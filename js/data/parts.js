@@ -54,15 +54,14 @@ export const PARTS = [
     label: 'Walls',
     fill: 'walls',
     defects: [
+      { id: 'WAL-09', label: 'Redecorate (emulsion)', unit: 'm2' },
       { id: 'WAL-01', label: 'Cracked plaster', unit: 'm2' },
-      { id: 'WAL-02', label: 'Blown / hollow plaster', unit: 'm2' },
       { id: 'WAL-03', label: 'Holes to make good', unit: 'nr' },
       { id: 'WAL-04', label: 'Damp', unit: 'm2' },
       { id: 'WAL-05', label: 'Mould treatment', unit: 'm2' },
-      { id: 'WAL-06', label: 'Remove graffiti', unit: 'm2' },
       { id: 'WAL-07', label: 'Strip wallpaper', unit: 'm2' },
       { id: 'WAL-08', label: 'Remove fixings / shelves', unit: 'nr' },
-      { id: 'WAL-09', label: 'Redecorate (emulsion)', unit: 'm2' },
+      { id: 'WAL-10', label: 'Stain Block', unit: 'm2' },
     ],
   },
   {

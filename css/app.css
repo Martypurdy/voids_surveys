@@ -1602,3 +1602,25 @@ a.form-card { text-decoration: none; color: inherit; }
 .mg-text span { font-size: .8rem; color: var(--muted); }
 .mg-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: var(--surface); border-top: 2px solid var(--primary); box-shadow: 0 -6px 18px rgb(0 0 0 / .18); }
 .mg-bar .btn-row { margin: 6px 0 0; }
+
+/* Clearance / clean: who does each task (Operative orange, Contractor red) */
+.alloc-who { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 4px; }
+.alloc-mode { min-height: 52px; border-radius: 12px; font-weight: 800; font-size: 1.05rem; background: var(--surface); border: 2px solid; cursor: pointer; }
+.alloc-op.alloc-mode { color: #b25400; border-color: #e8820c; }
+.alloc-con.alloc-mode { color: #b3261e; border-color: #c62828; }
+.alloc-op.alloc-mode[aria-pressed="true"] { background: #e8820c; color: #fff; }
+.alloc-con.alloc-mode[aria-pressed="true"] { background: #c62828; color: #fff; }
+.alloc .works-item[data-owner="op"] { background: #fff0dc; border-color: #e8820c; color: #8a4200; }
+.alloc .works-item[data-owner="op"] .works-tick { background: #e8820c; border-color: #e8820c; color: #fff; }
+.alloc .works-item[data-owner="con"] { background: #fde3e1; border-color: #c62828; color: #8c1d16; }
+.alloc .works-item[data-owner="con"] .works-tick { background: #c62828; border-color: #c62828; color: #fff; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .alloc-op.alloc-mode { color: #ffb066; }
+  :root:not([data-theme="light"]) .alloc-con.alloc-mode { color: #ff8a80; }
+  :root:not([data-theme="light"]) .alloc .works-item[data-owner="op"] { background: #43280a; color: #ffc891; }
+  :root:not([data-theme="light"]) .alloc .works-item[data-owner="con"] { background: #4a1714; color: #ffb4ab; }
+}
+:root[data-theme="dark"] .alloc-op.alloc-mode { color: #ffb066; }
+:root[data-theme="dark"] .alloc-con.alloc-mode { color: #ff8a80; }
+:root[data-theme="dark"] .alloc .works-item[data-owner="op"] { background: #43280a; color: #ffc891; }
+:root[data-theme="dark"] .alloc .works-item[data-owner="con"] { background: #4a1714; color: #ffb4ab; }

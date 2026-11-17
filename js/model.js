@@ -224,6 +224,26 @@ export const CLEARANCE_OPTIONS = ['Full clearance', 'Partial clearance', 'Needle
 /** Small text shown under an option. */
 export const CLEARANCE_HINTS = { 'Pre-clean': 'Environmental clean' };
 export const CLEARANCE_BY = ['Operatives', 'Contractor'];
+/** Who does each clearance / clean task: the two owners, in the order they are shown. */
+export const CLEARANCE_OWNERS = [['op', 'Operative'], ['con', 'Contractor']];
+export const ownerLabel = (k) => CLEARANCE_OWNERS.find(([c]) => c === k)?.[1] || '';
+/** Keep the older lists (clearance, clearanceBy) in step with the allocation map clearanceWho {task: 'op' | 'con' | ''}. */
+export function syncClearance(w) {
+  w.clearance = Object.keys(w.clearanceWho);
+  w.clearanceBy = CLEARANCE_OWNERS.filter(([k]) => Object.values(w.clearanceWho).includes(k)).map(([, l]) => (l === 'Operative' ? 'Operatives' : l));
+}
+/** "Operative – Pre-clean (environmental clean), Needle sweep; Contractor – Full clearance" */
+export function clearanceText(w) {
+  const name = (c) => (c === 'Pre-clean' ? 'Pre-clean (environmental clean)' : c);
+  const who = w.clearanceWho || {};
+  const parts = CLEARANCE_OWNERS.map(([k, l]) => {
+    const t = Object.keys(who).filter((c) => who[c] === k).map(name);
+    return t.length ? `${l} – ${t.join(', ')}` : '';
+  });
+  const un = Object.keys(who).filter((c) => !who[c]).map(name);
+  if (un.length) parts.push(`Not yet allocated – ${un.join(', ')}`);
+  return parts.filter(Boolean).join('; ');
+}
 
 export function newWorks() {
   return {
@@ -232,6 +252,7 @@ export function newWorks() {
     cylinders: null, // null = never chosen (pop-up pre-ticks Front door); [] = none
     clearance: [],
     clearanceBy: [],
+    clearanceWho: {}, // task -> 'op' (Operative, orange) | 'con' (Contractor, red) | '' (not allocated)
   };
 }
 
@@ -244,10 +265,7 @@ export function worksSummary(w, which = 'all') {
   if (sec && w.keySafe) out.push(['Fit key safe', '']);
   if (sec && w.gainEntry) out.push(['Gain entry', '']);
   if (sec && w.cylinders?.length) out.push(['Renew locks', w.cylinders.join(', ')]);
-  if (prop && (w.clearance.length || w.clearanceBy.length)) {
-    out.push(['Clearance / clean', [w.clearance.map((c) => (c === 'Pre-clean' ? 'Pre-clean (environmental clean)' : c)).join(', '), w.clearanceBy.length ? `by ${w.clearanceBy.join(' / ')}` : '']
-      .filter(Boolean).join(' – ')]);
-  }
+  if (prop && Object.keys(w.clearanceWho || {}).length) out.push(['Clearance / clean', clearanceText(w)]);
   return out;
 }
 
@@ -280,7 +298,9 @@ export function upgradeJob(job) {
   job.progress ??= {};
   job.property = { ...newProperty(), ...(job.property || {}) };
   if (!Array.isArray(job.property.photos)) job.property.photos = [];
+  const hadWho = Boolean(job.works?.clearanceWho);
   job.works = { ...newWorks(), ...(job.works || {}) };
+  if (!hadWho) delete job.works.clearanceWho; // older survey: allocated below from clearance / clearanceBy
   // 'Communal key / fob' was split into two options – keep both selected.
   const cyl = job.works.cylinders;
   if (Array.isArray(cyl) && cyl.includes('Communal key / fob')) {
@@ -288,6 +308,13 @@ export function upgradeJob(job) {
   }
   // 'Environmental' was renamed 'Pre-clean'.
   job.works.clearance = (job.works.clearance || []).map((c) => (c === 'Environmental' ? 'Pre-clean' : c));
+  // Older surveys: one "carried out by" for all tasks -> allocate each task to it (both or neither = not yet allocated).
+  if (!job.works.clearanceWho) {
+    const by = job.works.clearanceBy || [];
+    const owner = by.length === 1 ? (/contractor/i.test(by[0]) ? 'con' : 'op') : '';
+    job.works.clearanceWho = Object.fromEntries(job.works.clearance.map((c) => [c, owner]));
+  }
+  syncClearance(job.works);
   if (!Array.isArray(job.heating)) job.heating = [];
   // Older surveys: add Fuse board and Mains stop tap at the top of Services.
   for (const u of ['Mains stop tap', 'Fuse board']) {

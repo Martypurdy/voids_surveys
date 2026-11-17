@@ -57,6 +57,11 @@ export default async function security(root, { id }) {
           h('strong', null, '⚠ ACTION REQUIRED'),
           h('span', null, 'Communal keys required – Operative must arrange keys to be cut or communal lock change with manager before works are complete.'))
         : '',
+      w.cylinders?.includes('Post box')
+        ? h('div', { class: 'alert-box', role: 'alert' },
+          h('strong', null, '⚠ ACTION REQUIRED'),
+          h('span', null, 'Letter box lock required – Operative must arrange a new lock or keys for the letter box before works are complete.'))
+        : '',
       w.cylinders?.includes('Communal fob')
         ? h('div', { class: 'alert-box alert-amber', role: 'alert' },
           h('strong', null, '⚠ ACTION REQUIRED'),
