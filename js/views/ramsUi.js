@@ -15,7 +15,7 @@ const blankText = (v) => String(v ?? '').trim() === '';
  *   photos  true = a 📷 button per row (item.photos)      numbered  show 1, 2, 3 …
  *   onChange  called after every edit (save)
  */
-export function sheetEditor({ job, items, make, cols, onChange = () => {}, photos = false, numbered = false, removeLabel = 'Remove this row', confirmRemove = true }) {
+export function sheetEditor({ job, items, make, cols, onChange = () => {}, photos = false, numbered = false, removeLabel = 'Remove this row', confirmRemove = true, minRows = 3, addLabel = '+ Add line' }) {
   const sheet = h('div', { class: 'rep-sheet lst' });
   const template = `${numbered ? '38px ' : ''}${cols.map((c) => c.w || (c.kind === 'text' || !c.kind ? '1fr' : '84px')).join(' ')}${photos ? ' 84px' : ''} 48px`;
   sheet.style.setProperty('--cols', template);
@@ -84,15 +84,27 @@ export function sheetEditor({ job, items, make, cols, onChange = () => {}, photo
   };
 
   const render = () => {
+    while (items.length < minRows) items.push(make()); // always at least minRows lines to fill in
     ensureSpare();
     sheet.replaceChildren(
       h('div', { class: 'rep-head', 'aria-hidden': 'true' }, numbered ? h('span', null, 'No.') : null, cols.map((c) => h('span', null, c.label)), photos ? h('span', null, 'Photos') : null, h('span', null, '')),
       ...items.map(rowEl));
     renumber();
   };
-  sheet.refresh = render;
   render();
-  return sheet;
+  const add = h('button', {
+    type: 'button',
+    class: 'btn-small add-line-btn',
+    onclick: () => {
+      items.push(make());
+      onChange();
+      render();
+      sheet.querySelector('.rep-row:last-child textarea')?.focus();
+    },
+  }, addLabel);
+  const wrap = h('div', { class: 'lst-wrap' }, sheet, h('div', { class: 'btn-row' }, add));
+  wrap.refresh = render;
+  return wrap;
 }
 
 /** Hazards from the starter list and from saved sets: resolves with rows to add, or null. */

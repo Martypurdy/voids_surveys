@@ -1347,7 +1347,7 @@ a.form-card { text-decoration: none; color: inherit; }
   .content:not(.plan-page):not(.home):not(.wide):not(.props):not(.prop-detail) > h2 { break-after: avoid; margin-top: 0; } /* a column top drops its margin, so headings start level */
   .content:not(.plan-page):not(.home):not(.wide):not(.props):not(.prop-detail) > .complete-footer { column-span: all; }
   .content.wide { max-width: 1500px; margin-inline: auto; }
-  .content.wide > :not(.calc-wrap):not(.add-line):not(.run-total):not(.rep-sheet):not(.ra-list) { max-width: 720px; } /* the table uses the width; the controls keep their normal size */
+  .content.wide > :not(.calc-wrap):not(.add-line):not(.run-total):not(.rep-sheet):not(.ra-list):not(.lst-wrap) { max-width: 720px; } /* the table uses the width; the controls keep their normal size */
   .content.props, .content.prop-detail { max-width: 720px; margin-inline: auto; }
 
   /* home: start buttons beside Continue and Properties */

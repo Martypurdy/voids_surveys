@@ -11,6 +11,7 @@ export default async function repairMaterials(root, { id }) {
   const rep = job.repair;
   const save = () => scheduleSave(job);
   const list = h('div', { class: 'rep-mats' });
+  while (rep.materials.length < 3) rep.materials.push(newRepairMaterial('')); // always at least three lines to fill in
 
   const line = (m) => {
     const src = materialSource(rep, m.rowId, rowNumbers(rep));
@@ -23,9 +24,8 @@ export default async function repairMaterials(root, { id }) {
       h('button', { type: 'button', class: 'defect-remove', 'aria-label': 'Remove this material', onclick: () => { rep.materials.splice(rep.materials.indexOf(m), 1); save(); render(); } }, '−'));
   };
   const render = () => {
-    list.replaceChildren(...(rep.materials.length
-      ? rep.materials.map(line)
-      : [h('p', { class: 'hint' }, 'Nothing here yet. On the Repairs tab, tap “→ Materials” on a repair, or add a line below.')]));
+    while (rep.materials.length < 3) rep.materials.push(newRepairMaterial(''));
+    list.replaceChildren(...rep.materials.map(line));
   };
   render();
 

@@ -106,6 +106,7 @@ export default async function repairSheet(root, { id }) {
 
   const render = () => {
     numberEls = new Map();
+    while (rep.rows.length < 3) rep.rows.push(newRepairRow()); // always at least three rows to fill in
     ensureSpare();
     sheet.replaceChildren(
       h('div', { class: 'rep-head', 'aria-hidden': 'true' }, h('span', null, 'No.'), COLS.map(([, label]) => h('span', null, label)), h('span', null, 'Images'), h('span', null, '')),
@@ -119,5 +120,6 @@ export default async function repairSheet(root, { id }) {
     h('div', { class: 'content wide' },
       h('p', { class: 'hint' }, 'One row per repair. Photograph each with the 📷 button (hold it to view or delete). “→ Materials” puts what the repair needs on the Materials tab.'),
       sheet,
+      h('div', { class: 'btn-row' }, h('button', { type: 'button', class: 'btn-small add-line-btn', onclick: () => { rep.rows.push(newRepairRow()); save(); render(); sheet.querySelector('.rep-row:last-child textarea')?.focus(); } }, '+ Add row')),
       completeFooter(job, 'repairs')));
 }
