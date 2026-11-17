@@ -11,7 +11,7 @@ import { getLibrary } from '../sor.js';
 import { materialGroups, materialTotals, matQty } from '../materials.js';
 
 // Photos are re-encoded for the PDF so reports stay emailable. Each photo is stored once
-// and drawn twice: small in its section and large (about A5) on the Photos pages at the end.
+// and drawn twice: small in its section and larger (four to a page) on the Photos pages at the end.
 const PDF_PHOTO_MAX = 1400;
 const PDF_PHOTO_QUALITY = 0.7;
 
@@ -631,7 +631,7 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
   await photoPages();
   return finish();
 
-  // ---------- Photos: every photo, large and labelled, two to a page (hoisted) ----------
+  // ---------- Photos: every photo, labelled, four to a page (hoisted) ----------
   function photoList() {
     const items = [];
     const add = (ids, label) => (ids || []).forEach((id) => items.push({ id, label }));
@@ -669,24 +669,28 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
     doc.addPage();
     y = M;
     heading('Photos');
-    let slotH = (BOTTOM - y) / 2;
+    // four to a page: two columns, two rows
+    const gap = 6, cellW = (CW - gap) / 2;
+    let cellH = (BOTTOM - y) / 2;
+    let top0 = y;
     let slot = 0;
     for (const [i, it] of list.entries()) {
-      if (slot === 2) {
+      if (slot === 4) {
         doc.addPage();
         y = M;
-        slotH = (BOTTOM - y) / 2;
+        top0 = y;
+        cellH = (BOTTOM - y) / 2;
         slot = 0;
       }
-      const top = y;
-      font(10.5, 'bold', BRAND);
-      doc.text(doc.splitTextToSize(clean(`${i + 1}.  ${it.label}`), CW)[0], M, top + 4.5);
+      const x0 = M + (slot % 2) * (cellW + gap);
+      const top = top0 + Math.floor(slot / 2) * cellH;
+      font(9, 'bold', BRAND);
+      doc.text(doc.splitTextToSize(clean(`${i + 1}.  ${it.label}`), cellW)[0], x0, top + 4);
       const img = await pdfImage(recs.get(it.id));
-      const boxH = slotH - 12;
-      const s = Math.min(CW / img.w, boxH / img.h);
+      const boxH = cellH - 11;
+      const s = Math.min(cellW / img.w, boxH / img.h);
       const w = img.w * s, hgt = img.h * s;
-      doc.addImage(img.bytes, 'JPEG', M + (CW - w) / 2, top + 7, w, hgt, `photo-${it.id}`, 'NONE');
-      y = top + slotH;
+      doc.addImage(img.bytes, 'JPEG', x0 + (cellW - w) / 2, top + 6, w, hgt, `photo-${it.id}`, 'NONE');
       slot++;
     }
   }
