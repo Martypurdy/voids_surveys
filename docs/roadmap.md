@@ -72,16 +72,17 @@ Before each phase, show a short plan and wait for an OK.
 - Note: the hazard and control lists are starting points written for repairs and refurbishment work. The CITB, HSE and similar forms were used only as a guide to structure; none of their wording is copied.
 
 ## Phase 6 – Accountancy: receipt tracker
-- "Accountancy" button on the front screen.
-- Choose UK tax year (6 April to 5 April); receipts auto-assign by date.
-- Add receipts by camera or multi-select from gallery.
-- On-device OCR (Tesseract.js) reads date, supplier, amount, VAT; VAT on/off switch.
-- Check-and-correct screen after each scan.
-- Receipts sorted by date, stored locally.
-- Categories based on HMRC Self Assessment expense headings.
-- Supplier rules: once a supplier is categorised, future receipts auto-file there.
-- Spending totals per category per month and per year.
-- Data model must allow invoices (income) to slot in later.
+- [x] "Accountancy" button on the home screen, opening its own screen (not a form).
+- [x] Choose a UK tax year (6 April to 5 April); receipts are assigned to it automatically from their date.
+- [x] Add receipts by camera (several in a row), by multi-select from the gallery, or by hand.
+- [x] On-device OCR (Tesseract.js, vendored, offline after the first scan) reads date, supplier, total and VAT. A VAT registered switch, plus a per-receipt "has VAT" tick.
+- [x] Check-and-correct screen for every scan: the picture, the fields, and anything uncertain highlighted.
+- [x] Receipts sorted by date, stored on the device only (own IndexedDB store; pictures in the photo store).
+- [x] Categories are the HMRC Self Assessment expense headings (14), plus "Not sorted yet".
+- [x] Supplier rules: file a supplier once and later receipts from them are filed there automatically (viewable and removable).
+- [x] Spending totals per category per month and per year (VAT-aware); Excel export of a year with live SUMIFS totals.
+- [x] The data model carries kind: 'expense' | 'income', so invoices (Phase 7) can slot in later.
+- Notes: the scanner files (about 7 MB per device) are in `vendor/tesseract/` and cached on first use, not at install (see `docs/accounts.md`).
 
 ## Phase 7 – Quotes & invoices
 - Quote and invoice templates, exportable as PDF, Word and Excel.

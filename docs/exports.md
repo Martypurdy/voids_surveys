@@ -54,3 +54,5 @@ formula engine) and validate every part is well-formed with consistent relations
 Office itself accepts a file, so open one sample of each in real Word and Excel after changing a writer.
 
 The RAMS pack (`docs/rams.js`) builds one description (`ramsModel`) that both Word and PDF draw (PDF: `modelReport` in `pdf.js`), so they always agree. Table cells can hold `{ thumbs }` (small numbered photos) or `{ sig }` (a signature).
+
+Accountancy (`js/accounts/export.js`) builds its own workbook for a tax year (Totals with live SUMIFS formulas, and the Receipts list); the full accountant pack is Phase 8.

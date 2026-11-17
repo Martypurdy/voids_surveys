@@ -28,6 +28,7 @@ route('/job/:id/meters', () => import('./views/meters.js'));
 route('/job/:id/gifted', () => import('./views/gifted.js'));
 route('/job/:id/materials', () => import('./views/materials.js'));
 route('/job/:id/signoff', () => import('./views/signoff.js'));
+route('/accounts', () => import('./views/accounts.js'));
 route('/job/:id/calculate', () => import('./views/calcView.js'));
 route('/job/:id/calc-materials', () => import('./views/calcMaterials.js'));
 route('/job/:id/cpp', () => import('./views/ramsPlan.js'));

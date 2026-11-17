@@ -1,6 +1,6 @@
 // Service worker: precache the app shell, serve it cache-first so the app works offline.
 // Bump VERSION whenever any file below changes, so devices pick up the update.
-const VERSION = 'v88';
+const VERSION = 'v89';
 const CACHE = `voids-${VERSION}`;
 
 const ASSETS = [
@@ -58,6 +58,14 @@ const ASSETS = [
   'js/raLibrary.js',
   'js/rams.js',
   'js/calc/calculators.js',
+  'js/accounts/hmrc.js',
+  'js/accounts/parse.js',
+  'js/accounts/ocr.js',
+  'js/accounts/store.js',
+  'js/accounts/totals.js',
+  'js/accounts/export.js',
+  'js/views/accounts.js',
+  'js/views/receiptReview.js',
   'js/export/docs/calc.js',
   'js/views/calcView.js',
   'js/views/calcMaterials.js',
@@ -128,6 +136,20 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   // Only handle our own GET requests; postcodes.io, maps etc. go straight to the network.
   if (req.method !== 'GET' || url.origin !== self.location.origin) return;
+
+  // The receipt scanner's files (about 7 MB) are kept apart from the app: fetched the first time they are needed, then
+  // cached for good. Their cache name does not start with "voids-", so updates to the app leave them alone.
+  if (url.pathname.includes('/vendor/tesseract/')) {
+    event.respondWith((async () => {
+      const cache = await caches.open('ocr-files-v1');
+      const hit = await cache.match(req, { ignoreSearch: true });
+      if (hit) return hit;
+      const res = await fetch(req);
+      if (res.ok) cache.put(req, res.clone());
+      return res;
+    })());
+    return;
+  }
 
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);

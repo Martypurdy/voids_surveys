@@ -1454,3 +1454,56 @@ a.form-card { text-decoration: none; color: inherit; }
 .dyn-ans button[aria-pressed="true"][data-v="no"], .dyn-out button[aria-pressed="true"][data-v="stop"] { background: var(--poor); }
 .dyn-ans button[aria-pressed="true"][data-v="na"] { background: var(--na); }
 .dyn-out button[aria-pressed="true"][data-v="adjust"] { background: var(--fair); }
+
+/* ----- Accountancy ----- */
+.acc-top { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
+.acc-top select { flex: 1 1 200px; }
+.acc-vat { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.acc-vat input { width: 22px; height: 22px; }
+.acc-summary { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+.acc-stat { flex: 1 1 120px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; }
+.acc-stat strong { font-size: 1.25rem; color: var(--primary); }
+.acc-stat span { font-size: .8rem; color: var(--muted); }
+.acc-add { display: grid; grid-template-columns: 1fr; gap: 8px; margin-bottom: 16px; }
+.acc-filters { display: grid; grid-template-columns: 1fr; gap: 8px; margin-bottom: 10px; }
+.acc-month { margin: 14px 0 6px; font-size: .95rem; color: var(--muted); }
+.acc-list { display: flex; flex-direction: column; gap: 6px; }
+.acc-row { display: grid; grid-template-columns: 48px 1fr auto; gap: 10px; align-items: center; text-align: left; width: 100%; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; min-height: 56px; }
+.acc-date { font-weight: 700; color: var(--primary); }
+.acc-what { display: flex; flex-direction: column; min-width: 0; }
+.acc-what small, .acc-amt small { color: var(--muted); font-weight: 400; }
+.acc-what strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.acc-amt { display: flex; flex-direction: column; align-items: flex-end; font-weight: 700; }
+.acc-scroll { overflow-x: auto; margin-bottom: 12px; }
+.acc-table { border-collapse: collapse; font-size: .85rem; min-width: 100%; }
+.acc-table th, .acc-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: right; white-space: nowrap; }
+.acc-table th[scope="row"], .acc-table tfoot th { text-align: left; position: sticky; left: 0; background: var(--bg); }
+.acc-table thead th { background: var(--primary); color: #fff; }
+.acc-table thead th:first-child { text-align: left; position: sticky; left: 0; }
+.acc-total { font-weight: 700; }
+.acc-foot td, .acc-foot th { font-weight: 700; border-top: 2px solid var(--primary); }
+.acc-cats { display: flex; flex-direction: column; gap: 6px; }
+.acc-cat { display: flex; justify-content: space-between; gap: 12px; }
+.acc-foot-row { margin-top: 14px; }
+@media (min-width: 900px) { .acc-add { grid-template-columns: repeat(3, 1fr); } .acc-filters { grid-template-columns: 240px 1fr; } }
+
+/* the check-and-correct screen */
+.rv-overlay { position: fixed; inset: 0; z-index: 60; background: var(--bg); overflow-y: auto; padding: 12px; }
+.rv-card { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
+.rv-head { display: flex; justify-content: space-between; align-items: center; }
+.rv-status { margin: 0; min-height: 1.2em; color: var(--muted); font-size: .9rem; }
+.rv-busy .rv-form, .rv-busy .rv-buttons { opacity: .45; pointer-events: none; }
+.rv-imgwrap { background: #000; border-radius: 12px; overflow: hidden; max-height: 34vh; display: flex; justify-content: center; }
+.rv-imgwrap img { max-width: 100%; max-height: 34vh; object-fit: contain; }
+.rv-imgwrap.rv-big { max-height: none; }
+.rv-imgwrap.rv-big img { max-height: none; width: 100%; }
+.rv-form { display: flex; flex-direction: column; gap: 8px; }
+.rv-hint { color: var(--muted); font-size: .8rem; }
+.rv-field[data-flag="check"] input, .rv-field[data-flag="missing"] input { border-color: #d98a00; background: #fff6e0; }
+.rv-field[data-flag="check"] .field-label::after { content: ' – please check'; color: #a86b00; font-weight: 600; }
+.rv-field[data-flag="missing"] .field-label::after { content: ' – not found, please fill in'; color: #a86b00; font-weight: 600; }
+.rv-check { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+.rv-check input { width: 24px; height: 24px; }
+.rv-vat { display: flex; gap: 10px; align-items: flex-end; }
+.rv-vat .field { flex: 1; margin: 0; }
+.rv-buttons { display: flex; flex-direction: column; gap: 8px; padding-bottom: 24px; }

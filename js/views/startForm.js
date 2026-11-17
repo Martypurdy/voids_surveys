@@ -35,6 +35,7 @@ export const GROUPS = [
       { form: 'plan:property', emoji: '🏠', title: 'Whole property plan', text: 'Every room and floor with measurements, doors, windows, fuse board and water main.' },
     ],
   },
+  { key: 'accounts', emoji: '📒', title: 'Accountancy', text: 'Receipts read on your phone, VAT and spending by tax year.', href: '#/accounts' },
   {
     key: 'safety', emoji: '🦺', title: 'Health and safety', text: 'Risk assessments, method statements (RAMS) and CDM paperwork.',
     forms: [
@@ -104,19 +105,20 @@ export async function pickGroup(propertyId) {
   const key = await choose({
     title: 'Start something new',
     buttons: [
-      ...GROUPS.map((g) => ({ label: cardInner(g, Boolean(g.forms), '›'), value: g.key, class: g.forms ? 'form-card form-card-ready' : 'form-card form-card-soon' })),
+      ...GROUPS.map((g) => ({ label: cardInner(g, Boolean(g.forms || g.href), '›'), value: g.key, class: g.forms || g.href ? 'form-card form-card-ready' : 'form-card form-card-soon' })),
       { label: 'Cancel', value: null },
     ],
   });
   const g = GROUPS.find((x) => x.key === key);
   if (!g) return;
+  if (g.href) return go(g.href.slice(1));
   if (!g.forms) return pickGroup(propertyId);
   return pickForm(g, propertyId);
 }
 
 /** The grid of start buttons for one property. */
 export function formGrid(propertyId) {
-  return h('div', { class: 'form-grid' }, GROUPS.map((g) => h(g.forms ? 'button' : 'div', {
+  return h('div', { class: 'form-grid' }, GROUPS.map((g) => g.href ? h('a', { class: 'form-card form-card-ready form-card-group', href: g.href, dataset: { group: g.key } }, cardInner(g, true, '›')) : h(g.forms ? 'button' : 'div', {
     type: g.forms ? 'button' : null,
     class: `form-card${g.forms ? ' form-card-ready form-card-group' : ''}`,
     dataset: { group: g.key },
