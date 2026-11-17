@@ -1433,6 +1433,7 @@ a.form-card { text-decoration: none; color: inherit; }
 .calc-inputs, .calc-results { margin-bottom: 12px; }
 .calc-grid { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 8px; }
 .calc-res { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 10px 12px; background: var(--surface-2, #f1f5f9); border-radius: 10px; }
+.calc-res-total { background: transparent; border: 2px solid var(--primary); }
 .calc-res-label { color: var(--muted); font-size: .9rem; }
 .calc-res-val { font-size: 1.35rem; font-weight: 700; color: var(--primary); }
 .calc-res-val small { font-size: .8rem; font-weight: 500; color: var(--muted); }

@@ -37,10 +37,10 @@ export default async function calcView(root, { id }) {
     const f = textField(label, c.inputs[i.k], (v) => { c.inputs[i.k] = v; save(); refresh(); }, { inputmode: i.kind === 'frac' ? 'text' : 'decimal', placeholder: i.hint || (i.opt ? 'Optional' : '') });
     return f;
   };
-  const inputBox = h('div', { class: 'card card-body calc-inputs' }, spec.inputs.map((i) => {
+  const inputBox = h('div', { class: 'card card-body calc-inputs' }, spec.inputs.flatMap((i) => {
     const el = inputField(i);
     fields.push({ input: i, el });
-    return el;
+    return i.heading ? [h('h3', { class: 'mat-title calc-sub' }, i.heading), el] : [el];
   }));
 
   // ----- wastage -----
@@ -78,7 +78,7 @@ export default async function calcView(root, { id }) {
     }
     results.replaceChildren(
       h('strong', null, 'Results'),
-      h('div', { class: 'calc-grid' }, out.results.map((r) => h('div', { class: 'calc-res' }, h('span', { class: 'calc-res-label' }, r.label), h('span', { class: 'calc-res-val' }, r.value, r.unit ? h('small', null, ` ${r.unit}`) : null)))));
+      h('div', { class: 'calc-grid' }, out.results.map((r) => h('div', { class: r.total ? 'calc-res calc-res-total' : 'calc-res' }, h('span', { class: 'calc-res-label' }, r.label), h('span', { class: 'calc-res-val' }, r.value, r.unit ? h('small', null, ` ${r.unit}`) : null)))));
     how.hidden = false;
     how.replaceChildren(h('summary', null, h('span', { class: 'summary-title' }, 'How this is worked out')), h('ol', { class: 'calc-steps' }, out.steps.map((t) => h('li', null, t))), h('p', { class: 'hint' }, 'These are estimates. Check quantities against the product labels and the real job.'));
     addBtn.hidden = !out.lines.length;

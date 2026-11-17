@@ -1,10 +1,11 @@
 // Calculators for the Calculators button. Pure functions: no DOM, no storage (except the optional "last used" memory).
 // Every calculator is described the same way:
 //   key, title, emoji, group, text      what it is
-//   inputs       [{ k, label, unit, def, kind: 'num' | 'select' | 'frac', options, opt, hint, showIf: { otherInput: value } }]
+//   inputs       [{ k, label, unit, def, kind: 'num' | 'select' | 'frac', options, opt, hint, heading, showIf: { otherInput: value } }]  (heading: a sub-heading shown above this field)
 //   assumptions  [{ k, label, unit, def, hint }]    typical figures, shown on screen and editable
 //   waste        { mode: 'pct' | 'extra', value }    default wastage (false = no wastage option)
-//   compute(v, a, w)  ->  { results: [{ label, value, unit }], lines: [{ item, qty, unit }], steps: [text] }
+//   compute(v, a, w)  ->  { results: [{ label, value, unit, total? }], lines: [{ item, qty, unit }], steps: [text] }
+//   A result with total: true is a totals line (what you will actually buy, in all, and what is left over).
 // v = the inputs as numbers (select inputs stay text), a = the assumptions as numbers, w(qty, main) = a quantity with
 // wastage added: "pct" adds a percentage to everything; "extra" adds a fixed amount to the main quantity only.
 // Quantities bought in whole packs are rounded up AFTER wastage is added. All figures are estimates.
@@ -87,6 +88,8 @@ export const CALCS = [
         const bags = ceilN(volW / yieldM3);
         steps.push(`One ${fmt(a.bagKg, 0)} kg bag makes ${fmt(a.bagKg, 0)} ÷ ${fmt(a.dryDensity, 0)} = ${fmt(yieldM3, 4)} m³`, `Bags = ${fmt(volW, 3)} ÷ ${fmt(yieldM3, 4)} = ${fmt(volW / yieldM3, 1)}, rounded up to ${bags}`);
         results.push({ label: `Pre-mix bags (${fmt(a.bagKg, 0)} kg)`, value: String(bags), unit: 'bags' });
+        results.push({ label: 'Total concrete the bags will make', value: fmt(bags * yieldM3, 2), unit: 'm³', total: true });
+        steps.push(`${bags} bags × ${fmt(yieldM3, 4)} m³ = ${fmt(bags * yieldM3, 2)} m³ in all`);
         lines.push({ item: `Concrete pre-mix, ${fmt(a.bagKg, 0)} kg bag`, qty: bags, unit: 'bags' });
       } else {
         const [c, s, g] = parts(v.mix);
@@ -100,6 +103,9 @@ export const CALCS = [
           `Cement = ${fmt(cementM3, 3)} m³ × ${fmt(a.cementDensity, 0)} kg/m³ = ${fmt(cementKg, 0)} kg = ${bags} bags of ${fmt(a.cementBagKg, 0)} kg`,
           `Sand = ${fmt(sandM3, 3)} m³ × ${fmt(a.sandDensity, 0)} kg/m³ = ${fmt(sandT)} t`, `Aggregate = ${fmt(aggM3, 3)} m³ × ${fmt(a.aggDensity, 0)} kg/m³ = ${fmt(aggT)} t`);
         results.push({ label: `Cement (${fmt(a.cementBagKg, 0)} kg bags)`, value: String(bags), unit: 'bags' }, { label: 'Sand', value: fmt(sandT), unit: 'tonnes' }, { label: 'Coarse aggregate', value: fmt(aggT), unit: 'tonnes' });
+        const totalT = up(bags * a.cementBagKg / 1000 + sandT + aggT);
+        results.push({ label: 'Total weight of materials', value: fmt(totalT), unit: 'tonnes', total: true });
+        steps.push(`Total = ${bags} bags × ${fmt(a.cementBagKg, 0)} kg + ${fmt(sandT)} t sand + ${fmt(aggT)} t aggregate = ${fmt(totalT)} t`);
         lines.push({ item: `Cement, ${fmt(a.cementBagKg, 0)} kg bag`, qty: bags, unit: 'bags' }, { item: 'Sharp sand', qty: sandT, unit: 'tonnes' }, { item: 'Coarse aggregate', qty: aggT, unit: 'tonnes' });
       }
       return { results, lines, steps };
@@ -147,9 +153,10 @@ export const CALCS = [
         `Mortar = wall volume ${fmt(wall, 3)} m³ − units ${fmt(unitVol, 3)} m³, plus ${fmt(a.mortarWaste, 0)}% for waste = ${fmt(wet, 3)} m³`,
         `Dry materials = ${fmt(wetW, 3)} × ${fmt(a.dryFactor)} = ${fmt(dry, 3)} m³, shared 1 : ${s}`,
         `Cement = ${fmt(cementM3, 3)} m³ × ${fmt(a.cementDensity, 0)} = ${fmt(cementKg, 0)} kg = ${bags} bags; sand = ${fmt(sandT)} t`,
+        `Cement and sand together = ${bags} × ${fmt(a.cementBagKg, 0)} kg + ${fmt(sandT)} t = ${fmt(up(bags * a.cementBagKg / 1000 + sandT))} t`,
       ];
       return {
-        results: [{ label: 'Wall area', value: fmt(area), unit: 'm²' }, { label: 'Bricks or blocks', value: String(units), unit: 'units' }, { label: 'Mortar', value: fmt(wetW, 2), unit: 'm³' }, { label: `Cement (${fmt(a.cementBagKg, 0)} kg bags)`, value: String(bags), unit: 'bags' }, { label: 'Building sand', value: fmt(sandT), unit: 'tonnes' }],
+        results: [{ label: 'Wall area', value: fmt(area), unit: 'm²' }, { label: 'Bricks or blocks', value: String(units), unit: 'units' }, { label: 'Mortar', value: fmt(wetW, 2), unit: 'm³' }, { label: `Cement (${fmt(a.cementBagKg, 0)} kg bags)`, value: String(bags), unit: 'bags' }, { label: 'Building sand', value: fmt(sandT), unit: 'tonnes' }, { label: 'Cement and sand together', value: fmt(up(bags * a.cementBagKg / 1000 + sandT)), unit: 'tonnes', total: true }],
         lines: [{ item: `Bricks or blocks ${fmt(v.ul, 0)} × ${fmt(v.uh, 0)} × ${fmt(v.uw, 1)} mm`, qty: units, unit: 'each' }, { item: `Cement, ${fmt(a.cementBagKg, 0)} kg bag`, qty: bags, unit: 'bags' }, { item: 'Building sand', qty: sandT, unit: 'tonnes' }],
         steps,
       };
@@ -190,6 +197,9 @@ export const CALCS = [
         results.push({ label: 'Beading length', value: fmt(perim), unit: 'm' }, { label: 'Beading or scotia pieces', value: String(pieces), unit: 'pieces' });
         lines.push({ item: `Beading or scotia, ${fmt(v.piece)} m length`, qty: pieces, unit: 'pieces' });
       }
+      const bought = packs * v.perPack * plankArea;
+      results.push({ label: 'Total flooring bought', value: fmt(bought), unit: 'm²', total: true }, { label: 'Spare after laying', value: fmt(Math.max(0, bought - area)), unit: 'm²', total: true });
+      steps.push(`Total bought = ${packs} packs × ${fmt(v.perPack, 0)} planks × ${fmt(plankArea, 4)} m² = ${fmt(bought)} m², leaving ${fmt(Math.max(0, bought - area))} m² spare`);
       return { results, lines, steps };
     },
   },
@@ -216,7 +226,7 @@ export const CALCS = [
       const grout = w(v.area) * groutPerM2;
       const groutBags = bagsOf(grout, a.groutBag);
       return {
-        results: [{ label: 'Tiles', value: String(tiles), unit: 'tiles' }, { label: 'Boxes', value: String(boxes), unit: 'boxes' }, { label: `Adhesive (${fmt(a.adhesiveBag, 0)} kg)`, value: String(adhBags), unit: 'bags' }, { label: `Grout (${fmt(a.groutBag, 0)} kg)`, value: String(groutBags), unit: 'bags' }],
+        results: [{ label: 'Tiles', value: String(tiles), unit: 'tiles' }, { label: 'Boxes', value: String(boxes), unit: 'boxes' }, { label: `Adhesive (${fmt(a.adhesiveBag, 0)} kg)`, value: String(adhBags), unit: 'bags' }, { label: `Grout (${fmt(a.groutBag, 0)} kg)`, value: String(groutBags), unit: 'bags' }, { label: 'Tiles in the boxes you buy', value: String(boxes * v.perBox), unit: 'tiles', total: true }, { label: 'Total tile area bought', value: fmt(boxes * v.perBox * ((v.tl * v.tw) / 1e6)), unit: 'm²', total: true }],
         lines: [{ item: `Tiles ${fmt(v.tl, 0)} × ${fmt(v.tw, 0)} mm (boxes of ${fmt(v.perBox, 0)})`, qty: boxes, unit: 'boxes' }, { item: `Tile adhesive, ${fmt(a.adhesiveBag, 0)} kg`, qty: adhBags, unit: 'bags' }, { item: `Tile grout, ${fmt(a.groutBag, 0)} kg`, qty: groutBags, unit: 'bags' }],
         steps: [
           `One tile with its joint = (${fmt(v.tl, 0)} + ${fmt(v.joint, 0)}) × (${fmt(v.tw, 0)} + ${fmt(v.joint, 0)}) mm = ${fmt(tileArea, 4)} m²`,
@@ -225,6 +235,7 @@ export const CALCS = [
           `Adhesive = ${fmt(w(v.area))} m² × ${fmt(a.adhesiveKg)} kg = ${fmt(adhesive, 1)} kg = ${adhBags} bags`,
           `Grout per m² = ((${fmt(v.tl, 0)} + ${fmt(v.tw, 0)}) ÷ (${fmt(v.tl, 0)} × ${fmt(v.tw, 0)})) × joint ${fmt(v.joint, 0)} × thickness ${fmt(v.tt, 0)} × ${fmt(a.groutDensity)} = ${fmt(groutPerM2, 2)} kg`,
           `Grout = ${fmt(w(v.area))} × ${fmt(groutPerM2, 2)} = ${fmt(grout, 1)} kg = ${groutBags} bags`,
+          `Total bought = ${boxes} boxes × ${fmt(v.perBox, 0)} = ${boxes * v.perBox} tiles = ${fmt(boxes * v.perBox * ((v.tl * v.tw) / 1e6))} m² of tile`,
         ],
       };
     },
@@ -251,9 +262,9 @@ export const CALCS = [
       const litres = w((area * v.coats) / a.coverage, true);
       const tins = ceilN(litres / v.tin);
       return {
-        results: [{ label: 'Area', value: fmt(area), unit: 'm²' }, { label: 'Paint needed', value: fmt(litres, 1), unit: 'litres' }, { label: `Tins (${fmt(v.tin)} litres)`, value: String(tins), unit: 'tins' }],
+        results: [{ label: 'Area', value: fmt(area), unit: 'm²' }, { label: 'Paint needed', value: fmt(litres, 1), unit: 'litres' }, { label: `Tins (${fmt(v.tin)} litres)`, value: String(tins), unit: 'tins' }, { label: 'Total paint bought', value: fmt(tins * v.tin, 1), unit: 'litres', total: true }],
         lines: [{ item: `Paint, ${fmt(v.tin)} litre tin`, qty: tins, unit: 'tins' }],
-        steps: [v.area > 0 ? `Area = ${fmt(area)} m² (as entered)` : `Area = walls 2 × (${fmt(v.length)} + ${fmt(v.width)}) × ${fmt(v.height)}${ceil ? ` + ceiling ${fmt(ceil)}` : ''} − openings ${fmt(v.openings)} = ${fmt(area)} m²`, `Litres = ${fmt(area)} × ${fmt(v.coats, 0)} coats ÷ ${fmt(a.coverage)} m² per litre = ${fmt((area * v.coats) / a.coverage, 2)}; with wastage ${fmt(litres, 2)}`, `Tins = ${fmt(litres, 2)} ÷ ${fmt(v.tin)} = ${fmt(litres / v.tin, 2)}, rounded up to ${tins}`],
+        steps: [v.area > 0 ? `Area = ${fmt(area)} m² (as entered)` : `Area = walls 2 × (${fmt(v.length)} + ${fmt(v.width)}) × ${fmt(v.height)}${ceil ? ` + ceiling ${fmt(ceil)}` : ''} − openings ${fmt(v.openings)} = ${fmt(area)} m²`, `Litres = ${fmt(area)} × ${fmt(v.coats, 0)} coats ÷ ${fmt(a.coverage)} m² per litre = ${fmt((area * v.coats) / a.coverage, 2)}; with wastage ${fmt(litres, 2)}`, `Tins = ${fmt(litres, 2)} ÷ ${fmt(v.tin)} = ${fmt(litres / v.tin, 2)}, rounded up to ${tins}`, `Total bought = ${tins} × ${fmt(v.tin)} litres = ${fmt(tins * v.tin, 1)} litres`],
       };
     },
   },
@@ -276,6 +287,7 @@ export const CALCS = [
       const screws = ceilN(w(v.area * a.screwsPerM2));
       const boxes = ceilN(screws / a.screwBox);
       const results = [{ label: 'Boards', value: String(boards), unit: 'boards' }, { label: 'Screws', value: String(screws), unit: 'screws' }, { label: `Boxes of ${fmt(a.screwBox, 0)}`, value: String(boxes), unit: 'boxes' }];
+      results.push({ label: 'Total board bought', value: fmt(boards * boardArea, 1), unit: 'm²', total: true });
       const lines = [{ item: `Plasterboard ${fmt(v.bl, 0)} × ${fmt(v.bw, 0)} mm`, qty: boards, unit: 'boards' }, { item: 'Drywall screws', qty: boxes, unit: `boxes of ${fmt(a.screwBox, 0)}` }];
       const steps = [`One board = ${fmt(v.bl, 0)} × ${fmt(v.bw, 0)} mm = ${fmt(boardArea, 3)} m²`, `Boards = ${fmt(v.area)} ÷ ${fmt(boardArea, 3)} = ${fmt(rawBoards, 1)}; with wastage ${fmt(w(rawBoards, true), 1)}, rounded up to ${boards}`, `Screws = ${fmt(w(v.area))} m² × ${fmt(a.screwsPerM2, 0)} = ${screws} (${boxes} boxes)`];
       if (v.thick > 0) {
@@ -295,22 +307,58 @@ export const CALCS = [
     inputs: [
       { k: 'length', label: 'Wall length', unit: 'm' }, { k: 'height', label: 'Wall height', unit: 'm', def: '2.4' },
       { k: 'centres', label: 'Stud centres', kind: 'select', def: '400', options: [['400', '400 mm'], ['450', '450 mm'], ['600', '600 mm']] },
-      { k: 'rows', label: 'Rows of noggins', unit: '', def: '1' }, { k: 'sw', label: 'Stud width (for noggin length)', unit: 'mm', def: '47' },
-      { k: 'piece', label: 'Length of timber bought for plates', unit: 'm', def: '2.4' },
+      { k: 'rows', label: 'Rows of noggins', unit: '', def: '1' },
+      { k: 'studW', heading: 'Stud timber', label: 'Studs: timber width', unit: 'mm', def: '47' }, { k: 'studD', label: 'Studs: timber depth', unit: 'mm', def: '100' }, { k: 'studStock', label: 'Studs: length of timber you buy', unit: 'm', def: '2.4' },
+      { k: 'nogW', heading: 'Noggin timber', label: 'Noggins: timber width', unit: 'mm', def: '47' }, { k: 'nogD', label: 'Noggins: timber depth', unit: 'mm', def: '100' }, { k: 'nogStock', label: 'Noggins: length of timber you buy', unit: 'm', def: '2.4' },
+      { k: 'plateW', heading: 'Head and sole plate timber', label: 'Plates: timber width', unit: 'mm', def: '47' }, { k: 'plateD', label: 'Plates: timber depth', unit: 'mm', def: '100' }, { k: 'plateStock', label: 'Plates: length of timber you buy', unit: 'm', def: '2.4' },
     ],
-    assumptions: [],
+    assumptions: [{ k: 'kerf', label: 'Timber lost to each saw cut', unit: 'mm', def: '3' }],
     compute(v, a, w) {
       const c = Number(v.centres);
       const studsRaw = ceilN((v.length * 1000) / c) + 1;
       const studs = ceilN(w(studsRaw, true));
       const noggins = ceilN(w(v.rows * (studsRaw - 1)));
-      const nogLen = c - v.sw;
+      const nogLen = c - v.studW; // a noggin fits between two studs
       const plates = 2 * v.length;
-      const pieces = ceilN(w(plates) / v.piece);
+      const platesW = w(plates);
+      const stockStud = v.studStock * 1000, stockNog = v.nogStock * 1000;
+      // how many pieces of a given length fit in one bought length: n pieces need n x length + (n - 1) x kerf
+      const fit = (stock, len) => Math.floor((stock + a.kerf) / (len + a.kerf) + 1e-9);
+      const perStud = fit(stockStud, v.height * 1000), perNog = fit(stockNog, nogLen);
+      if (perStud < 1) return { error: `The stud timber you buy (${fmt(v.studStock)} m) is shorter than the wall height (${fmt(v.height)} m). Choose a longer length.` };
+      if (perNog < 1) return { error: 'The noggins are longer than the noggin timber you buy. Choose a longer length.' };
+      const studLengths = ceilN(studs / perStud);
+      const nogLengths = ceilN(noggins / perNog);
+      const plateLengths = ceilN(platesW / v.plateStock);
+      const lengths = studLengths + nogLengths + plateLengths;
+      const totalTimber = studs * v.height + (noggins * nogLen) / 1000 + platesW;
+      const sec = (w, d) => `${fmt(w, 0)} × ${fmt(d, 0)} mm`;
+      const LS = fmt(v.studStock), LN = fmt(v.nogStock), LP = fmt(v.plateStock);
       return {
-        results: [{ label: `Studs (${fmt(v.height)} m long)`, value: String(studs), unit: 'studs' }, { label: `Noggins (${fmt(nogLen, 0)} mm long)`, value: String(noggins), unit: 'noggins' }, { label: 'Head and sole plate', value: fmt(plates), unit: 'm' }, { label: `Plate timber (${fmt(v.piece)} m lengths)`, value: String(pieces), unit: 'lengths' }],
-        lines: [{ item: `Stud timber, ${fmt(v.height)} m long`, qty: studs, unit: 'each' }, { item: `Noggins cut from stud timber, ${fmt(nogLen, 0)} mm long`, qty: noggins, unit: 'each' }, { item: `Plate timber, ${fmt(v.piece)} m length`, qty: pieces, unit: 'lengths' }],
-        steps: [`Studs = ${fmt(v.length)} m ÷ ${fmt(c, 0)} mm = ${ceilN((v.length * 1000) / c)} spaces, + 1 = ${studsRaw}; with wastage ${studs}`, `Noggins = ${fmt(v.rows, 0)} row(s) × ${studsRaw - 1} gaps = ${v.rows * (studsRaw - 1)}; with wastage ${noggins}, each ${fmt(c, 0)} − ${fmt(v.sw, 0)} = ${fmt(nogLen, 0)} mm`, `Plates = 2 × ${fmt(v.length)} = ${fmt(plates)} m; with wastage ${fmt(w(plates))} ÷ ${fmt(v.piece)} m = ${pieces} lengths`],
+        results: [
+          { label: `Studs (${fmt(v.height)} m long)`, value: String(studs), unit: 'studs' },
+          { label: `Noggins (${fmt(nogLen, 0)} mm long)`, value: String(noggins), unit: 'noggins' },
+          { label: 'Head and sole plate', value: fmt(plates), unit: 'm' },
+          { label: `Timber for studs (${sec(v.studW, v.studD)}, ${LS} m lengths)`, value: String(studLengths), unit: 'lengths' },
+          { label: `Timber for noggins (${sec(v.nogW, v.nogD)}, ${LN} m lengths, ${perNog} per length)`, value: String(nogLengths), unit: 'lengths' },
+          { label: `Plate timber (${sec(v.plateW, v.plateD)}, ${LP} m lengths)`, value: String(plateLengths), unit: 'lengths' },
+          { label: 'Total lengths to buy', value: String(lengths), unit: 'lengths in all', total: true },
+          { label: 'Total timber in the wall', value: fmt(totalTimber, 1), unit: 'm', total: true },
+        ],
+        lines: [
+          { item: `Timber ${sec(v.studW, v.studD)}, ${LS} m length (studs)`, qty: studLengths, unit: 'lengths' },
+          { item: `Timber ${sec(v.nogW, v.nogD)}, ${LN} m length (noggins, cut ${fmt(nogLen, 0)} mm)`, qty: nogLengths, unit: 'lengths' },
+          { item: `Timber ${sec(v.plateW, v.plateD)}, ${LP} m length (head and sole plates)`, qty: plateLengths, unit: 'lengths' },
+        ],
+        steps: [
+          `Studs = ${fmt(v.length)} m ÷ ${fmt(c, 0)} mm = ${ceilN((v.length * 1000) / c)} spaces, + 1 = ${studsRaw}; with wastage ${studs}`,
+          `Studs per bought length = (${fmt(stockStud, 0)} + ${fmt(a.kerf, 0)}) ÷ (${fmt(v.height * 1000, 0)} + ${fmt(a.kerf, 0)}) = ${perStud}, so ${studs} ÷ ${perStud} = ${studLengths} lengths`,
+          `Noggins = ${fmt(v.rows, 0)} row(s) × ${studsRaw - 1} gaps = ${v.rows * (studsRaw - 1)}; with wastage ${noggins}, each ${fmt(c, 0)} − stud width ${fmt(v.studW, 0)} = ${fmt(nogLen, 0)} mm`,
+          `Noggins per bought length = (${fmt(stockNog, 0)} + ${fmt(a.kerf, 0)}) ÷ (${fmt(nogLen, 0)} + ${fmt(a.kerf, 0)}) = ${perNog}, so ${noggins} ÷ ${perNog} = ${nogLengths} lengths`,
+          `Plates = 2 × ${fmt(v.length)} = ${fmt(plates)} m; with wastage ${fmt(platesW)} ÷ ${LP} m = ${plateLengths} lengths`,
+          `Total lengths to buy = ${studLengths} + ${nogLengths} + ${plateLengths} = ${lengths} (studs, noggins and plates are each cut from their own lengths; sharing offcuts could save a length)`,
+          `Total timber = ${studs} studs × ${fmt(v.height)} m + ${noggins} noggins × ${fmt(nogLen / 1000, 3)} m + plates ${fmt(platesW)} m = ${fmt(totalTimber, 1)} m`,
+        ],
       };
     },
   },
@@ -329,7 +377,7 @@ export const CALCS = [
       const vol = (v.area * v.depth) / 1000;
       const name = v.product === 'board' ? 'boards or packs' : 'rolls';
       return {
-        results: [{ label: 'Volume of insulation', value: fmt(vol, 2), unit: 'm³' }, { label: `Number of ${name}`, value: String(packs), unit: name }],
+        results: [{ label: 'Volume of insulation', value: fmt(vol, 2), unit: 'm³' }, { label: `Number of ${name}`, value: String(packs), unit: name }, { label: 'Total area covered by what you buy', value: fmt(packs * v.coverage, 1), unit: 'm²', total: true }],
         lines: [{ item: `Insulation ${fmt(v.depth, 0)} mm, covers ${fmt(v.coverage)} m² each`, qty: packs, unit: name }],
         steps: [`Volume = ${fmt(v.area)} m² × ${fmt(v.depth, 0)} mm = ${fmt(vol, 2)} m³`, `${v.product === 'board' ? 'Packs' : 'Rolls'} = ${fmt(w(v.area, true))} m² (with wastage) ÷ ${fmt(v.coverage)} m² = ${fmt(w(v.area, true) / v.coverage, 2)}, rounded up to ${packs}`],
       };
@@ -378,7 +426,7 @@ export const CALCS = [
       const run = v.area / (v.gauge / 1000);
       const battens = ceilN(w(run) / v.piece);
       return {
-        results: [{ label: 'Tiles per m²', value: fmt(perM2, 1), unit: '' }, { label: 'Tiles', value: String(tiles), unit: 'tiles' }, { label: 'Batten length', value: fmt(w(run), 0), unit: 'm' }, { label: `Battens (${fmt(v.piece)} m)`, value: String(battens), unit: 'battens' }],
+        results: [{ label: 'Tiles per m²', value: fmt(perM2, 1), unit: '' }, { label: 'Tiles', value: String(tiles), unit: 'tiles' }, { label: 'Batten length', value: fmt(w(run), 0), unit: 'm' }, { label: `Battens (${fmt(v.piece)} m)`, value: String(battens), unit: 'battens' }, { label: 'Total batten length bought', value: fmt(battens * v.piece, 1), unit: 'm', total: true }],
         lines: [{ item: 'Roof tiles', qty: tiles, unit: 'each' }, { item: `Roof battens, ${fmt(v.piece)} m length`, qty: battens, unit: 'each' }],
         steps: [`Tiles per m² = 1 ÷ (${fmt(v.gauge, 0)} mm × ${fmt(v.cover, 0)} mm) = ${fmt(perM2, 2)}`, `Tiles = ${fmt(v.area)} × ${fmt(perM2, 2)} = ${fmt(raw, 1)}; with wastage ${fmt(w(raw, true), 1)}, rounded up to ${tiles}`, `Batten run = ${fmt(v.area)} m² ÷ ${fmt(v.gauge / 1000, 3)} m = ${fmt(run, 1)} m; with wastage ${fmt(w(run), 1)} ÷ ${fmt(v.piece)} m = ${battens} battens`],
       };
