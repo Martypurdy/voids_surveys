@@ -30,7 +30,8 @@ export function setSettings(patch) {
 
 // ---------- receipts ----------
 // ---------- businesses (companies or projects) ----------
-export const BUSINESS_COLORS = ['#1f5f8b', '#2e7d32', '#c2410c', '#7b1fa2', '#b3261e', '#00838f', '#a86b00', '#455a64', '#ad1457', '#5d4037'];
+// Light and mid tones, so the business name can be black text on the bar. (A darker colour you pick yourself gets white text instead.)
+export const BUSINESS_COLORS = ['#64b5f6', '#81c784', '#ffb74d', '#dfa8ea', '#ef9a9a', '#4dd0e1', '#ffd54f', '#b0bec5', '#f48fb1', '#bcaaa4'];
 let BUSINESSES = [];
 
 /** Black or white, whichever reads better on this colour. */

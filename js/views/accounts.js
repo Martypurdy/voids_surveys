@@ -192,7 +192,7 @@ export default async function accounts(root) {
 
   // ---------- companies / projects ----------
   const bizSel = h('select', { 'aria-label': 'Company or project', onchange: (e) => { selectBusiness(e.target.value); biz = currentBusiness(); receipts = mine(); paintBiz(); render(); } });
-  const bizBar = h('div', { class: 'acc-biz' }, h('span', { class: 'acc-biz-label' }, 'Company / project'), bizSel,
+  const bizBar = h('div', { class: 'acc-biz' }, bizSel,
     h('button', { type: 'button', class: 'btn-small', onclick: () => manageBusinesses() }, 'Add / edit'));
   const header = pageHeader('Accountancy', { back: '#/' });
   const paintBiz = () => {

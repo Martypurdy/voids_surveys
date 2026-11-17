@@ -1522,13 +1522,13 @@ a.form-card { text-decoration: none; color: inherit; }
 /* Companies / projects: the bar takes the business's colour so it is obvious who you are entering for */
 .appbar[data-biz] { background: var(--biz); color: var(--biz-ink); }
 .appbar[data-biz] .icon-btn, .appbar[data-biz] .torch-btn { color: var(--biz-ink); }
-.acc-biz { display: flex; gap: 8px; align-items: stretch; margin-bottom: 12px; padding: 8px; border-radius: 12px; background: var(--biz, var(--primary)); color: var(--biz-ink, #fff); }
-.acc-biz select { flex: 1; min-width: 0; font-weight: 700; }
-.acc-biz .btn-small { background: rgb(255 255 255 / .92); color: #111; }
-.acc-biz-label { align-self: center; font-weight: 700; font-size: .85rem; white-space: nowrap; }
+.acc-biz { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; padding: 6px 8px 6px 10px; border-radius: 12px; background: var(--biz, var(--primary)); color: var(--biz-ink, #fff); }
+/* the name sits straight on the colour, filling the bar; the small arrow stays for switching */
+.acc-biz select, .rv-biz select { flex: 1; min-width: 0; font-weight: 800; font-size: 1.1rem; background-color: transparent; color: inherit; border: 0; box-shadow: none; padding: 8px 4px; text-overflow: ellipsis; cursor: pointer; }
+.acc-biz select option, .rv-biz select option { color: #111; background: #fff; font-weight: 600; }
+.acc-biz select:focus-visible, .rv-biz select:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 8px; }
+.acc-biz .btn-small { background: rgb(255 255 255 / .92); color: #111; flex: none; }
 .rv-biz { display: flex; gap: 8px; align-items: center; margin: -12px -12px 0; padding: 10px 12px; background: var(--biz, var(--primary)); color: var(--biz-ink, #fff); position: sticky; top: -12px; z-index: 2; }
-.rv-biz select { flex: 1; min-width: 0; font-weight: 700; }
-.rv-biz-label { font-weight: 700; font-size: .85rem; }
 .biz-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); }
 .biz-dot { width: 22px; height: 22px; border-radius: 50%; flex: none; border: 2px solid rgb(0 0 0 / .15); }
 .biz-name { flex: 1; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; }

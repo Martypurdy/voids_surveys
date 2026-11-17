@@ -185,7 +185,7 @@ export function reviewReceipt(entry, { index = 0, count = 1, mode = 'scan' } = {
     r.businessId = businessOf(r);
     const bizSel = h('select', { 'aria-label': 'Company or project' }, getBusinesses().map((b) => h('option', { value: b.id }, b.name)));
     bizSel.value = r.businessId;
-    const bizBar = h('div', { class: 'rv-biz' }, h('span', { class: 'rv-biz-label' }, 'For'), bizSel);
+    const bizBar = h('div', { class: 'rv-biz' }, bizSel);
     const paintBiz = () => {
       const b = getBusinesses().find((x) => x.id === r.businessId);
       bizBar.style.setProperty('--biz', b?.color || '#1f5f8b');
