@@ -4,7 +4,8 @@ import { scheduleSave } from '../db.js';
 import { CYLINDER_OPTIONS, CYLINDER_DEFAULT, isRtl } from '../model.js';
 import { rtlKeysSection } from './keysRtl.js';
 import { getLibrary } from '../sor.js';
-import { h, multiSelect, worksButton } from '../ui.js';
+import { h, multiSelect, worksButton, toast } from '../ui.js';
+import { syncDoorsToLocks } from '../lockDoors.js';
 import { keySafeSection } from './keySafe.js';
 import { featureList } from './featureList.js';
 import { loadJobOr404, jobChrome, completeFooter } from './chrome.js';
@@ -43,8 +44,12 @@ export default async function security(root, { id }) {
           });
           if (!r) return;
           [w.cylinders] = r;
+          // The doors chosen here are the doors in the Doors & windows list below.
+          const { added, removed } = syncDoorsToLocks(job.security, w.cylinders);
           save();
           renderList();
+          doors.refresh();
+          if (added.length || removed.length) toast(`Doors & windows: ${[added.length ? `added ${added.join(', ')}` : '', removed.length ? `removed ${removed.join(', ')}` : ''].filter(Boolean).join('; ')}`, { timeout: 5000 });
         }, { chevron: '›' }),
       // Must-action: communal keys (red) and fobs (amber) are constant hold-ups at handover.
       w.cylinders?.includes('Communal key')

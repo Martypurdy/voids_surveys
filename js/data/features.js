@@ -18,7 +18,8 @@ const EXT_DOOR = (p) => [
   d(`${p}-08`, 'Threshold / weather bar damaged'),
   d(`${p}-09`, 'Letterbox damaged / missing'),
   d(`${p}-10`, 'Door closer faulty'),
-  d(`${p}-11`, 'Viewer / chain missing'),
+  d(`${p}-11`, 'Door viewer missing / damaged'),
+  d(`${p}-14`, 'Door chain missing / damaged'), // -13 is taken by the communal door's entry system
   d(`${p}-12`, 'Boarded – remove boarding'),
 ];
 
