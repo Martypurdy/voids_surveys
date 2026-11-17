@@ -87,6 +87,8 @@ export function entrySummary(job) {
     total: sectionsOf(job).length,
     started: Object.keys(job.progress || {}).length > 0,
     lastExported: job.lastExported || null,
+    nextId: job.nextId || '',
+    fromId: job.fromId || '',
     meta: entryMeta(job),
     ref: isPrice(job) ? [job.pricing?.ref, job.pricing?.customer].filter((s) => s && s.trim()).join(' ') : isRepair(job) ? [job.repair?.ref, job.repair?.customer].filter((s) => s && s.trim()).join(' ') : isRams(job) ? [job.rams?.ref, job.rams?.customer].filter((s) => s && s.trim()).join(' ') : isCalc(job) ? [job.calc?.ref, job.calc?.customer].filter((s) => s && s.trim()).join(' ') : isDoc(job) ? [job.doc?.number, job.doc?.ref, job.doc?.customer].filter((s) => s && s.trim()).join(' ') : '',
   };

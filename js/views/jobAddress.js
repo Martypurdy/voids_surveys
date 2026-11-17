@@ -1,8 +1,9 @@
 // Screen: address – postcode lookup, address, GPS, navigate, surveyor.
 import { scheduleSave } from '../db.js';
-import { jobTitle, fmtDateTime, isPrice, isPlan, isRepair, isRams, isCalc, isDoc } from '../model.js';
+import { jobTitle, fmtDateTime, isPrice, isPlan, isRepair, isRams, isCalc, isDoc, isRtl } from '../model.js';
 import { businessBar } from '../docs/ui.js';
 import { ramsDetails } from './ramsStart.js';
+import { inspectionStart } from './rtlStart.js';
 import { h, textField, toast, confirmDialog } from '../ui.js';
 import { lookupPostcode, lookupStreet, formatPostcode, getPosition, directionsUrl, pinUrl, demoAddress, isDemoPostcode } from '../geo.js';
 import { surveyorField } from '../surveyors.js';
@@ -157,6 +158,7 @@ export default async function jobAddress(root, { id }) {
     h('div', { class: 'content' },
       docBar,
       isRams(job) ? [h('h2', null, 'The job'), ramsDetails(job, save, updateDerived)] : null,
+      isRtl(job) ? [h('h2', null, 'Start from an inspection'), inspectionStart(job, save, updateDerived)] : null,
       refBox ? [h('h2', null, isRepair(job) ? 'Tenant / contact and job number' : isRams(job) || isCalc(job) ? 'Client or tenant and job number' : isDoc(job) ? 'Client' : 'Customer / job reference'), refBox] : null,
       h('h2', null, isPrice(job) ? 'Project address' : isDoc(job) ? 'Site address (where the work is)' : isRepair(job) || isRams(job) || isCalc(job) ? 'Property address' : 'Address'),
       h('div', { class: 'input-row' }, postcodeField, lookupBtn),

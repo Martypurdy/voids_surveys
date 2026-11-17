@@ -1576,3 +1576,7 @@ a.form-card { text-decoration: none; color: inherit; }
 .biz-docs-body { display: flex; flex-direction: column; gap: 6px; padding-bottom: 8px; }
 @media (min-width: 900px) { .doc-cols { flex-direction: row; align-items: flex-start; } .doc-cols > * { flex: 1 1 0; } }
 @media (min-width: 900px) { .rep-sheet.lst .rep-out { padding-top: 8px; align-items: flex-end; } }
+
+/* ---------- Inspection -> Ready to let button (.rtl-go) ---------- */
+.rtl-go { flex: none; align-self: center; margin-right: 4px; min-width: 64px; height: 48px; padding: 0 8px; border: 0; border-radius: 10px; background: var(--primary); color: var(--primary-ink); font: inherit; font-size: 11px; font-weight: 600; line-height: 1.1; white-space: nowrap; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; cursor: pointer; }
+.rtl-go-i { font-size: 18px; line-height: 1; }

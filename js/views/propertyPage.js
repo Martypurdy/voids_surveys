@@ -9,6 +9,7 @@ import { jobActions } from './jobActions.js';
 import { pickGroup } from './startForm.js';
 import { editPropertyDialog } from './addressEditor.js';
 import { pickProperty } from './pickProperty.js';
+import { rtlButton } from './rtlStart.js';
 import { offerFile } from '../export/deliver.js';
 
 export default async function propertyPage(root, { id }) {
@@ -119,7 +120,9 @@ export function buildDetail(p) {
           h('div', { class: 'progress', 'aria-hidden': 'true' }, Array.from({ length: e.total }, (_, i) => h('span', { dataset: { state: i < e.done ? 'complete' : 'todo' } }))),
           h('span', { class: 'job-pct' }, `${e.total ? Math.round((e.done / e.total) * 100) : 0}%`)),
         h('div', { class: 'job-meta' }, e.meta),
+        e.nextId ? h('div', { class: 'job-meta' }, '✓ Moved on to Ready to let') : e.fromId ? h('div', { class: 'job-meta' }, 'Started from an inspection') : null,
         status.stale ? h('span', { class: 'warn' }, '⚠ ', status.text) : null),
+      e.form === 'void' && done ? rtlButton(e) : null,
       h('button', {
         type: 'button',
         class: 'icon-btn',

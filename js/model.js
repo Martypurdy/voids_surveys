@@ -260,6 +260,8 @@ export function upgradeJob(job) {
   job.form ??= 'void';
   job.propertyId ??= null; // the property this entry belongs to (set when it is filed)
   job.nature ??= ''; // what the file is about, e.g. "Empty home works" (blank = the form's name)
+  job.nextId ??= ''; // Empty home inspection: the Ready to let started from it
+  job.fromId ??= ''; // Ready to let: the Empty home inspection it was started from
   if (isRtl(job)) {
     const d = newRtl();
     job.rtl = { ...d, ...(job.rtl || {}) };

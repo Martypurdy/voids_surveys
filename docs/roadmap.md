@@ -108,3 +108,10 @@ Before each phase, show a short plan and wait for an OK.
 
 Calculators built (13): Concrete; Bricks and blocks; Laminate and flooring; Screw converter; Unit converter; Tiles; Paint; Plasterboard and plaster; Stud wall; Insulation; Aggregates; Roof tiles; Fall and gradient. Defaults are typical figures, shown and editable; results are estimates. Each was tested against figures worked out separately (`docs/calculators.md`).
 - [ ] Later: more calculators by trade (list to be expanded); live-formula Excel; copy a result between two calculations.
+
+## Inspection to Ready to let
+- [x] A 👍 Ready to let button on the property timeline bar of every finished Empty home inspection starts a Ready to let at the same property.
+- [x] Copied: address, key safe location, pin and photos (never the code), fuse board and mains stop tap in full, the gas, electric and water meters' locations only (readings are photographed each visit), and the room and outside area lists with sizes. Nothing else (no defects, readings, signature, gifted items, tenant details).
+- [x] Linked both ways ("Moved on to Ready to let" / "Started from an inspection"); pressing the button again warns and offers to open the one already started.
+- [x] Ready to let Address tab: "Start from an inspection" lists the inspections at the property and fills only the blanks.
+- Notes: code in `js/startRtl.js` and `js/views/rtlStart.js`; photos are copied as the new form's own records.
