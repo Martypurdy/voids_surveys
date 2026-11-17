@@ -47,9 +47,15 @@ export default async function gifted(root, { id }) {
       const rooms = g.selected[item] || [];
       const btn = worksButton(item, rooms.length ? rooms.join(', ') : 'Tap to choose rooms', rooms.length > 0,
         () => pickRooms(item), { chevron: '›' });
-      return g.extra.includes(item)
+      // A delete button on every line that is in use (your own items go from the list altogether;
+      // a standard item goes back to not selected), for things no longer there at sign off.
+      if (g.extra.includes(item)) {
+        return h('div', { class: 'room-row' }, btn,
+          h('button', { type: 'button', class: 'feature-remove', 'aria-label': `Remove ${item}`, onclick: () => removeOwn(item) }, '✕'));
+      }
+      return rooms.length
         ? h('div', { class: 'room-row' }, btn,
-          h('button', { type: 'button', class: 'feature-remove', 'aria-label': `Remove ${item}`, onclick: () => removeOwn(item) }, '−'))
+          h('button', { type: 'button', class: 'feature-remove', 'aria-label': `Remove ${item}`, onclick: () => { delete g.selected[item]; save(); render(); toast(`${item} removed`); } }, '✕'))
         : btn;
     }));
   };

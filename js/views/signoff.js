@@ -33,9 +33,15 @@ export default async function signoff(root, { id }) {
     textField('Notes', a.notes, (v) => { a.notes = v; save(); }, { multiline: true, autocapitalize: 'sentences' }));
 
   const render = () => {
-    listSlot.replaceChildren(a.any === 'yes'
-      ? worksButton('Appliances', a.list.length ? a.list.join(', ') : 'Tap to choose appliances', a.list.length > 0, pick, { chevron: '›' })
-      : '');
+    // One line per appliance, each with a delete button (for ones the tenant does not want or that were damaged).
+    listSlot.replaceChildren(...(a.any === 'yes'
+      ? [
+        ...a.list.map((name) => h('div', { class: 'room-row' },
+          worksButton(name, '', true, pick),
+          h('button', { type: 'button', class: 'feature-remove', 'aria-label': `Remove ${name}`, onclick: () => { a.list = a.list.filter((x) => x !== name); save(); render(); } }, '✕'))),
+        worksButton(a.list.length ? 'Add or change appliances' : 'Appliances', a.list.length ? '' : 'Tap to choose appliances', false, pick, { chevron: '›' }),
+      ]
+      : []));
     listSlot.hidden = a.any !== 'yes';
     more.hidden = !a.any;
   };

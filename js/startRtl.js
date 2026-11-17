@@ -28,7 +28,7 @@ const meterIsBlank = (m) => blank(m.location) && blank(m.serial) && blank(m.note
  * The caller saves the job.
  */
 export async function fillFromInspection(job, src) {
-  const done = { property: false, keySafe: false, services: 0, rooms: 0 };
+  const done = { property: false, gifted: false, keySafe: false, services: 0, rooms: 0 };
 
   // Key safe: location, pin and photos, never the code (it is changed when the property is closed down).
   const ks = job.keySafe;
@@ -51,6 +51,16 @@ export async function fillFromInspection(job, src) {
   }
   if (!tp.photos.length && sp.photos?.length) { tp.photos = await clonePhotos(sp.photos, job.id); copiedProperty = true; }
   done.property = copiedProperty;
+
+  // Gifted items: the list and where each is (the surveyor deletes any that have gone at sign off).
+  let copiedGifted = false;
+  for (const [item, places] of Object.entries(src.gifted?.selected || {})) {
+    if (!job.gifted.selected[item] && places.length) { job.gifted.selected[item] = [...places]; copiedGifted = true; }
+  }
+  for (const item of src.gifted?.extra || []) {
+    if (!job.gifted.extra.includes(item)) { job.gifted.extra.push(item); copiedGifted = true; }
+  }
+  done.gifted = copiedGifted;
 
   // Services, matched by name in order (a second gas meter matches the second one on this form).
   const used = new Set();
@@ -87,6 +97,7 @@ export async function fillFromInspection(job, src) {
 
 export const summaryText = (d) => [
   d.property ? 'property details and photos' : '',
+  d.gifted ? 'gifted items' : '',
   d.keySafe ? 'key safe location' : '',
   d.services ? `${d.services} service${d.services === 1 ? '' : 's'}` : '',
   d.rooms ? `${d.rooms} room${d.rooms === 1 ? '' : 's'} and areas` : '',
