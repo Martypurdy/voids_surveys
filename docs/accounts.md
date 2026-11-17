@@ -38,3 +38,7 @@ before businesses existed belong to the first business. Anything finance-related
 
 A field the scanner was unsure about is highlighted pale orange with dark text and an "I have checked this" tick. Ticking it, or correcting it,
 turns the box green-outlined and marked checked; unticking brings the warning back.
+
+## Big receipt preview (tablets and desktops)
+
+From 900 px wide the check-and-correct screen shows the receipt big, beside the form (`.rv-pane`), on the left or right: drag its handle across the screen or tap ⇄ (remembered in localStorage `voids.receiptPane`, like the Designer panel). It has zoom (− / + / ⤢ fit, double-click for 200%) and pans by dragging when zoomed. On phones the small picture stays above the form. A receipt with no picture has no preview.

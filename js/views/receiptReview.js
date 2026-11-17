@@ -16,6 +16,10 @@ export function parseMoney(v) {
 
 const toMoneyText = (n) => (n == null || !Number.isFinite(Number(n)) ? '' : (Math.round(Number(n) * 100) / 100).toFixed(2));
 
+const PANE_KEY = 'voids.receiptPane';
+const readPaneSide = () => { try { return JSON.parse(localStorage.getItem(PANE_KEY) || '{}').side === 'right' ? 'right' : 'left'; } catch { return 'left'; } };
+const saveSide = (side) => { try { localStorage.setItem(PANE_KEY, JSON.stringify({ side })); } catch { /* storage blocked */ } };
+
 /**
  * Show a receipt for checking.
  *   entry = { receipt, ready: Promise|null (resolves when the scan has filled the receipt in), flags: { date, supplier, total, vat }, error }
@@ -104,15 +108,67 @@ export function reviewReceipt(entry, { index = 0, count = 1, mode = 'scan' } = {
     showVat();
 
     const status = h('p', { class: 'rv-status', 'aria-live': 'polite' });
+    // Phones: a small picture above the form. Tablets and desktops (900 px and up): a big preview beside the form, on the
+    // left or right as you prefer (drag its handle across, or tap ⇄), with zoom. The side is remembered on this device.
     const img = h('img', { class: 'rv-img', alt: 'Receipt' });
     const imgWrap = h('div', { class: 'rv-imgwrap' }, img);
+    let side = readPaneSide();
+    let zoom = 1;
+    const paneImg = h('img', { class: 'rv-pane-img', alt: 'Receipt, large' });
+    const view = h('div', { class: 'rv-pane-view' }, paneImg);
+    const zoomText = h('span', { class: 'rv-zoom-text', 'aria-live': 'polite' }, 'Fit');
+    const setZoom = (z) => {
+      zoom = Math.max(1, Math.min(5, Math.round(z * 4) / 4));
+      view.classList.toggle('rv-zoomed', zoom > 1);
+      paneImg.style.width = zoom > 1 ? `${zoom * 100}%` : '';
+      zoomText.textContent = zoom > 1 ? `${Math.round(zoom * 100)}%` : 'Fit';
+    };
+    const pb = (label, title, fn) => h('button', { type: 'button', class: 'rv-pane-btn', 'aria-label': title, title, onclick: fn }, label);
+    const grip = h('div', { class: 'rv-pane-grip', title: 'Drag to the other side of the screen', 'aria-label': 'Drag to move the receipt to the other side' }, '⠿ Receipt');
+    const paneHead = h('div', { class: 'rv-pane-head' }, grip, pb('−', 'Zoom out', () => setZoom(zoom - 0.5)), zoomText, pb('+', 'Zoom in', () => setZoom(zoom + 0.5)), pb('⤢', 'Fit the whole receipt', () => setZoom(1)), pb('⇄', 'Move the receipt to the other side', () => { side = side === 'left' ? 'right' : 'left'; applySide(); }));
+    const pane = h('aside', { class: 'rv-pane', hidden: true }, paneHead, view);
+    const applySide = () => { overlay.dataset.side = side; saveSide(side); };
+    paneImg.addEventListener('dblclick', () => setZoom(zoom > 1 ? 1 : 2));
+    // drag the handle across the screen to put the preview on the other side
+    grip.addEventListener('pointerdown', (e) => {
+      if (e.button > 0) return;
+      e.preventDefault();
+      grip.setPointerCapture(e.pointerId);
+      let target = side;
+      const move = (ev) => { target = ev.clientX > window.innerWidth / 2 ? 'right' : 'left'; overlay.dataset.drop = target; };
+      const up = () => {
+        grip.removeEventListener('pointermove', move);
+        grip.removeEventListener('pointerup', up);
+        grip.removeEventListener('pointercancel', up);
+        delete overlay.dataset.drop;
+        if (target !== side) { side = target; applySide(); }
+      };
+      grip.addEventListener('pointermove', move);
+      grip.addEventListener('pointerup', up);
+      grip.addEventListener('pointercancel', up);
+    });
+    // pan a zoomed receipt by dragging it
+    view.addEventListener('pointerdown', (e) => {
+      if (zoom <= 1 || e.button > 0 || e.target !== paneImg) return;
+      e.preventDefault();
+      view.setPointerCapture(e.pointerId);
+      const sx = e.clientX, sy = e.clientY, sl = view.scrollLeft, st = view.scrollTop;
+      const move = (ev) => { view.scrollLeft = sl - (ev.clientX - sx); view.scrollTop = st - (ev.clientY - sy); };
+      const up = () => { view.removeEventListener('pointermove', move); view.removeEventListener('pointerup', up); view.removeEventListener('pointercancel', up); };
+      view.addEventListener('pointermove', move);
+      view.addEventListener('pointerup', up);
+      view.addEventListener('pointercancel', up);
+    });
     const loadImage = async () => {
       if (!r.photoId) { imgWrap.hidden = true; return; }
       const rec = await getPhoto(r.photoId);
       if (!rec) { imgWrap.hidden = true; return; }
-      url = URL.createObjectURL(rec.blob);
+      if (!url) url = URL.createObjectURL(rec.blob);
       img.src = url;
+      paneImg.src = url;
       imgWrap.hidden = false;
+      pane.hidden = false;
+      overlay.classList.add('rv-has-pane');
     };
     img.addEventListener('click', () => imgWrap.classList.toggle('rv-big'));
 
@@ -194,9 +250,11 @@ export function reviewReceipt(entry, { index = 0, count = 1, mode = 'scan' } = {
     paintBiz();
     bizSel.addEventListener('change', () => { r.businessId = bizSel.value; paintBiz(); touchedCategory = false; loadNames(); applyRule(); });
 
-    const overlay = h('div', { class: 'rv-overlay', role: 'dialog', 'aria-modal': 'true', 'aria-label': title },
-      h('div', { class: 'rv-card' },
-        bizBar,
+    const overlay = h('div', { class: 'rv-overlay', role: 'dialog', 'aria-modal': 'true', 'aria-label': title, dataset: { side } },
+      bizBar,
+      h('div', { class: 'rv-main' },
+        pane,
+        h('div', { class: 'rv-card' },
         h('div', { class: 'rv-head' }, h('strong', null, title), h('button', { type: 'button', class: 'btn-small', onclick: stop, 'aria-label': 'Close' }, '✕')),
         status,
         imgWrap,
@@ -208,7 +266,7 @@ export function reviewReceipt(entry, { index = 0, count = 1, mode = 'scan' } = {
           vatBlock,
           h('label', { class: 'field' }, h('span', { class: 'field-label' }, 'Category (tax return heading)'), category), ownRow, ruleNote,
           h('label', { class: 'field' }, h('span', { class: 'field-label' }, 'Notes'), notes)),
-        h('div', { class: 'rv-buttons' }, buttons)));
+        h('div', { class: 'rv-buttons' }, buttons))));
     document.body.append(overlay);
     document.body.classList.add('no-scroll');
     untrack = trackOverlay(() => { untrack = () => {}; stop(); });
