@@ -1,6 +1,6 @@
 // Inspection -> Ready to let. Copies what does not change between visits (where things are) from an Empty home
 // inspection into a Ready to let form at the same property: address, key safe location and photos (never the code),
-// the services' locations (fuse board and mains stop tap come across in full; gas, electric and water meters only
+// the property type, bedrooms, storeys and photos, the services' locations (fuse board and mains stop tap come across in full; gas, electric and water meters only
 // their location, because their readings are photographed each visit) and the room and outside area list.
 // Nothing is overwritten: a field that already has something in it is left alone.
 import { saveJob, getJob, getPhotos, putPhotos } from './db.js';
@@ -28,7 +28,7 @@ const meterIsBlank = (m) => blank(m.location) && blank(m.serial) && blank(m.note
  * The caller saves the job.
  */
 export async function fillFromInspection(job, src) {
-  const done = { keySafe: false, services: 0, rooms: 0 };
+  const done = { property: false, keySafe: false, services: 0, rooms: 0 };
 
   // Key safe: location, pin and photos, never the code (it is changed when the property is closed down).
   const ks = job.keySafe;
@@ -41,6 +41,16 @@ export async function fillFromInspection(job, src) {
     ks.code = '';
     done.keySafe = true;
   }
+
+  // Property: type, style, bedrooms, storeys, floor and the property photos (blanks only).
+  const sp = src.property || {};
+  const tp = job.property;
+  let copiedProperty = false;
+  for (const k of ['type', 'style', 'bedrooms', 'storeys', 'floor']) {
+    if (blank(tp[k]) && !blank(sp[k])) { tp[k] = sp[k]; copiedProperty = true; }
+  }
+  if (!tp.photos.length && sp.photos?.length) { tp.photos = await clonePhotos(sp.photos, job.id); copiedProperty = true; }
+  done.property = copiedProperty;
 
   // Services, matched by name in order (a second gas meter matches the second one on this form).
   const used = new Set();
@@ -76,6 +86,7 @@ export async function fillFromInspection(job, src) {
 }
 
 export const summaryText = (d) => [
+  d.property ? 'property details and photos' : '',
   d.keySafe ? 'key safe location' : '',
   d.services ? `${d.services} service${d.services === 1 ? '' : 's'}` : '',
   d.rooms ? `${d.rooms} room${d.rooms === 1 ? '' : 's'} and areas` : '',

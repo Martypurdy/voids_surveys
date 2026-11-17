@@ -79,6 +79,7 @@ export default async function property(root, { id }) {
   root.append(
     ...jobChrome(job, 'property'),
     h('div', { class: 'content' },
+      rtl && job.fromId ? h('p', { class: 'copied-note' }, '✓ Copied from the inspection') : null,
       h('h2', null, 'Property type'),
       typeButtons,
       styleField,
@@ -92,8 +93,8 @@ export default async function property(root, { id }) {
       photoField(job, p.photos),
 
       rtl ? [
-        h('h2', null, 'Clearance'), ...rtlCheck('clearance', 'Clearance completed'),
-        h('h2', null, 'Cleaning'), ...rtlCheck('cleaning', 'Cleaning completed'),
+        h('h2', null, 'Clearance'), ...rtlCheck('clearance', 'Cleared'),
+        h('h2', null, 'Cleaning'), ...rtlCheck('cleaning', 'Cleaned'),
       ] : [h('h2', null, 'Clearance / clean'), list],
       completeFooter(job, 'property')));
 }

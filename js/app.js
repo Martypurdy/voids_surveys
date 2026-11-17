@@ -1,7 +1,7 @@
 // Entry point: routes, autosave flushing, service worker.
 import { route, start } from './router.js';
 import { flushSave, adoptOrphans, consolidateProperties } from './db.js';
-import { toast } from './ui.js';
+import { toast, updateBanner } from './ui.js';
 import { findUrl, setPendingLink } from './linkfill.js';
 
 // No browser right-click menu on the app (right-click is used for editing and dragging the plan);
@@ -77,13 +77,9 @@ async function registerServiceWorker() {
   try {
     const reg = await navigator.serviceWorker.register('sw.js');
     const offerUpdate = (worker) => {
-      toast('A new version is available', {
-        action: 'Reload',
-        timeout: 0,
-        onAction: async () => {
-          await flushSave();
-          worker.postMessage('skipWaiting');
-        },
+      updateBanner(async () => {
+        await flushSave();
+        worker.postMessage('skipWaiting');
       });
     };
     if (reg.waiting && navigator.serviceWorker.controller) offerUpdate(reg.waiting);

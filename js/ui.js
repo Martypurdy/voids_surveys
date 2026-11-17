@@ -366,6 +366,16 @@ export function toast(message, { action, onAction, timeout = 3500 } = {}) {
   if (timeout) toastTimer = setTimeout(() => toastEl?.remove(), timeout);
 }
 
+/** A floating banner under the top bar that stays until tapped (used for "new version ready"). */
+export function updateBanner(onReload) {
+  document.querySelector('.upd-banner')?.remove();
+  const el = h('div', { class: 'upd-banner', role: 'status' },
+    h('span', { class: 'upd-ico', 'aria-hidden': 'true' }, '🔄'),
+    h('span', { class: 'upd-text' }, h('strong', null, 'New version ready'), h('span', null, 'Your work is saved first')),
+    h('button', { type: 'button', onclick: () => { el.remove(); onReload(); } }, 'Reload now'));
+  document.body.append(el);
+}
+
 /** Show a blocking "working…" overlay. Returns { update(msg), close() }. */
 export function busy(message) {
   const text = h('div', { class: 'busy-box', role: 'status' }, message);
