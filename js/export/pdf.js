@@ -275,7 +275,7 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
     alerts.push({ level: 'red', text: 'Communal keys required – Operative must arrange keys to be cut or communal lock change with manager before works are complete.' });
   }
   if (!rtl && locks.includes('Post box')) {
-    alerts.push({ level: 'red', text: 'Letter box lock required – Operative must arrange a new lock or keys for the letter box before works are complete.' });
+    alerts.push({ level: 'red', text: 'Letter box lock must be changed – fit a new lock.' });
   }
   if (!rtl && (locks.includes('Communal fob') || fobDefect)) {
     alerts.push({ level: 'amber', text: 'COMMUNAL FOB REQUIRED - arrange with the fob team before the property is handed over.' });

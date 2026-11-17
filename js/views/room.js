@@ -99,17 +99,19 @@ export default async function roomPage(root, { id, roomId, kind = 'rooms' }) {
       h('h2', null, 'Features'),
       features.el,
 
+      h('h2', null, `${noun[0].toUpperCase()}${noun.slice(1)} photos`),
+      photoField(job, room.photos),
+      h('h2', null, `${noun[0].toUpperCase()}${noun.slice(1)} notes`),
+      textField(`${noun} notes`, room.notes, (v) => { room.notes = v; save(); }, { multiline: true, autocapitalize: 'sentences' }),
+
       h('details', { class: 'card room-more' },
-        h('summary', null, `${noun} name, notes & photos`),
+        h('summary', null, `${noun} name & delete`),
         h('div', { class: 'card-body' },
           textField(`${noun} name`, room.name, (v) => {
             room.name = v;
             save();
             root.querySelector('.appbar h1')?.replaceChildren(v || noun);
           }, { autocapitalize: 'words' }),
-          textField(`${noun} notes`, room.notes, (v) => { room.notes = v; save(); }, { multiline: true, autocapitalize: 'sentences' }),
-          h('span', { class: 'field-label' }, `${noun} photos`),
-          photoField(job, room.photos),
           h('div', { class: 'btn-row' },
             h('button', {
               type: 'button',

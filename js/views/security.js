@@ -60,7 +60,7 @@ export default async function security(root, { id }) {
       w.cylinders?.includes('Post box')
         ? h('div', { class: 'alert-box', role: 'alert' },
           h('strong', null, '⚠ ACTION REQUIRED'),
-          h('span', null, 'Letter box lock required – Operative must arrange a new lock or keys for the letter box before works are complete.'))
+          h('span', null, 'Letter box lock must be changed – fit a new lock.'))
         : '',
       w.cylinders?.includes('Communal fob')
         ? h('div', { class: 'alert-box alert-amber', role: 'alert' },

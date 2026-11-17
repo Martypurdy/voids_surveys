@@ -32,6 +32,10 @@ export default async function rooms(root, { id, kind = 'rooms' }) {
   const rtlState = (room) => (room.done ? 'ok' : 'todo');
   const rtlSummary = (room) => [room.done ? 'Works complete' : 'Tap to check', room.photos.length ? `📷 ${room.photos.length}` : ''].filter(Boolean).join(' · ');
 
+  // All features checked (green or red) but not one photo anywhere in the room: flag it with a small !
+  const photoCount = (room) => room.photos.length + Object.values(room.parts || {}).reduce((n, p) => n + (p.photos?.length || 0), 0);
+  const noPhotos = (room, s) => !rtl && (s.state === 'ok' || s.state === 'attention') && photoCount(room) === 0;
+
   const roomButton = (room) => {
     const s = rtl ? { state: rtlState(room) } : roomStatus(room, featuresOf(room, kind));
     return h('button', {
@@ -44,6 +48,7 @@ export default async function rooms(root, { id, kind = 'rooms' }) {
     h('span', { class: 'works-text' },
       h('span', { class: 'works-label' }, room.name || `Untitled ${noun}`),
       h('span', { class: 'works-detail' }, rtl ? rtlSummary(room) : roomSummary(room, kind))),
+    noPhotos(room, s) ? h('span', { class: 'room-nophoto', title: 'Marked complete but no photos added', 'aria-label': 'No photos added' }, '!') : null,
     h('span', { class: 'works-chevron', 'aria-hidden': 'true' }, '›'));
   };
 

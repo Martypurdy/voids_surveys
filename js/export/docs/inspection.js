@@ -51,7 +51,7 @@ export async function collectInspection(job, { includeCode = false } = {}) {
   const fobDefect = [...job.rooms, ...job.externals, job.security].filter(Boolean)
     .some((r) => Object.values(r.parts || {}).some((p) => (p.defects || []).some((d) => d.id === 'CDR-13' || /fob/i.test(d.d || ''))));
   if (!rtl && locks.includes('Communal key')) alerts.push('ACTION REQUIRED: Communal keys required – the operative must arrange keys to be cut or a communal lock change with the manager before works are complete.');
-  if (!rtl && locks.includes('Post box')) alerts.push('ACTION REQUIRED: Letter box lock required – the operative must arrange a new lock or keys for the letter box before works are complete.');
+  if (!rtl && locks.includes('Post box')) alerts.push('ACTION REQUIRED: Letter box lock must be changed – fit a new lock.');
   if (!rtl && (locks.includes('Communal fob') || fobDefect)) alerts.push('ACTION REQUIRED: COMMUNAL FOB REQUIRED – arrange with the fob team before the property is handed over.');
 
   const ks = job.keySafe;
