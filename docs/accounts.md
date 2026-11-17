@@ -20,3 +20,7 @@ The Accountancy button on the home screen opens `#/accounts`: receipts by UK tax
 - **VAT:** when VAT registered, a receipt's VAT is separated out (cost = total less VAT). Otherwise the full amount is the cost.
 - **Back button:** overlays use `trackOverlay`; open the next one a moment after closing the last (see `scanBatch`).
 - **Backups:** receipts are not part of the job backups yet. The accountant pack (Phase 8) will hold everything for a tax year, pictures included.
+
+## Categories
+
+`CATEGORIES` in `hmrc.js` starts with **Cost of sales (materials, hardware and small tools)**, then the 14 HMRC headings. Users can add their own (a box under the category list on the receipt screen, and **My categories** on the Accountancy screen). Custom categories are stored in the receipts store (`__categories`), loaded into `hmrc.js` by `loadCustomCategories()` when the screen opens, and appear in the lists, the filter, the totals and the Excel export. Removing one sends its receipts back to *Not sorted yet*.

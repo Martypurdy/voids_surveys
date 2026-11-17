@@ -3,7 +3,7 @@
 // VAT: when the business is VAT registered, the VAT on a receipt can be reclaimed, so the cost of a receipt that has VAT is its
 // total less the VAT, and the VAT is added up separately. When it is not registered (or the receipt has no VAT), the whole
 // amount is the cost. Money is added up in pence so totals never drift.
-import { CATEGORIES, UNSORTED, taxYearStart, taxYearMonths } from './hmrc.js';
+import { allCategories, UNSORTED, taxYearStart, taxYearMonths } from './hmrc.js';
 
 const pence = (x) => Math.round((Number(x) || 0) * 100);
 
@@ -24,7 +24,7 @@ export const receiptsInYear = (receipts, start) => receipts.filter((r) => r.kind
 export function yearTotals(receipts, start, { vatRegistered = false } = {}) {
   const list = receiptsInYear(receipts, start);
   const months = taxYearMonths(start);
-  const cats = [...CATEGORIES, UNSORTED];
+  const cats = [...allCategories(), UNSORTED];
   const rows = cats.map((c) => ({ key: c.key, label: c.label, short: c.short, byMonth: {}, total: 0, vat: 0 }));
   const byKey = new Map(rows.map((r) => [r.key, r]));
   const monthTotals = {};

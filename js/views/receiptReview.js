@@ -2,8 +2,8 @@
 // what was read from it, with anything uncertain highlighted), for adding a receipt by hand, and for editing a saved one.
 import { h, toast, confirmDialog, trackOverlay } from '../ui.js';
 import { getPhoto } from '../db.js';
-import { CATEGORIES, UNSORTED, taxYearStart, taxYearLabel } from '../accounts/hmrc.js';
-import { saveReceipt, deleteReceipt, ruleFor, categoryForSupplier, getSettings, knownSuppliers } from '../accounts/store.js';
+import { allCategories, UNSORTED, taxYearStart, taxYearLabel } from '../accounts/hmrc.js';
+import { saveReceipt, deleteReceipt, ruleFor, categoryForSupplier, knownSuppliers, addCustomCategory } from '../accounts/store.js';
 
 /** A typed amount as a number: "£1,234.50" or "12,5" -> 1234.5 / 12.5; NaN when it is not one. */
 export function parseMoney(v) {
@@ -47,8 +47,23 @@ export function reviewReceipt(entry, { index = 0, count = 1, mode = 'scan' } = {
     const vatOn = h('input', { type: 'checkbox', checked: Boolean(r.vatOn) });
     const vat = h('input', { type: 'text', inputmode: 'decimal', value: toMoneyText(r.vat), placeholder: '0.00' });
     const twenty = h('button', { type: 'button', class: 'btn-small', onclick: () => { const t = parseMoney(total.value); if (!(t > 0)) return toast('Type the total first'); vat.value = toMoneyText((t * 20) / 120); flags.vat = 'sure'; boxVat.paint(); } }, '20% of total');
-    const category = h('select', null, h('option', { value: '' }, UNSORTED.label), CATEGORIES.map((c) => h('option', { value: c.key }, c.label)));
+    const category = h('select', null);
+    const paintOptions = () => category.replaceChildren(h('option', { value: '' }, UNSORTED.label), ...allCategories().map((c) => h('option', { value: c.key }, c.label)));
+    paintOptions();
     category.value = r.category || '';
+    // your own category: type a name and add it; it joins the list for every receipt from now on
+    const newCat = h('input', { type: 'text', placeholder: 'Or type your own category…', autocapitalize: 'sentences', 'aria-label': 'Your own category', onkeydown: (e) => { if (e.key === 'Enter') { e.preventDefault(); addOwn(); } } });
+    const addOwn = async () => {
+      try {
+        const c = await addCustomCategory(newCat.value);
+        paintOptions();
+        category.value = c.key;
+        touchedCategory = true;
+        newCat.value = '';
+        ruleNote.textContent = `“${c.label}” added`;
+      } catch (err) { toast(err.message); }
+    };
+    const ownRow = h('div', { class: 'rv-own' }, newCat, h('button', { type: 'button', class: 'btn-small', onclick: addOwn }, 'Add'));
     category.addEventListener('change', () => { touchedCategory = true; ruleNote.textContent = ''; });
     const ruleNote = h('small', { class: 'rv-hint' });
     const notes = h('textarea', { rows: 2, placeholder: 'What it was for (optional)', autocapitalize: 'sentences' }, r.notes || '');
@@ -160,7 +175,7 @@ export function reviewReceipt(entry, { index = 0, count = 1, mode = 'scan' } = {
           boxTotal,
           h('label', { class: 'rv-check' }, vatOn, h('span', null, 'This receipt has VAT on it')),
           vatBlock,
-          h('label', { class: 'field' }, h('span', { class: 'field-label' }, 'Category (tax return heading)'), category, ruleNote),
+          h('label', { class: 'field' }, h('span', { class: 'field-label' }, 'Category (tax return heading)'), category), ownRow, ruleNote,
           h('label', { class: 'field' }, h('span', { class: 'field-label' }, 'Notes'), notes)),
         h('div', { class: 'rv-buttons' }, buttons)));
     document.body.append(overlay);

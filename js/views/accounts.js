@@ -1,15 +1,16 @@
 // Accountancy: receipts by UK tax year. Scan or choose receipts (read on the device), check each one, and see spending by
 // HMRC expense heading per month and per year. Everything is stored on this device only.
-import { h, toast, choose, busy, pageHeader } from '../ui.js';
+import { h, toast, choose, busy, pageHeader, confirmDialog } from '../ui.js';
 import { openCamera, cameraSupported } from '../camera.js';
-import { CATEGORIES, UNSORTED, categoryOf, currentTaxYear, taxYearStart, taxYearLabel, monthLabel } from '../accounts/hmrc.js';
-import { listReceipts, newReceipt, deleteReceipt, storeReceiptImage, categoryForSupplier, knownSuppliers, getSettings, setSettings, getRules, forgetRule } from '../accounts/store.js';
+import { allCategories, UNSORTED, categoryOf, currentTaxYear, taxYearStart, taxYearLabel, monthLabel } from '../accounts/hmrc.js';
+import { listReceipts, newReceipt, deleteReceipt, storeReceiptImage, categoryForSupplier, knownSuppliers, getSettings, setSettings, getRules, forgetRule, loadCustomCategories, addCustomCategory, removeCustomCategory } from '../accounts/store.js';
 import { yearTotals, receiptParts, receiptsInYear, money } from '../accounts/totals.js';
 import { parseReceiptText } from '../accounts/parse.js';
 import { reviewReceipt } from './receiptReview.js';
 
 export default async function accounts(root) {
   const settings = getSettings();
+  await loadCustomCategories();
   let receipts = await listReceipts();
   let year = settings.year ?? currentTaxYear();
   let tab = 'receipts';
@@ -98,7 +99,7 @@ export default async function accounts(root) {
   // ---------- receipts tab ----------
   function receiptsTab(list) {
     const catSel = h('select', { 'aria-label': 'Category', onchange: (e) => { filterCat = e.target.value; render(); } },
-      h('option', { value: '' }, 'All categories'), CATEGORIES.map((c) => h('option', { value: c.key }, c.short)), h('option', { value: '__none' }, UNSORTED.label));
+      h('option', { value: '' }, 'All categories'), allCategories().map((c) => h('option', { value: c.key }, c.short)), h('option', { value: '__none' }, UNSORTED.label));
     catSel.value = filterCat;
     const search = h('input', { type: 'search', placeholder: 'Search supplier or notes', value: filterText, 'aria-label': 'Search', oninput: (e) => { filterText = e.target.value; renderList(); } });
     const listEl = h('div', { class: 'acc-list' });
@@ -167,6 +168,23 @@ export default async function accounts(root) {
     await choose({ title: 'Supplier rules', message: 'Receipts from these suppliers are filed under the category shown.', content, buttons: [{ label: 'Done', value: 'done', class: 'btn-primary' }] });
   }
 
+  async function manageCategories() {
+    const content = h('div', null);
+    const paint = async () => {
+      const list = (await loadCustomCategories());
+      const input = h('input', { type: 'text', placeholder: 'e.g. Small tools', autocapitalize: 'sentences', 'aria-label': 'New category', onkeydown: (e) => { if (e.key === 'Enter') { e.preventDefault(); add.click(); } } });
+      const add = h('button', { type: 'button', class: 'btn-small btn-primary', onclick: async () => { try { await addCustomCategory(input.value); await paint(); } catch (err) { toast(err.message); } } }, 'Add');
+      content.replaceChildren(
+        h('p', { class: 'hint' }, 'The usual tax return headings are always there. Add your own for things you want to see on their own, such as small tools.'),
+        h('div', { class: 'rv-own' }, input, add),
+        ...(list.length ? list.map((c) => h('div', { class: 'lib-row' }, h('span', null, c.label), h('button', { type: 'button', class: 'btn-small btn-danger', onclick: async () => { if (await confirmDialog(`Remove “${c.label}”? Its receipts go back to “Not sorted yet”.`, { ok: 'Remove' })) { await removeCustomCategory(c.key); await paint(); } } }, 'Remove'))) : [h('p', { class: 'hint' }, 'You have not added any yet.')]));
+    };
+    await paint();
+    await choose({ title: 'Your categories', content, buttons: [{ label: 'Done', value: 'done', class: 'btn-primary' }] });
+    receipts = await listReceipts();
+    render();
+  }
+
   // ---------- the page ----------
   function render() {
     const years = new Set([currentTaxYear(), year, ...receipts.map((r) => taxYearStart(r.date)).filter((y) => y != null)]);
@@ -196,6 +214,7 @@ export default async function accounts(root) {
       body,
       h('div', { class: 'btn-row acc-foot-row' },
         h('button', { type: 'button', onclick: exportYear }, '⬇ Export this year (Excel)'),
+        h('button', { type: 'button', onclick: manageCategories }, 'My categories'),
         h('button', { type: 'button', onclick: manageRules }, 'Supplier rules')),
       h('p', { class: 'hint' }, '🔒 Receipts and their pictures stay on this device. They are read on the device too: nothing is uploaded.')));
   render();

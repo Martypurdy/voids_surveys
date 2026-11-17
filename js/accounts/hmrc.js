@@ -3,6 +3,7 @@
 
 /** key, label (the heading on the tax return), short (for narrow tables). */
 export const CATEGORIES = [
+  { key: 'costofsales', label: 'Cost of sales (materials, hardware and small tools)', short: 'Cost of sales' },
   { key: 'goods', label: 'Cost of goods bought for resale or goods used', short: 'Goods and materials' },
   { key: 'subcontractors', label: 'Construction industry – payments to subcontractors', short: 'Subcontractors' },
   { key: 'staff', label: 'Wages, salaries and other staff costs', short: 'Staff costs' },
@@ -19,7 +20,13 @@ export const CATEGORIES = [
   { key: 'other', label: 'Other business expenses', short: 'Other expenses' },
 ];
 export const UNSORTED = { key: '', label: 'Not sorted yet', short: 'Not sorted yet' };
-export const categoryOf = (key) => CATEGORIES.find((c) => c.key === key) || UNSORTED;
+// Categories you add yourself (kept in the receipts store; loaded into this list when the Accountancy screen opens).
+let CUSTOM = [];
+export const setCustomCategories = (list) => { CUSTOM = Array.isArray(list) ? list.filter((c) => c && c.key && c.label) : []; };
+export const customCategories = () => CUSTOM;
+/** The built-in headings, then your own. */
+export const allCategories = () => [...CATEGORIES, ...CUSTOM.map((c) => ({ key: c.key, label: c.label, short: c.label, custom: true }))];
+export const categoryOf = (key) => allCategories().find((c) => c.key === key) || UNSORTED;
 
 // ---------- tax years ----------
 

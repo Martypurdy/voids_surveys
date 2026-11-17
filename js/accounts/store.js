@@ -10,9 +10,11 @@ import { createStore, get, set, del, values } from '../../vendor/idb-keyval.js';
 import { putPhoto, deletePhotos } from '../db.js';
 import { resizeImage, makeThumb } from '../photos.js';
 import { uid, nowISO } from '../model.js';
+import { allCategories, setCustomCategories } from './hmrc.js';
 
 const store = createStore('voids-receipts', 'receipts');
 const RULES = '__rules';
+const CATS = '__categories';
 const SETTINGS = 'voids.accounts';
 
 // ---------- settings (small, kept in localStorage) ----------
@@ -51,6 +53,40 @@ export async function storeReceiptImage(blob) {
   const rec = { id: uid(), jobId: 'receipts', blob: full.blob, thumb, w: full.w, h: full.h, created: nowISO() };
   await putPhoto(rec);
   return rec.id;
+}
+
+// ---------- your own categories ----------
+/** Load the categories you have added into the shared list (call when the screen opens). */
+export async function loadCustomCategories() {
+  const list = (await get(CATS, store)) || [];
+  setCustomCategories(list);
+  return list;
+}
+const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'category';
+/** Add a category with your own name. Returns it (the existing one if the name is already there); throws if the name is empty. */
+export async function addCustomCategory(label) {
+  const name = String(label ?? '').trim().replace(/\s+/g, ' ').slice(0, 60);
+  if (!name) throw new Error('Type a name for the category first');
+  const same = allCategories().find((c) => c.label.toLowerCase() === name.toLowerCase() || c.short.toLowerCase() === name.toLowerCase());
+  if (same) return same;
+  const list = (await get(CATS, store)) || [];
+  let key = `custom-${slug(name)}`;
+  for (let i = 2; list.some((c) => c.key === key); i++) key = `custom-${slug(name)}-${i}`;
+  list.push({ key, label: name });
+  await set(CATS, list, store);
+  setCustomCategories(list);
+  return { key, label: name, short: name, custom: true };
+}
+/** Remove one of your own categories: its receipts go back to "Not sorted yet" and its supplier rules are dropped. */
+export async function removeCustomCategory(key) {
+  const list = ((await get(CATS, store)) || []).filter((c) => c.key !== key);
+  await set(CATS, list, store);
+  setCustomCategories(list);
+  for (const r of await listReceipts()) if (r.category === key) { r.category = ''; await saveReceipt(r); }
+  const rules = await getRules();
+  let changed = false;
+  for (const [k, v] of Object.entries(rules)) if (v.category === key) { delete rules[k]; changed = true; }
+  if (changed) await set(RULES, rules, store);
 }
 
 // ---------- supplier rules ----------
