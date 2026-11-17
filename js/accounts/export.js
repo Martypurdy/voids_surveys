@@ -7,7 +7,7 @@ import { receiptsInYear, receiptParts, yearTotals } from './totals.js';
 const head = (labels) => labels.map((v) => ({ v, s: 'headTeal' }));
 const pounds = (p) => p / 100;
 
-export function receiptsWorkbook(receipts, start, vatRegistered) {
+export function receiptsWorkbook(receipts, start, vatRegistered, businessName = '') {
   const list = receiptsInYear(receipts, start).sort((a, b) => a.date.localeCompare(b.date) || (a.created || '').localeCompare(b.created || ''));
   const t = yearTotals(receipts, start, { vatRegistered });
 
@@ -31,7 +31,7 @@ export function receiptsWorkbook(receipts, start, vatRegistered) {
   const cols = months.length;
   const colL = (i) => String.fromCharCode(66 + i); // B, C, D …
   const yearCol = colL(cols);
-  const tRows = [[{ v: `Receipts ${taxYearLabel(start)}`, s: 'title' }], [{ v: `Costs by tax return heading and month${vatRegistered ? ', without reclaimable VAT' : ''}. Worked out from the Receipts sheet.`, s: 'note' }], [{ v: 'Month (key)', s: 'note' }, ...months.map((m) => ({ v: m, s: 'note' }))]];
+  const tRows = [[{ v: `Receipts ${taxYearLabel(start)}${businessName ? ` – ${businessName}` : ''}`, s: 'title' }], [{ v: `Costs by tax return heading and month${vatRegistered ? ', without reclaimable VAT' : ''}. Worked out from the Receipts sheet.`, s: 'note' }], [{ v: 'Month (key)', s: 'note' }, ...months.map((m) => ({ v: m, s: 'note' }))]];
   tRows.push(head(['Category', ...months.map(monthLabel), 'Year']));
   const firstData = tRows.length + 1;
   for (const r of t.rows) {

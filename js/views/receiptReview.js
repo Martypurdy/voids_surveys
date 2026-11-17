@@ -3,7 +3,7 @@
 import { h, toast, confirmDialog, trackOverlay } from '../ui.js';
 import { getPhoto } from '../db.js';
 import { allCategories, UNSORTED, taxYearStart, taxYearLabel } from '../accounts/hmrc.js';
-import { saveReceipt, deleteReceipt, ruleFor, categoryForSupplier, knownSuppliers, addCustomCategory } from '../accounts/store.js';
+import { saveReceipt, deleteReceipt, ruleFor, categoryForSupplier, knownSuppliers, addCustomCategory, getBusinesses, businessOf, inkFor } from '../accounts/store.js';
 
 /** A typed amount as a number: "£1,234.50" or "12,5" -> 1234.5 / 12.5; NaN when it is not one. */
 export function parseMoney(v) {
@@ -30,23 +30,38 @@ export function reviewReceipt(entry, { index = 0, count = 1, mode = 'scan' } = {
     let url = null;
     let untrack = () => {};
 
+    // A field the scanner was unsure about is highlighted, with a tick to say "I have checked this": ticking it (or
+    // correcting it) turns the box green. orig remembers what the scanner thought, so unticking brings the warning back.
+    const orig = { ...flags };
+    const accepted = {};
+    const unsure = (k) => Boolean(orig[k]) && orig[k] !== 'sure';
     const fieldBox = (label, input, key, hint) => {
-      const box = h('label', { class: 'field rv-field' }, h('span', { class: 'field-label' }, label), input, hint ? h('small', { class: 'rv-hint' }, hint) : null);
-      const paint = () => { box.dataset.flag = flags[key] && flags[key] !== 'sure' ? flags[key] : ''; };
+      const accept = h('input', { type: 'checkbox', 'aria-label': `I have checked the ${label.toLowerCase()}` });
+      const acceptRow = h('label', { class: 'rv-accept' }, accept, h('span', null, 'I have checked this'));
+      const box = h('div', { class: 'field rv-field' }, h('label', { class: 'rv-fieldlabel' }, h('span', { class: 'field-label' }, label), input), hint ? h('small', { class: 'rv-hint' }, hint) : null, acceptRow);
+      const paint = () => {
+        box.dataset.flag = accepted[key] ? 'accepted' : flags[key] && flags[key] !== 'sure' ? flags[key] : '';
+        acceptRow.hidden = !unsure(key);
+        accept.checked = Boolean(accepted[key]);
+      };
       paint();
-      input.addEventListener('input', () => { flags[key] = 'sure'; paint(); });
+      const markDone = () => { if (unsure(key)) accepted[key] = true; flags[key] = 'sure'; paint(); };
+      input.addEventListener('input', markDone); // correcting it counts as checking it
+      accept.addEventListener('change', () => { accepted[key] = accept.checked; flags[key] = accept.checked ? 'sure' : orig[key]; paint(); });
       box.paint = paint;
+      box.markDone = markDone;
       return box;
     };
 
     const date = h('input', { type: 'date', value: r.date || '' });
     const supplier = h('input', { type: 'text', value: r.supplier || '', list: 'rv-suppliers', autocapitalize: 'words', placeholder: 'e.g. Screwfix' });
     const datalist = h('datalist', { id: 'rv-suppliers' });
-    knownSuppliers().then((names) => datalist.replaceChildren(...names.map((n) => h('option', { value: n }))));
+    const loadNames = () => knownSuppliers(r.businessId).then((names) => datalist.replaceChildren(...names.map((n) => h('option', { value: n }))));
+    loadNames();
     const total = h('input', { type: 'text', inputmode: 'decimal', value: toMoneyText(r.total), placeholder: '0.00' });
     const vatOn = h('input', { type: 'checkbox', checked: Boolean(r.vatOn) });
     const vat = h('input', { type: 'text', inputmode: 'decimal', value: toMoneyText(r.vat), placeholder: '0.00' });
-    const twenty = h('button', { type: 'button', class: 'btn-small', onclick: () => { const t = parseMoney(total.value); if (!(t > 0)) return toast('Type the total first'); vat.value = toMoneyText((t * 20) / 120); flags.vat = 'sure'; boxVat.paint(); } }, '20% of total');
+    const twenty = h('button', { type: 'button', class: 'btn-small', onclick: () => { const t = parseMoney(total.value); if (!(t > 0)) return toast('Type the total first'); vat.value = toMoneyText((t * 20) / 120); boxVat.markDone(); } }, '20% of total');
     const category = h('select', null);
     const paintOptions = () => category.replaceChildren(h('option', { value: '' }, UNSORTED.label), ...allCategories().map((c) => h('option', { value: c.key }, c.label)));
     paintOptions();
@@ -76,7 +91,7 @@ export function reviewReceipt(entry, { index = 0, count = 1, mode = 'scan' } = {
     // a supplier you have filed before is filed the same way again
     const applyRule = async () => {
       if (touchedCategory || !supplier.value.trim()) return;
-      const c = await categoryForSupplier(supplier.value);
+      const c = await categoryForSupplier(supplier.value, r.businessId);
       if (c && !touchedCategory) { category.value = c; ruleNote.textContent = 'Filed here automatically because of this supplier'; }
     };
     supplier.addEventListener('change', applyRule);
@@ -109,6 +124,8 @@ export function reviewReceipt(entry, { index = 0, count = 1, mode = 'scan' } = {
       vatOn.checked = Boolean(r.vatOn);
       if (r.category) category.value = r.category;
       Object.assign(flags, entry.flags || {});
+      Object.assign(orig, entry.flags || {});
+      for (const k of Object.keys(accepted)) delete accepted[k];
       for (const b of [boxDate, boxSupplier, boxTotal, boxVat]) b.paint();
       paintYear();
       showVat();
@@ -141,7 +158,7 @@ export function reviewReceipt(entry, { index = 0, count = 1, mode = 'scan' } = {
       r.category = category.value;
       r.notes = notes.value.trim();
       await saveReceipt(r);
-      if (r.supplier && r.category) await ruleFor(r.supplier, r.category);
+      if (r.supplier && r.category) await ruleFor(r.supplier, r.category, r.businessId);
       close('saved');
     };
 
@@ -164,8 +181,22 @@ export function reviewReceipt(entry, { index = 0, count = 1, mode = 'scan' } = {
       close('stop');
     };
 
+    // the business this receipt is for: a bar like the tax year one, in the business's colour
+    r.businessId = businessOf(r);
+    const bizSel = h('select', { 'aria-label': 'Company or project' }, getBusinesses().map((b) => h('option', { value: b.id }, b.name)));
+    bizSel.value = r.businessId;
+    const bizBar = h('div', { class: 'rv-biz' }, h('span', { class: 'rv-biz-label' }, 'For'), bizSel);
+    const paintBiz = () => {
+      const b = getBusinesses().find((x) => x.id === r.businessId);
+      bizBar.style.setProperty('--biz', b?.color || '#1f5f8b');
+      bizBar.style.setProperty('--biz-ink', inkFor(b?.color));
+    };
+    paintBiz();
+    bizSel.addEventListener('change', () => { r.businessId = bizSel.value; paintBiz(); touchedCategory = false; loadNames(); applyRule(); });
+
     const overlay = h('div', { class: 'rv-overlay', role: 'dialog', 'aria-modal': 'true', 'aria-label': title },
       h('div', { class: 'rv-card' },
+        bizBar,
         h('div', { class: 'rv-head' }, h('strong', null, title), h('button', { type: 'button', class: 'btn-small', onclick: stop, 'aria-label': 'Close' }, '✕')),
         status,
         imgWrap,

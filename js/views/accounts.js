@@ -3,7 +3,8 @@
 import { h, toast, choose, busy, pageHeader, confirmDialog } from '../ui.js';
 import { openCamera, cameraSupported } from '../camera.js';
 import { allCategories, UNSORTED, categoryOf, currentTaxYear, taxYearStart, taxYearLabel, monthLabel } from '../accounts/hmrc.js';
-import { listReceipts, newReceipt, deleteReceipt, storeReceiptImage, categoryForSupplier, knownSuppliers, getSettings, setSettings, getRules, forgetRule, loadCustomCategories, addCustomCategory, removeCustomCategory } from '../accounts/store.js';
+import { listReceipts, newReceipt, deleteReceipt, storeReceiptImage, categoryForSupplier, knownSuppliers, getSettings, setSettings, getRules, forgetRule, loadCustomCategories, addCustomCategory, removeCustomCategory,
+  loadBusinesses, getBusinesses, businessOf, currentBusiness, selectBusiness, addBusiness, updateBusiness, removeBusiness, BUSINESS_COLORS, inkFor } from '../accounts/store.js';
 import { yearTotals, receiptParts, receiptsInYear, money } from '../accounts/totals.js';
 import { parseReceiptText } from '../accounts/parse.js';
 import { reviewReceipt } from './receiptReview.js';
@@ -11,7 +12,11 @@ import { reviewReceipt } from './receiptReview.js';
 export default async function accounts(root) {
   const settings = getSettings();
   await loadCustomCategories();
-  let receipts = await listReceipts();
+  await loadBusinesses();
+  let biz = currentBusiness();
+  let allReceipts = await listReceipts();
+  const mine = () => allReceipts.filter((r) => businessOf(r) === biz.id);
+  let receipts = mine(); // the receipts of the business being worked in
   let year = settings.year ?? currentTaxYear();
   let tab = 'receipts';
   let filterCat = '';
@@ -20,18 +25,18 @@ export default async function accounts(root) {
   const body = h('div', { class: 'acc-body' });
   const summary = h('div', { class: 'acc-summary' });
   const yearSel = h('select', { 'aria-label': 'Tax year', onchange: (e) => { year = Number(e.target.value); setSettings({ year }); render(); } });
-  const vatBox = h('input', { type: 'checkbox', checked: settings.vatRegistered, onchange: (e) => { setSettings({ vatRegistered: e.target.checked }); render(); } });
+  const vatBox = h('input', { type: 'checkbox', checked: biz.vatRegistered, onchange: async (e) => { biz = await updateBusiness(biz.id, { vatRegistered: e.target.checked }); render(); } });
 
-  const reload = async () => { receipts = await listReceipts(); render(); };
-  const vatRegistered = () => getSettings().vatRegistered;
+  const reload = async () => { allReceipts = await listReceipts(); receipts = mine(); render(); };
+  const vatRegistered = () => biz.vatRegistered;
 
   // ---------- adding ----------
   /** Read each picture on the device, then show it for checking, one at a time. */
   async function scanBatch(blobs) {
     if (!blobs.length) return;
     const { readReceipt, closeScanner } = await import('../accounts/ocr.js');
-    const known = await knownSuppliers();
-    const entries = blobs.map((blob) => ({ blob, receipt: newReceipt({ source: 'scan' }), flags: {}, error: '', ready: null, progress: '' }));
+    const known = await knownSuppliers(biz.id);
+    const entries = blobs.map((blob) => ({ blob, receipt: newReceipt({ source: 'scan', businessId: biz.id }), flags: {}, error: '', ready: null, progress: '' }));
     let chain = Promise.resolve();
     for (const e of entries) {
       e.ready = chain = chain.then(async () => {
@@ -48,7 +53,7 @@ export default async function accounts(root) {
           Object.assign(e.receipt, { date: p.date, supplier: p.supplier, total: p.total, vat: p.vat });
           e.receipt.vatOn = vatRegistered() && p.vat != null && p.vat > 0; // a VAT-registered business ticks it when VAT was found
           e.flags = p.flags;
-          e.receipt.category = (await categoryForSupplier(p.supplier)) || '';
+          e.receipt.category = (await categoryForSupplier(p.supplier, biz.id)) || '';
         } catch (err) {
           e.error = err.message;
         }
@@ -86,7 +91,7 @@ export default async function accounts(root) {
   }
 
   async function addByHand() {
-    const receipt = newReceipt({ date: '', source: 'manual' });
+    const receipt = newReceipt({ date: '', source: 'manual', businessId: biz.id });
     const res = await reviewReceipt({ receipt, flags: {} }, { mode: 'new' });
     if (res === 'saved') await reload();
   }
@@ -149,9 +154,9 @@ export default async function accounts(root) {
       const { receiptsWorkbook } = await import('../accounts/export.js');
       const { buildXlsx } = await import('../export/xlsx.js');
       const { offerFile } = await import('../export/deliver.js');
-      const blob = await buildXlsx(receiptsWorkbook(receipts, year, vatRegistered()));
+      const blob = await buildXlsx(receiptsWorkbook(receipts, year, vatRegistered(), biz.name));
       progress.close();
-      await offerFile(blob, `Receipts ${taxYearLabel(year).replace('/', '-')}.xlsx`, 'Receipts');
+      await offerFile(blob, `Receipts ${taxYearLabel(year).replace('/', '-')} - ${biz.name.replace(/[\\/:*?"<>|]+/g, '')}.xlsx`, 'Receipts');
     } catch (e) {
       console.error(e);
       progress.close();
@@ -160,12 +165,12 @@ export default async function accounts(root) {
   }
 
   async function manageRules() {
-    const rules = await getRules();
+    const rules = await getRules(biz.id);
     const entries = Object.entries(rules);
     const content = h('div', null, entries.length
       ? entries.map(([key, v]) => h('div', { class: 'lib-row' }, h('span', null, `${v.name} → ${categoryOf(v.category).short}`), h('button', { type: 'button', class: 'btn-small btn-danger', onclick: async (ev) => { await forgetRule(key); ev.target.closest('.lib-row').remove(); } }, 'Forget')))
       : h('p', { class: 'hint' }, 'None yet. Once you file a receipt under a category, that supplier is filed there automatically next time.'));
-    await choose({ title: 'Supplier rules', message: 'Receipts from these suppliers are filed under the category shown.', content, buttons: [{ label: 'Done', value: 'done', class: 'btn-primary' }] });
+    await choose({ title: `Supplier rules – ${biz.name}`, message: 'Receipts from these suppliers are filed under the category shown for this business.', content, buttons: [{ label: 'Done', value: 'done', class: 'btn-primary' }] });
   }
 
   async function manageCategories() {
@@ -182,6 +187,93 @@ export default async function accounts(root) {
     await paint();
     await choose({ title: 'Your categories', content, buttons: [{ label: 'Done', value: 'done', class: 'btn-primary' }] });
     receipts = await listReceipts();
+    render();
+  }
+
+  // ---------- companies / projects ----------
+  const bizSel = h('select', { 'aria-label': 'Company or project', onchange: (e) => { selectBusiness(e.target.value); biz = currentBusiness(); receipts = mine(); paintBiz(); render(); } });
+  const bizBar = h('div', { class: 'acc-biz' }, h('span', { class: 'acc-biz-label' }, 'Company / project'), bizSel,
+    h('button', { type: 'button', class: 'btn-small', onclick: () => manageBusinesses() }, 'Add / edit'));
+  const header = pageHeader('Accountancy', { back: '#/' });
+  const paintBiz = () => {
+    bizSel.replaceChildren(...getBusinesses().map((b) => h('option', { value: b.id }, b.name)));
+    bizSel.value = biz.id;
+    for (const el of [bizBar, header]) { el.style.setProperty('--biz', biz.color); el.style.setProperty('--biz-ink', inkFor(biz.color)); }
+    header.dataset.biz = biz.id;
+    header.querySelector('h1').textContent = `Accountancy · ${biz.name}`;
+  };
+
+  async function manageBusinesses() {
+    const content = h('div', null);
+    let editing = null;
+    let color = BUSINESS_COLORS[getBusinesses().length % BUSINESS_COLORS.length];
+    const paint = () => {
+      const list = getBusinesses();
+      const name = h('input', { type: 'text', placeholder: 'e.g. Smith Plumbing Ltd, or Kitchen job at 12 High St', value: editing ? editing.name : '', autocapitalize: 'words', 'aria-label': 'Business name' });
+      const vat = h('input', { type: 'checkbox', checked: editing ? editing.vatRegistered : false });
+      const swatches = h('div', { class: 'biz-swatches', role: 'group', 'aria-label': 'Colour' });
+      const picker = h('input', { type: 'color', value: color, 'aria-label': 'Pick any colour', oninput: (e) => { color = e.target.value; paintSwatches(); } });
+      const paintSwatches = () => swatches.replaceChildren(...BUSINESS_COLORS.map((c) => h('button', { type: 'button', class: 'biz-swatch', style: `background:${c}`, 'aria-label': c, 'aria-pressed': String(color.toLowerCase() === c), onclick: () => { color = c; picker.value = c; paintSwatches(); } })), picker);
+      paintSwatches();
+      const save = h('button', { type: 'button', class: 'btn-primary', onclick: async () => {
+        try {
+          if (editing) await updateBusiness(editing.id, { name: name.value, color, vatRegistered: vat.checked });
+          else { const b = await addBusiness({ name: name.value, color, vatRegistered: vat.checked }); selectBusiness(b.id); }
+          biz = currentBusiness();
+          editing = null;
+          color = BUSINESS_COLORS[getBusinesses().length % BUSINESS_COLORS.length];
+          receipts = mine();
+          paintBiz();
+          paint();
+          render();
+        } catch (err) { toast(err.message); }
+      } }, editing ? 'Save changes' : 'Add business');
+      content.replaceChildren(
+        h('p', { class: 'hint' }, 'Add each company, contractor or project you keep records for. Pick a colour: the top bar takes it, so you can see at a glance who you are adding to.'),
+        ...list.map((b) => h('div', { class: 'biz-row' },
+          h('span', { class: 'biz-dot', style: `background:${b.color}` }),
+          h('span', { class: 'biz-name' }, b.name),
+          h('button', { type: 'button', class: 'btn-small', onclick: () => { editing = b; color = b.color; paint(); } }, 'Edit'),
+          list.length > 1 ? h('button', { type: 'button', class: 'btn-small btn-danger', onclick: () => removeIt(b, paint) }, 'Remove') : null)),
+        h('div', { class: 'biz-form' },
+          h('strong', null, editing ? `Edit “${editing.name}”` : 'Add a company or project'),
+          h('label', { class: 'field' }, h('span', { class: 'field-label' }, 'Name'), name),
+          h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Colour'), swatches),
+          h('label', { class: 'rv-check' }, vat, h('span', null, 'VAT registered')),
+          h('div', { class: 'btn-row' }, save, editing ? h('button', { type: 'button', onclick: () => { editing = null; paint(); } }, 'Cancel edit') : null)));
+    };
+    async function removeIt(b, repaint) {
+      const count = allReceipts.filter((r) => businessOf(r) === b.id).length;
+      const others = getBusinesses().filter((x) => x.id !== b.id);
+      let moveTo = others[0].id;
+      if (count) {
+        const pick = await choose({
+          title: `Remove “${b.name}”?`,
+          message: `It has ${count} receipt${count === 1 ? '' : 's'}. What should happen to them?`,
+          buttons: [
+            ...others.map((o) => ({ label: `Move them to “${o.name}”`, value: `move:${o.id}`, class: 'btn-primary' })),
+            { label: 'Delete the receipts and their pictures', value: 'delete', class: 'btn-danger' },
+            { label: 'Cancel', value: null },
+          ],
+        });
+        if (!pick) return;
+        moveTo = pick.startsWith('move:') ? pick.slice(5) : '';
+      } else if (!(await confirmDialog(`Remove “${b.name}”?`, { ok: 'Remove' }))) return;
+      try {
+        await removeBusiness(b.id, moveTo);
+        if (biz.id === b.id) { selectBusiness(null); biz = currentBusiness(); }
+        allReceipts = await listReceipts();
+        receipts = mine();
+        paintBiz();
+        repaint();
+        render();
+      } catch (err) { toast(err.message); }
+    }
+    paint();
+    await choose({ title: 'Companies and projects', content, buttons: [{ label: 'Done', value: 'done', class: 'btn-primary' }] });
+    allReceipts = await listReceipts();
+    receipts = mine();
+    paintBiz();
     render();
   }
 
@@ -202,8 +294,9 @@ export default async function accounts(root) {
   }
 
   root.append(
-    pageHeader('Accountancy', { back: '#/' }),
+    header,
     h('div', { class: 'content wide acc-page' },
+      bizBar,
       h('div', { class: 'acc-top' }, yearSel, h('label', { class: 'acc-vat' }, vatBox, h('span', null, 'I’m VAT registered'))),
       summary,
       h('div', { class: 'acc-add' },
@@ -217,5 +310,6 @@ export default async function accounts(root) {
         h('button', { type: 'button', onclick: manageCategories }, 'My categories'),
         h('button', { type: 'button', onclick: manageRules }, 'Supplier rules')),
       h('p', { class: 'hint' }, '🔒 Receipts and their pictures stay on this device. They are read on the device too: nothing is uploaded.')));
+  paintBiz();
   render();
 }

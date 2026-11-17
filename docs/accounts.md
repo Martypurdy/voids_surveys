@@ -24,3 +24,17 @@ The Accountancy button on the home screen opens `#/accounts`: receipts by UK tax
 ## Categories
 
 `CATEGORIES` in `hmrc.js` starts with **Cost of sales (materials, hardware and small tools)**, then the 14 HMRC headings. Users can add their own (a box under the category list on the receipt screen, and **My categories** on the Accountancy screen). Custom categories are stored in the receipts store (`__categories`), loaded into `hmrc.js` by `loadCustomCategories()` when the screen opens, and appear in the lists, the filter, the totals and the Excel export. Removing one sends its receipts back to *Not sorted yet*.
+
+## Companies and projects (businesses)
+
+Every receipt has a `businessId`; there is always at least one business (`My business` is made on first use). A business is
+`{ id, name, color, vatRegistered }`, stored in the receipts store (`__businesses`), loaded by `loadBusinesses()`. The Accountancy screen has a
+Company / project bar like the tax year one, and the top bar (and the receipt screen's "For" bar) takes the business's colour (`inkFor` picks black
+or white text). Totals, the receipts list, supplier rules (`businessId|supplier`) and the VAT setting are all per business. Receipts and rules from
+before businesses existed belong to the first business. Anything finance-related added later (invoices, quotes, mileage) should carry a
+`businessId` the same way.
+
+## Receipt screen: checking what was read
+
+A field the scanner was unsure about is highlighted pale orange with dark text and an "I have checked this" tick. Ticking it, or correcting it,
+turns the box green-outlined and marked checked; unticking brings the warning back.
