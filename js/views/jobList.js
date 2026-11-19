@@ -7,6 +7,7 @@ import { h, icon, ICONS, torchButton } from '../ui.js';
 import { refresh } from '../router.js';
 import { getLastSurveyor } from '../surveyors.js';
 import { formGrid, cardInner } from './startForm.js';
+import { inboxCount } from '../files.js';
 
 // App logo (house on a notepad), drawn on the white square in the header.
 const LOGO_SVG = '<svg viewBox="8 8 84 84" aria-hidden="true"><rect x="23" y="21" width="54" height="63" rx="7" fill="#eef4f9"/>'
@@ -30,6 +31,7 @@ const CONTINUE = 3; // unfinished forms shown on the home screen
 
 export default async function jobList(root) {
   const props = await listProperties();
+  const waiting = await inboxCount().catch(() => 0); // files shared to the app, not yet saved to a property
   const all = props.flatMap((p) => p.entries.map((e) => ({ e, p })));
   const open = all.filter(({ e }) => e.done < e.total);
   const inProgress = open.length;
@@ -91,6 +93,8 @@ export default async function jobList(root) {
         h('h2', { class: 'home-h' }, 'Start a new form'),
         formGrid(null)), // no address needed: it goes in "No address yet" until you give it one
       h('div', { class: 'home-side' },
+      waiting ? h('a', { class: 'form-card form-card-ready form-card-group', href: '#/inbox', dataset: { group: 'shared' } },
+        cardInner({ emoji: '📥', title: `Shared files (${waiting})`, text: 'Photos and documents shared to PropertyPad. Save them to a property.' }, true, '›')) : null,
       recent.length ? [h('h2', { class: 'home-h' }, 'Continue'), h('div', { class: 'job-list compact' }, recent.map(continueCard))] : null,
       h('h2', { class: 'home-h' }, 'Properties and history'),
       h('a', { class: 'form-card form-card-ready form-card-group', href: '#/properties', dataset: { group: 'properties' } },

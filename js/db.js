@@ -5,6 +5,7 @@
 //   premigration – a copy of the job records as they were before they were filed into properties (safety net)
 import { createStore, get, set, del, values, keys, getMany, setMany, delMany } from '../vendor/idb-keyval.js';
 import { allPhotoIds, nowISO, upgradeJob } from './model.js';
+import { deleteFilesFor, moveFilesTo } from './files.js';
 import { entrySummary, indexProperty, refreshActivity, newProperty, propKey, sameAddress } from './properties.js';
 
 const jobStore = createStore('voids-jobs', 'jobs');
@@ -92,6 +93,7 @@ export async function findOrCreateProperty(address) {
 export async function deleteProperty(id) {
   const p = await get(id, propertyStore);
   if (p) for (const e of p.entries) await deleteJob(e.id);
+  await deleteFilesFor(id);
   await del(id, propertyStore);
 }
 
@@ -120,6 +122,7 @@ export async function mergeProperties(fromId, toId) {
     const job = await getJob(e.id);
     if (job) await moveEntry(job, toId);
   }
+  await moveFilesTo(fromId, toId);
   await del(fromId, propertyStore);
 }
 

@@ -11,6 +11,7 @@ import { editPropertyDialog } from './addressEditor.js';
 import { pickProperty } from './pickProperty.js';
 import { rtlButton } from './rtlStart.js';
 import { offerFile } from '../export/deliver.js';
+import { filesSection } from './propertyFiles.js';
 
 export default async function propertyPage(root, { id }) {
   await flushSave();
@@ -33,7 +34,7 @@ export function buildDetail(p) {
       title,
       buttons: [
         { label: '✎ Edit address and reference', value: 'edit', class: 'btn-primary' },
-        p.entries.length ? { label: '🗜 Export the whole file (zip)', value: 'pack', class: 'btn-primary' } : null,
+        { label: '🗜 Export the whole file (zip)', value: 'pack', class: 'btn-primary' },
         { label: '⇆ Merge into another property', value: 'merge' },
         { label: 'Delete this property', value: 'delete', class: 'btn-danger' },
         { label: 'Cancel', value: null },
@@ -143,6 +144,7 @@ export function buildDetail(p) {
     children: [
       card,
       h('button', { type: 'button', class: 'btn-primary btn-big btn-block', onclick: () => pickGroup(p.id) }, '＋ Start something new here'),
+      filesSection(p),
       h('h2', { class: 'home-h' }, `History (${entries.length})`),
       chips,
       list,

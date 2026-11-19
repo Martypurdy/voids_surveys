@@ -1,6 +1,6 @@
 // Service worker: precache the app shell, serve it cache-first so the app works offline.
 // Bump VERSION whenever any file below changes, so devices pick up the update.
-const VERSION = 'v106';
+const VERSION = 'v107';
 const CACHE = `voids-${VERSION}`;
 
 const ASSETS = [
@@ -121,6 +121,9 @@ const ASSETS = [
   'js/export/json.js',
   'js/export/pdf.js',
   'js/export/preview.js',
+  'js/files.js',
+  'js/views/propertyFiles.js',
+  'js/views/inbox.js',
 ];
 
 self.addEventListener('install', (event) => {
@@ -143,9 +146,44 @@ self.addEventListener('message', (event) => {
   if (event.data === 'skipWaiting') self.skipWaiting();
 });
 
+// Files (and links) shared to the app from another app's Share menu arrive as a POST to ./share-target. Files wait in
+// the 'shared-inbox-v1' cache until the app files them (Shared files screen); a link goes to the product-link screen.
+// The cache name must not start with "voids-" (old app caches with that prefix are deleted on update).
+async function receiveShare(req) {
+  const scope = self.registration.scope;
+  try {
+    const form = await req.formData();
+    const files = form.getAll('files').filter((f) => typeof f !== 'string' && f.size >= 0);
+    if (files.length) {
+      const cache = await caches.open('shared-inbox-v1');
+      const stamp = Date.now().toString(36);
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        await cache.put(new URL(`./shared-inbox/${stamp}-${i}-${Math.random().toString(36).slice(2, 7)}`, scope).href, new Response(f, {
+          headers: {
+            'Content-Type': f.type || 'application/octet-stream',
+            'X-Name': encodeURIComponent(f.name || 'File'),
+            'X-Added': new Date().toISOString(),
+          },
+        }));
+      }
+      return Response.redirect(new URL('./#/inbox', scope).href, 303);
+    }
+    const q = new URLSearchParams();
+    for (const k of ['title', 'text', 'url']) { const v = form.get(k); if (typeof v === 'string' && v) q.set(k, v); }
+    return Response.redirect(new URL(q.toString() ? `./?${q}` : './', scope).href, 303);
+  } catch (e) {
+    return Response.redirect(new URL('./', scope).href, 303);
+  }
+}
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);
+  if (req.method === 'POST' && url.origin === self.location.origin && url.pathname.endsWith('/share-target')) {
+    event.respondWith(receiveShare(req));
+    return;
+  }
   // Only handle our own GET requests; postcodes.io, maps etc. go straight to the network.
   if (req.method !== 'GET' || url.origin !== self.location.origin) return;
 

@@ -1,5 +1,6 @@
 // Entry point: routes, autosave flushing, service worker.
-import { route, start } from './router.js';
+import { route, start, refresh } from './router.js';
+import { stashToInbox } from './files.js';
 import { flushSave, adoptOrphans, consolidateProperties } from './db.js';
 import { toast, updateBanner } from './ui.js';
 import { findUrl, setPendingLink } from './linkfill.js';
@@ -45,6 +46,7 @@ route('/job/:id/costs', () => import('./views/costSheet.js'), { kind: 'materials
 route('/job/:id/labour', () => import('./views/costSheet.js'), { kind: 'labour' });
 route('/job/:id/totals', () => import('./views/priceTotals.js'));
 route('/share', () => import('./views/shareLink.js'));
+route('/inbox', () => import('./views/inbox.js'));
 route('/job/:id/dimensions', () => import('./views/planEditor.js'), { mode: 'dimensions' });
 route('/job/:id/plan', () => import('./views/planEditor.js'), { mode: 'layout' });
 
@@ -57,6 +59,18 @@ route('/job/:id/plan', () => import('./views/planEditor.js'), { mode: 'layout' }
     if (link) setPendingLink(link);
     else setTimeout(() => toast('Nothing to add – share a product page’s link'), 500);
   }
+}
+
+// Opened with PropertyPad from the computer (right-click a PDF or photo > Open with): the files wait in Shared files.
+if ('launchQueue' in window) {
+  launchQueue.setConsumer(async (params) => {
+    if (!params.files?.length) return;
+    const files = [];
+    for (const handle of params.files) { try { files.push(await handle.getFile()); } catch (e) { console.warn(e); } }
+    if (!files.length) return;
+    await stashToInbox(files);
+    if (location.hash === '#/inbox') refresh(); else location.hash = '#/inbox';
+  });
 }
 
 // File any entries that are not in a property yet (existing jobs, imports), then show the first screen.

@@ -5,6 +5,7 @@ import { zipFiles, readZip } from './zip.js';
 import { getJob } from '../db.js';
 import { loadPhotos } from '../photos.js';
 import { allPhotoIds, SCHEMA, nowISO, todayLocal } from '../model.js';
+import { listPropertyFiles } from '../files.js';
 import { fileBase, addressTitle, natureOf } from '../properties.js';
 
 const APP = 'voids_surveys';
@@ -71,6 +72,14 @@ export async function buildPropertyPack(p, { includeCode = false, onProgress = (
     if (used.has(folder)) folder += ` (${job.id.slice(0, 4)})`;
     used.add(folder);
     files.push(...await entryFiles(job, folder, { includeCode, onProgress }));
+  }
+  const kept = await listPropertyFiles(p.id); // quotes, PDFs and photos filed against the property
+  const names = new Set();
+  for (const f of kept) {
+    let n = safe(f.name) || 'File';
+    while (names.has(n.toLowerCase())) n = `${f.id.slice(-4)} ${n}`;
+    names.add(n.toLowerCase());
+    files.push({ name: `${top}/Files/${n}`, data: f.blob });
   }
   return { blob: await zipFiles(files), filename: `${top} - ${todayLocal()}.zip` };
 }

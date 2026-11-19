@@ -23,7 +23,7 @@ export function loadPdfJs() {
 }
 
 /** Full-screen preview with Share/Save. Resolves when closed. */
-export function previewPdf(blob, filename) {
+export function previewPdf(blob, filename, { title = 'Report preview' } = {}) {
   return new Promise(async (resolve) => {
     const pages = h('div', { class: 'preview-pages' }, h('p', { class: 'preview-status' }, 'Loading preview…'));
     let doc = null;
@@ -40,7 +40,7 @@ export function previewPdf(blob, filename) {
     const onKey = (e) => { if (e.key === 'Escape') close(); };
     const overlay = h('div', { class: 'preview', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'PDF preview' },
       h('header', { class: 'sheet-head' },
-        h('h2', null, 'Report preview'),
+        h('h2', null, title),
         h('button', {
           type: 'button',
           class: 'btn-small preview-share',

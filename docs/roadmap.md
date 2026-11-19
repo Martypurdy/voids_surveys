@@ -121,3 +121,13 @@ Calculators built (13): Concrete; Bricks and blocks; Laminate and flooring; Scre
 - [x] Export the ticked entries as one zip (or several parts when there are many photos): entry data and photos for each, optional PDF reports and key safe codes; importable again with Import.
 - [x] Export, then remove: asks to check the file saved, then deletes the entries, their photos and any address left empty. Or Delete on its own, always with a confirmation.
 - Later idea: a rule that checks an entry is backed up to a storage location and removes it from the device after a set period (needs the automatic storage push first).
+
+## Shared files (share menu, Open with, property files)
+- [x] Android: PropertyPad appears in the Share menu for photos, PDFs, Word, Excel, CSV and text files (Web Share Target, POST). Shared links to product pages still work. The service worker keeps shared files in the `shared-inbox-v1` cache until they are filed.
+- [x] Shared files screen (`#/inbox`, also a card on the home screen while files are waiting): check the name and type (Quote or invoice / Document / Photo / Other), view, remove, then save to an existing or a new property.
+- [x] Files block on every property page: list, open (PDF in the in-app viewer, photos full screen, anything else through Share / Save), rename, change type, move to another property, delete, Add file button and drag and drop on computers.
+- [x] Computer (Edge / Chrome, installed app): right-click a PDF or photo > Open with > PropertyPad (file handler) puts it in Shared files.
+- [x] The whole-property zip includes a Files folder; merging properties moves the files, deleting a property deletes them. Files are not in JSON backups and are not restored by Import yet.
+- [ ] Later: restore files from a property zip on Import; read quote lines into the Materials list (pdf.js text + scanner) with a check-and-correct screen.
+- Not possible: iPhone / iPad (no share target for web apps). Android "Open with" lists do not include web apps, so share to PropertyPad instead.
+- Code: `js/files.js`, `js/views/propertyFiles.js`, `js/views/inbox.js`; tests `p10-test.mjs`.
