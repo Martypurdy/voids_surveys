@@ -93,8 +93,10 @@ export default async function jobList(root) {
         h('h2', { class: 'home-h' }, 'Start a new form'),
         formGrid(null)), // no address needed: it goes in "No address yet" until you give it one
       h('div', { class: 'home-side' },
-      waiting ? h('a', { class: 'form-card form-card-ready form-card-group', href: '#/inbox', dataset: { group: 'shared' } },
-        cardInner({ emoji: '📥', title: `Shared files (${waiting})`, text: 'Photos and documents shared to PropertyPad. Save them to a property.' }, true, '›')) : null,
+      h('a', { class: 'form-card form-card-ready form-card-group', href: '#/inbox', dataset: { group: 'shared' } },
+        cardInner(waiting
+          ? { emoji: '📥', title: `Shared files (${waiting})`, text: 'Photos and documents shared to PropertyPad. Save them to a property.' }
+          : { emoji: '📎', title: 'Add files', text: 'Choose photos or documents from this device, then save them to a property.' }, true, '›')),
       recent.length ? [h('h2', { class: 'home-h' }, 'Continue'), h('div', { class: 'job-list compact' }, recent.map(continueCard))] : null,
       h('h2', { class: 'home-h' }, 'Properties and history'),
       h('a', { class: 'form-card form-card-ready form-card-group', href: '#/properties', dataset: { group: 'properties' } },
