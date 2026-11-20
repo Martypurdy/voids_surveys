@@ -44,6 +44,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
   const tape = { on: false, mode: 'drag', pending: null, typed: '', hover: null, snap: null, dir: null };
   const allMeasures = () => (floor().measures ||= []);
   const measures = () => allMeasures().filter((m) => (m.page || 'dimensions') === section); // each tab keeps its own tapes
+  const igroup = () => (sel?.type === 'item' ? sel.ids || [sel.id] : []); // the selected units (shift-click adds more)
   const group = () => (sel?.type === 'measure' ? sel.ids || [sel.id] : []); // the selected tapes (shift-click adds more)
   const measureById = (mid) => measures().find((m) => m.id === mid);
 
@@ -107,7 +108,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     for (const r of f.rooms) {
       out.push(`<rect class="room${sel?.type === 'room' && sel.id === r.id ? ' sel' : ''}" x="${X(r.x)}" y="${Y(r.y)}" width="${r.w * s}" height="${r.h * s}"/>`);
     }
-    const isSel = (it) => sel?.type === 'item' && sel.id === it.id;
+    const isSel = (it) => igroup().includes(it.id);
     refreshPosts(f);
     const nums = cabinetNumbers(f);
     const tags = featureTags(f);
@@ -118,7 +119,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       const d = ITEMS[it.type];
       if (!r || d.kind !== 'fixture') continue;
       const x = X(r.x + it.dx), y = Y(r.y + it.dy), w = it.w * s, hh = it.h * s;
-      const cls = `fx${d.dashed ? ' dashed' : ''}${isSel(it) ? ' sel' : ''}`;
+      const cls = `fx${d.dashed ? ' dashed' : ''}${isSel(it) ? ' sel glow' : ''}`; // selected units glow soft purple
       const line = (c, a) => `<line class="${c}" x1="${x + a[0] * s}" y1="${y + a[1] * s}" x2="${x + a[2] * s}" y2="${y + a[3] * s}"/>`;
       if (d.corner) {
         out.push(`<polygon class="${cls}" points="${cornerPoints(it).map(([px, py]) => `${x + px * s},${y + py * s}`).join(' ')}"/>`);
@@ -494,6 +495,11 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       setTape(false);
       return;
     }
+    if (e.button === 2 && sel?.type === 'item') { // right button lets go of the selected unit(s); on the Room dimensions tab a door, window or radiator still opens for editing
+      const hit0 = hitTest(pt(e));
+      const edits = dims && hit0?.kind === 'item' && (ITEMS[hit0.item.type].kind === 'wall' || hit0.item.type === 'radiator');
+      if (!edits) { sel = null; renderCanvas(); renderPanel(); return; }
+    }
     svg.setPointerCapture(e.pointerId);
     pointers.set(e.pointerId, pt(e));
     if (pointers.size === 2) {
@@ -558,7 +564,24 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       const start = floor().items.filter((it) => it.roomId === hit.room.id).map((it) => ({ it, dx: it.dx, dy: it.dy, at: it.at }));
       drag = { kind: 'resize', room: hit.room, corner: hit.corner, o: { ...hit.room }, start, w0: w, p0: p, snapshot };
     } else if (hit?.kind === 'item') {
-      sel = { type: 'item', id: hit.item.id };
+      const isUnit = ITEMS[hit.item.type].kind === 'fixture';
+      if (e.shiftKey && isUnit) { // Shift-click adds a unit to the selection, or takes it out
+        const ids = new Set(igroup().filter((i) => { const q = floor().items.find((x) => x.id === i); return q && ITEMS[q.type].kind === 'fixture'; }));
+        if (ids.has(hit.item.id)) ids.delete(hit.item.id); else ids.add(hit.item.id);
+        const list = [...ids];
+        sel = list.length ? { type: 'item', id: ids.has(hit.item.id) ? hit.item.id : list[list.length - 1], ids: list } : null;
+        renderCanvas();
+        renderPanel();
+        return;
+      }
+      if (isUnit && igroup().length > 1 && igroup().includes(hit.item.id)) { // pull the whole selection along together
+        const items = floor().items.filter((q) => igroup().includes(q.id)).map((q) => ({ it: q, dx0: q.dx, dy0: q.dy, room: roomById(q.roomId) })).filter((q) => q.room);
+        drag = { kind: 'igroup', items, w0: w, p0: p, snapshot };
+        drag.button = e.button;
+        renderCanvas();
+        return;
+      }
+      sel = { type: 'item', id: hit.item.id, ids: [hit.item.id] }; // a single click selects just this one
       if (ITEMS[hit.item.type].kind === 'wall') setTimeout(revealPanel, 0); // after the panel redraws
       const r = roomById(hit.item.roomId);
       drag = { kind: 'item', item: hit.item, o: { ...hit.item, ax: r.x + (hit.item.dx || 0), ay: r.y + (hit.item.dy || 0) }, w0: w, p0: p, snapshot };
@@ -632,6 +655,16 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     }
     const w = toWorld(p);
     const dx = w.x - drag.w0.x, dy = w.y - drag.w0.y;
+    if (drag.kind === 'igroup') { // all selected units move by the same amount, staying in their rooms and keeping their arrangement
+      let ddx = snap(dx), ddy = snap(dy);
+      const lo = (key, size) => Math.max(...drag.items.map((q) => -q[key]));
+      const hiX = Math.min(...drag.items.map((q) => q.room.w - q.it.w - q.dx0)), hiY = Math.min(...drag.items.map((q) => q.room.h - q.it.h - q.dy0));
+      const loX = lo('dx0'), loY = lo('dy0');
+      ddx = Math.max(Math.min(ddx, hiX), Math.min(loX, hiX));
+      ddy = Math.max(Math.min(ddy, hiY), Math.min(loY, hiY));
+      for (const q of drag.items) { q.it.dx = q.dx0 + ddx; q.it.dy = q.dy0 + ddy; }
+      return renderCanvas();
+    }
     if (drag.kind === 'moff') { // pull the dimension lines sideways only: each stays parallel to what it measures, so a pull across moves only the tapes that run the other way
       for (const it of drag.items) {
         let off = it.off0 + dx * it.n.x + dy * it.n.y;
@@ -1164,6 +1197,13 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       showFigures();
       return;
     }
+    if (sel?.type === 'item' && igroup().filter((i) => f.items.some((x) => x.id === i)).length > 1) {
+      const ids = igroup().filter((i) => f.items.some((x) => x.id === i));
+      return panel.replaceChildren(
+        h('strong', null, `${ids.length} units selected`),
+        h('p', { class: 'hint' }, 'Drag any selected unit to move them all together. Shift-click a unit to add it or take it out. Right-click, or press Esc, to let go of them.'),
+        h('div', { class: 'btn-row' }, delBtn(`Delete ${ids.length} units`, () => { remember(); f.items = f.items.filter((x) => !ids.includes(x.id)); sel = null; save(); renderAll(); })));
+    }
     if (sel?.type === 'item') {
       const it = f.items.find((i) => i.id === sel.id);
       if (!it) { sel = null; return renderPanel(); }
@@ -1493,10 +1533,10 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       const f = floor();
       if (sel.type === 'measure') return deleteMeasures(group());
       if (sel.type === 'item') {
-        const i = f.items.findIndex((x) => x.id === sel.id);
-        if (i < 0) return;
+        const ids = igroup();
+        if (!f.items.some((x) => ids.includes(x.id))) return;
         remember();
-        f.items.splice(i, 1);
+        f.items = f.items.filter((x) => !ids.includes(x.id));
         sel = null;
         save();
         renderAll();

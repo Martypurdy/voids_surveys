@@ -1688,3 +1688,6 @@ a.form-card { text-decoration: none; color: inherit; }
 .plan-svg .tape-e.att.sel { stroke: var(--primary); }
 .plan-svg .tape-ext { stroke: #b98600; stroke-width: 1; stroke-dasharray: 1.5 3; pointer-events: none; }
 .plan-svg .tape-tick { fill: #f2b705; stroke: #1f1f1f; stroke-width: 1; pointer-events: none; }
+
+/* Designer: selected units glow soft purple */
+.plan-svg .fx.glow { filter: drop-shadow(0 0 4px rgb(175 140 255 / .95)) drop-shadow(0 0 9px rgb(190 160 255 / .6)); }
