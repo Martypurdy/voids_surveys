@@ -117,13 +117,63 @@ export async function pickGroup(propertyId) {
   return pickForm(g, propertyId);
 }
 
-/** The grid of start buttons for one property. */
+const ORDER_KEY = 'voids.homeOrder';
+const readOrder = () => { try { const v = JSON.parse(localStorage.getItem(ORDER_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
+const writeOrder = (v) => { try { localStorage.setItem(ORDER_KEY, JSON.stringify(v)); } catch { /* storage blocked */ } };
+
+/** GROUPS in this device's saved order. New buttons added later go at the end. */
+export function orderedGroups() {
+  const saved = readOrder();
+  const rank = (g) => { const i = saved.indexOf(g.key); return i < 0 ? saved.length + GROUPS.indexOf(g) : i; };
+  return [...GROUPS].sort((a, b) => rank(a) - rank(b));
+}
+
+/** The grid of start buttons for one property, with a Reorder mode (up / down arrows, saved on this device). */
 export function formGrid(propertyId) {
-  return h('div', { class: 'form-grid' }, GROUPS.map((g) => g.href ? h('a', { class: 'form-card form-card-ready form-card-group', href: g.href, dataset: { group: g.key } }, cardInner(g, true, '›')) : h(g.forms ? 'button' : 'div', {
-    type: g.forms ? 'button' : null,
-    class: `form-card${g.forms ? ' form-card-ready form-card-group' : ''}`,
-    dataset: { group: g.key },
-    onclick: g.forms ? () => pickForm(g, propertyId) : null,
-    'aria-disabled': g.forms ? null : 'true',
-  }, cardInner(g, Boolean(g.forms), '›'))));
+  let editing = false;
+  const wrap = h('div', { class: 'form-grid-wrap' });
+
+  const move = (key, dir) => {
+    const keys = orderedGroups().map((g) => g.key);
+    const i = keys.indexOf(key);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= keys.length) return;
+    [keys[i], keys[j]] = [keys[j], keys[i]];
+    writeOrder(keys);
+    draw(key, dir);
+  };
+
+  const card = (g) => (g.href
+    ? h('a', { class: 'form-card form-card-ready form-card-group', href: g.href, dataset: { group: g.key } }, cardInner(g, true, '›'))
+    : h(g.forms ? 'button' : 'div', {
+      type: g.forms ? 'button' : null,
+      class: `form-card${g.forms ? ' form-card-ready form-card-group' : ''}`,
+      dataset: { group: g.key },
+      onclick: g.forms ? () => pickForm(g, propertyId) : null,
+      'aria-disabled': g.forms ? null : 'true',
+    }, cardInner(g, Boolean(g.forms), '›')));
+
+  const sortCard = (g, i, n) => h('div', { class: 'form-card form-card-ready form-card-sort', dataset: { group: g.key } },
+    h('span', { class: 'form-emoji', 'aria-hidden': 'true' }, g.emoji),
+    h('span', { class: 'form-text' }, h('span', { class: 'form-title' }, g.title)),
+    h('span', { class: 'sort-btns' },
+      h('button', { type: 'button', class: 'sort-btn', dataset: { dir: 'up' }, 'aria-label': `Move ${g.title} up`, disabled: i === 0, onclick: () => move(g.key, -1) }, '▲'),
+      h('button', { type: 'button', class: 'sort-btn', dataset: { dir: 'down' }, 'aria-label': `Move ${g.title} down`, disabled: i === n - 1, onclick: () => move(g.key, 1) }, '▼')));
+
+  function draw(focusKey, dir) {
+    const groups = orderedGroups();
+    wrap.replaceChildren(...[
+      h('div', { class: 'form-grid-bar' },
+        editing ? h('span', { class: 'form-grid-hint' }, 'Use the arrows to put the buttons in your order.') : null,
+        h('button', { type: 'button', class: editing ? 'btn-primary' : 'btn-quiet', onclick: () => { editing = !editing; draw(); } }, editing ? '✓ Done' : '↕ Reorder')),
+      h('div', { class: 'form-grid' }, groups.map((g, i) => (editing ? sortCard(g, i, groups.length) : card(g)))),
+    ].filter(Boolean));
+    if (editing && focusKey) {
+      const row = wrap.querySelector(`[data-group="${focusKey}"]`);
+      const btn = row && (row.querySelector(`.sort-btn[data-dir="${dir < 0 ? 'up' : 'down'}"]:not([disabled])`) || row.querySelector('.sort-btn:not([disabled])'));
+      if (btn) btn.focus({ preventScroll: true });
+    }
+  }
+  draw();
+  return wrap;
 }
