@@ -2,7 +2,7 @@
 import { addressLines, jobTitle, fmtDate, fmtDateTime, slug, todayLocal, allPhotoIds, worksSummary, roomStatus, roomAreas, serviceTitle, hasMeterDoor, isRtl, isPrice, isPlan, isRepair, isRams, isCalc, isDoc, formOf, textLines } from '../model.js';
 import { usedRows, usedMaterials, rowNumbers, materialSource, repairPhotos, rowPhotoNumbers } from '../repair.js';
 import { fileBase } from '../properties.js';
-import { ITEMS, roomFigures, floorArea, planArea, metres, sqm, openingGeometry, bounds, legend, cornerPoints, cabinetNumbers, cabinetText, frontEdge, cornerLabelPoint, blindGeometry, panelLines, refreshPosts, refreshDepths, settingsLine, cabinetShapes, badgePoint, featureTags, describeFeature, serviceInfo } from '../plan.js';
+import { ITEMS, roomFigures, floorArea, planArea, metres, sqm, openingGeometry, bounds, legend, cornerPoints, cabinetNumbers, cabinetText, frontEdge, cornerLabelPoint, blindGeometry, curvedOutline, panelLines, refreshPosts, refreshDepths, settingsLine, cabinetShapes, badgePoint, featureTags, describeFeature, serviceInfo } from '../plan.js';
 import { syncMeasures, measuresOn } from '../measure.js';
 import { sheetTotals, lineTotals, isBlankLine, gbp, money, LABOUR_BASIS } from '../pricing.js';
 import { UNITS, defectInfo, isSorCode, qtyText as unitQty } from '../data/parts.js';
@@ -1001,6 +1001,22 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
         doc.setLineDashPattern([], 0);
         const [lx, ly2] = cornerLabelPoint(it);
         badge(px(r.x + it.dx + lx), py(r.y + it.dy + ly2), nums.get(it.id));
+        continue;
+      }
+      if (it.variant === 'curved' && !d.corner) { // a curved end unit: the front corner on its handing side is rounded off
+        const { poly, front, divider } = curvedOutline(it);
+        const pts = poly.map(([ux, uy]) => [px(r.x + it.dx + ux), py(r.y + it.dy + uy)]);
+        doc.lines(pts.slice(1).concat([pts[0]]).map((p, i) => [p[0] - pts[i][0], p[1] - pts[i][1]]), pts[0][0], pts[0][1], [1, 1], d.dashed ? 'S' : 'FD', true);
+        doc.setLineDashPattern([], 0);
+        const dv = divider.map(([ux, uy]) => [px(r.x + it.dx + ux), py(r.y + it.dy + uy)]);
+        doc.setDrawColor(70, 80, 90);
+        doc.setLineWidth(0.25);
+        doc.line(dv[0][0], dv[0][1], dv[1][0], dv[1][1]);
+        const fl = front.map(([ux, uy]) => [px(r.x + it.dx + ux), py(r.y + it.dy + uy)]);
+        doc.setDrawColor(...BRAND);
+        doc.setLineWidth(0.7);
+        for (let i = 1; i < fl.length; i++) doc.line(fl[i - 1][0], fl[i - 1][1], fl[i][0], fl[i][1]);
+        if (d.cab) { const [bpx, bpy] = badgePoint(it); badge(px(r.x + it.dx) + bpx * k, py(r.y + it.dy) + bpy * k, nums.get(it.id)); }
         continue;
       }
       const bx = px(r.x + it.dx), by = py(r.y + it.dy), w = it.w * k, hh = it.h * k;

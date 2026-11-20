@@ -2,6 +2,8 @@
 // Units: centimetres. Rooms are rectangles (x, y = top-left corner). Every item belongs to
 // a room and is stored relative to it, so moving a room moves its doors, windows and fittings.
 
+import { RANGE } from './data/cabinets.js';
+
 const newId = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`);
 
 export const PLAN_KINDS = {
@@ -11,8 +13,12 @@ export const PLAN_KINDS = {
 };
 
 // Standard unit widths (cm) offered in the size drop-down.
-const BASE_SIZES = [30, 40, 45, 50, 60, 80, 90, 100, 120];
-const WALL_SIZES = [30, 40, 50, 60, 80, 90, 100];
+const cm = (list) => list.map((v) => v / 10);
+const union = (...lists) => [...new Set(lists.flat())].sort((a, b) => a - b);
+const BASE_SIZES = union(cm(RANGE.widths.baseDoor), [30, 40, 45, 50, 60, 80, 90, 100, 120]); // the range, plus our own 120
+const WALL_SIZES = union(cm(RANGE.widths.wall), [30, 40, 50, 60, 80, 90, 100]);
+const DEPTH_BASE = RANGE.depth.base / 10, DEPTH_WALL = RANGE.depth.wall / 10; // carcass depths (cm); the door and its gap go on top
+const H_BASE = RANGE.height.base / 10, H_TOWER = RANGE.height.tower / 10;
 
 /**
  * run: fixtures in the same run (base-level or wall-level) snap flush against each other.
@@ -31,20 +37,27 @@ export const ITEMS = {
   smoke: { kind: 'point', label: 'Smoke alarm', emoji: '🔔', code: 'SA' },
   co: { kind: 'point', label: 'CO alarm', emoji: '⚠️', code: 'CO' },
   radiator: { kind: 'fixture', label: 'Radiator', emoji: '▬', w: 100, h: 12 },
-  base: { kind: 'fixture', cab: true, styles: true, label: 'Base unit', emoji: '▢', w: 60, h: 59, fronted: true, cd: 57, run: 'base', sizes: BASE_SIZES },
-  wallunit: { kind: 'fixture', cab: true, label: 'Wall unit', emoji: '▭', w: 60, h: 33, fronted: true, cd: 31, dashed: true, run: 'wall', sizes: WALL_SIZES },
-  cornerbase: { kind: 'fixture', cab: true, label: 'Corner base unit', emoji: '◣', w: 90, h: 90, corner: 59, run: 'base', sizes: [90, 100] },
-  cornerwall: { kind: 'fixture', cab: true, label: 'Corner wall unit', emoji: '◤', w: 60, h: 60, corner: 33, dashed: true, run: 'wall', sizes: [60, 65] },
-  blindcorner: { kind: 'fixture', cab: true, blind: true, label: 'Blind corner base unit', emoji: '◧', w: 100, h: 59, fronted: true, cd: 57, run: 'base', sizes: [80, 100] },
-  appspace: { kind: 'fixture', cab: true, space: true, dashed: true, label: 'Appliance space', emoji: '⬚', w: 62, h: 59, fronted: true, cd: 57, run: 'base', sizes: [45, 50, 55, 60, 62, 70, 90, 100] },
-  fillerbase: { kind: 'fixture', filler: true, label: 'Filler panel (base)', emoji: '▮', w: 5, h: 59, fronted: true, cd: 57, run: 'base', sizes: [3, 5, 7.5, 10, 15, 20, 30] },
-  fillerwall: { kind: 'fixture', filler: true, dashed: true, label: 'Filler panel (wall)', emoji: '▯', w: 5, h: 33, fronted: true, cd: 31, run: 'wall', sizes: [3, 5, 7.5, 10, 15, 20, 30] },
-  larder: { kind: 'fixture', cab: true, patterns: true, label: 'Larder unit', emoji: '🗄️', w: 60, h: 59, fronted: true, cd: 57, run: 'base', sizes: [30, 40, 45, 50, 60, 80, 100] },
-  ovenhousing: { kind: 'fixture', cab: true, patterns: true, label: 'Oven housing', emoji: '♨️', w: 60, h: 59, fronted: true, cd: 57, run: 'base', sizes: [60] },
-  fridgefreezer: { kind: 'fixture', cab: true, patterns: true, label: 'Fridge / freezer housing', emoji: '🧊', w: 60, h: 59, fronted: true, cd: 57, run: 'base', sizes: [55, 60, 70] },
+  base: { kind: 'fixture', cab: true, styles: true, label: 'Base unit', emoji: '▢', w: 60, h: 58.5, fronted: true, cd: DEPTH_BASE, hgt: H_BASE, run: 'base', sizes: BASE_SIZES },
+  wallunit: { kind: 'fixture', cab: true, label: 'Wall unit', emoji: '▭', w: 60, h: 31, fronted: true, cd: DEPTH_WALL, hgt: 72, dashed: true, run: 'wall', sizes: WALL_SIZES },
+  cornerbase: { kind: 'fixture', cab: true, label: 'Corner base unit', emoji: '◣', w: 90, h: 90, corner: 58.5, fronted: true, cd: DEPTH_BASE, hgt: H_BASE, run: 'base', sizes: [90, 93.1, 100] },
+  cornerwall: { kind: 'fixture', cab: true, label: 'Corner wall unit', emoji: '◤', w: 63.1, h: 63.1, corner: 31, fronted: true, cd: DEPTH_WALL, hgt: 72, dashed: true, run: 'wall', sizes: [60, 63.1, 65, 73.1] },
+  blindcorner: { kind: 'fixture', cab: true, blind: true, label: 'Blind corner base unit', emoji: '◧', w: 100, h: 58.5, fronted: true, cd: DEPTH_BASE, hgt: H_BASE, run: 'base', sizes: [80, 100] },
+  blindwall: { kind: 'fixture', cab: true, blind: true, label: 'Blind corner wall unit', emoji: '◨', w: 100, h: 31, fronted: true, cd: DEPTH_WALL, hgt: 72, dashed: true, run: 'wall', sizes: [80, 90, 100] },
+  towercorner: { kind: 'fixture', cab: true, blind: true, label: 'Larder top corner tower', emoji: '◧', w: 100, h: 58.5, fronted: true, cd: DEPTH_BASE, hgt: H_TOWER, run: 'base', sizes: [100] },
+  appspace: { kind: 'fixture', cab: true, space: true, dashed: true, label: 'Appliance space', emoji: '⬚', w: 62, h: 58.5, fronted: true, cd: DEPTH_BASE, hgt: H_BASE, run: 'base', sizes: [45, 50, 55, 60, 62, 70, 90, 100] },
+  fillerbase: { kind: 'fixture', filler: true, label: 'Filler panel (base)', emoji: '▮', w: 5, h: 58.5, fronted: true, cd: DEPTH_BASE, hgt: H_BASE, run: 'base', sizes: [3, 5, 7.5, 10, 15, 20, 30] },
+  fillerwall: { kind: 'fixture', filler: true, dashed: true, label: 'Filler panel (wall)', emoji: '▯', w: 5, h: 31, fronted: true, cd: DEPTH_WALL, hgt: 72, run: 'wall', sizes: [3, 5, 7.5, 10, 15, 20, 30] },
+  larder: { kind: 'fixture', cab: true, patterns: true, label: 'Larder unit', emoji: '🗄️', w: 60, h: 58.5, fronted: true, cd: DEPTH_BASE, hgt: H_TOWER, run: 'base', sizes: union(cm(RANGE.widths.larder), [30, 40, 45, 50, 60, 80, 100]) },
+  ovenhousing: { kind: 'fixture', cab: true, patterns: true, label: 'Oven housing', emoji: '♨️', w: 60, h: 58.5, fronted: true, cd: DEPTH_BASE, hgt: H_TOWER, run: 'base', sizes: [60] },
+  fridgefreezer: { kind: 'fixture', cab: true, patterns: true, label: 'Fridge / freezer housing', emoji: '🧊', w: 60, h: 58.5, fronted: true, cd: DEPTH_BASE, hgt: H_TOWER, run: 'base', sizes: [55, 60, 70] },
+  // One button for all the tall housings. It is a menu, never placed itself: it opens a picker of larder / oven housing /
+  // fridge-freezer housing (which stay as their own item types so older plans keep working).
+  tall: { kind: 'fixture', menu: true, label: 'Tall housing', emoji: '🗄️', variants: ['tall-larder', 'tall-oven', 'tall-apptower', 'tall-midi', 'tall-fridge', 'tall-corner'], hint: 'larder, oven, fridge, corner', pick: 'Pick the kind of tall unit. The width and the door pattern (upper / lower door) come next.' },
+  basemenu: { kind: 'fixture', menu: true, label: 'Base units', emoji: '▢', variants: ['base-door', 'base-drawerline', 'base-2drawer', 'base-3drawer', 'base-4drawer', 'base-corner', 'base-carousel', 'base-blind', 'base-belfast', 'base-oven', 'base-curved'], hint: 'door, drawers, corner, sink', pick: 'Pick the kind of base unit. The width and options come next.' },
+  wallmenu: { kind: 'fixture', menu: true, label: 'Wall units', emoji: '▭', variants: ['wall-std', 'wall-corner', 'wall-blind', 'wall-bridging', 'wall-hob', 'wall-microwave', 'wall-wine', 'wall-curved'], hint: 'heights, corner, blind', pick: 'Pick the kind of wall unit. The width and options come next.' },
   // An end panel is a loose decorative board against the exposed end of a unit. It is its own part: it never changes the unit's size.
-  // uw = its thickness (16, 18 or 22 mm), ud = its depth (590 mm, the same as a base unit with its door).
-  endpanel: { kind: 'fixture', panel: true, label: 'End panel', emoji: '▌', w: 1.8, h: 59, run: 'base' },
+  // uw = its thickness (16, 18 or 22 mm), ud = its depth (585 mm, the same as a base unit with its door).
+  endpanel: { kind: 'fixture', panel: true, label: 'End panel', emoji: '▌', w: 1.8, h: 58.5, run: 'base' },
   sink: { kind: 'fixture', label: 'Sink', emoji: '🚰', w: 100, h: 55, run: 'base' },
   hob: { kind: 'fixture', label: 'Hob', emoji: '🍳', w: 60, h: 55, run: 'base' },
   oven: { kind: 'fixture', label: 'Oven', emoji: '♨️', w: 60, h: 60, run: 'base' },
@@ -61,19 +74,19 @@ export const ITEMS = {
 for (const [k, d] of Object.entries(ITEMS)) if (d.kind === 'fixture' && k !== 'radiator') d.facing = true;
 
 /** Blind corner units: the door widths that go with each unit width (cm). */
-export const DOOR_OPTIONS = { 100: [50, 60], 80: [30, 35, 40] };
+export const DOOR_OPTIONS = { 100: [50, 60], 90: [40, 45, 50], 80: [30, 35, 40] };
 export const APPLIANCES = ['Oven / cooker', 'Dishwasher', 'Washing machine', 'Fridge / freezer', 'Other'];
 export const GAP = 0.2; // cm between the carcass and its door / drawer front
 export const DEFAULT_SETTINGS = { front: 18, board: 18 }; // mm: door / drawer fronts; fillers and new end panels
 export const PANEL_THICKNESSES = [16, 18, 22]; // mm: the common end panel boards
-export const PANEL_DEPTH = 59; // cm (590 mm)
+export const PANEL_DEPTH = 58.5; // cm (585 mm: 565 carcass + 2 gap + 18 door, so it lines up with the doors)
 const frontCm = (st) => (st?.front ?? DEFAULT_SETTINGS.front) / 10;
 const boardCm = (st) => (st?.board ?? DEFAULT_SETTINGS.board) / 10;
 
 /** Buttons offered for each kind of plan, in order. */
 export const PALETTE = {
-  property: ['door', 'window', 'fuse', 'water', 'gas', 'elec', 'boiler', 'smoke', 'co', 'radiator', 'base', 'cornerbase', 'blindcorner', 'larder', 'ovenhousing', 'fridgefreezer', 'appspace', 'fillerbase', 'endpanel', 'wallunit', 'cornerwall', 'fillerwall', 'sink', 'hob', 'oven', 'fridge', 'washer', 'dishwasher', 'bath', 'shower', 'wc', 'basin'],
-  kitchen: ['door', 'window', 'base', 'cornerbase', 'blindcorner', 'larder', 'ovenhousing', 'fridgefreezer', 'appspace', 'fillerbase', 'endpanel', 'wallunit', 'cornerwall', 'fillerwall', 'sink', 'hob', 'oven', 'fridge', 'washer', 'dishwasher', 'boiler', 'radiator', 'fuse', 'water', 'gas', 'elec'],
+  property: ['door', 'window', 'fuse', 'water', 'gas', 'elec', 'boiler', 'smoke', 'co', 'radiator', 'basemenu', 'tall', 'appspace', 'fillerbase', 'endpanel', 'wallmenu', 'fillerwall', 'sink', 'hob', 'oven', 'fridge', 'washer', 'dishwasher', 'bath', 'shower', 'wc', 'basin'],
+  kitchen: ['door', 'window', 'basemenu', 'tall', 'appspace', 'fillerbase', 'endpanel', 'wallmenu', 'fillerwall', 'sink', 'hob', 'oven', 'fridge', 'washer', 'dishwasher', 'boiler', 'radiator', 'fuse', 'water', 'gas', 'elec'],
   bathroom: ['door', 'window', 'bath', 'shower', 'wc', 'basin', 'radiator', 'water'],
 };
 
@@ -84,7 +97,7 @@ export const PALETTE = {
 export const isStructure = (type) => ITEMS[type].kind !== 'fixture' || type === 'radiator';
 
 /** What a base unit can be, and the door splits for tall units (upper / lower door). */
-export const STYLES = { door: 'Full height door', drawerline: 'Drawer-line unit', drawers: 'Full drawer cabinet' };
+export const STYLES = { door: 'Full height door', drawerline: 'Drawer-line unit', drawers2: '2 drawer unit', drawers: '3 drawer unit', drawers4: '4 drawer unit' };
 export const PATTERNS = ['50/50', '60/40', '70/30'];
 
 export const ROOM_NAMES = ['Living room', 'Kitchen', 'Kitchen / diner', 'Dining room', 'Bedroom 1', 'Bedroom 2', 'Bedroom 3', 'Box room', 'Bathroom', 'Shower room', 'En-suite', 'WC', 'Hallway', 'Landing', 'Stairs', 'Utility', 'Conservatory', 'Store', 'Garage'];
@@ -109,6 +122,7 @@ export function newPlanItem(type, props = {}) {
     : d.facing ? {
       w: d.w, h: d.h, uw: d.w, ud: d.h, rot: 0, manual: false, dx: 0, dy: 0,
       ...(d.fronted ? { cd: d.cd, ew: 0 } : {}),
+      ...(d.hgt ? { hgt: d.hgt } : {}),
       ...(d.styles ? { style: 'door' } : {}),
       ...(d.patterns ? { pattern: '50/50' } : {}),
       ...(d.blind ? { door: 60, hand: 'right', post: 7 } : {}),
@@ -366,8 +380,36 @@ export function legend(floors) {
 }
 
 /** Corner units are L-shaped: the outline (cm, relative to the unit's box) turned by item.rot (0/90/180/270). */
+export const armOf = (item) => item.arm ?? ITEMS[item.type].corner;
+/**
+ * A curved end unit seen from above, like a stock curved base unit: an open shelved bay whose front corner is rounded
+ * off by a quarter circle, a fixed upright, and a straight bay with the door. The curved bay is about two thirds of
+ * the width. hand 'left' / 'right' = which side the curve is on, seen from the front.
+ * Returns { poly, front, divider } in box coordinates (cm): the outline to fill, the door front (the straight bay only),
+ * and the upright between the two bays.
+ */
+export function curvedOutline(it) {
+  const uw = it.uw ?? it.w, ud = it.ud ?? it.h;
+  const r = Math.min(uw * 0.65, ud * 0.8);
+  const right = (it.hand || 'left') === 'right';
+  const mirror = (u) => (right ? uw - u : u);
+  const cx = r, cy = ud - r; // the arc's centre (for the left hand), curving from the front edge to the side
+  const arc = [];
+  for (let i = 0; i <= 10; i++) {
+    const t = Math.PI / 2 + (Math.PI / 2) * (i / 10); // 90 to 180 degrees
+    arc.push([cx + r * Math.cos(t), cy + r * Math.sin(t)]);
+  }
+  const local = {
+    poly: [[0, 0], [uw, 0], [uw, ud], ...arc],
+    front: [[r, ud], [uw, ud]], // the door is on the straight bay
+    divider: [[r, 0], [r, ud]],
+  };
+  const map = (pts) => pts.map(([u, v]) => boxPoint(it, mirror(u), v));
+  return { poly: map(local.poly), front: map(local.front), divider: map(local.divider) };
+}
+
 export function cornerPoints(item) {
-  const S = item.w, a = Math.min(ITEMS[item.type].corner, S);
+  const S = item.w, a = Math.min(armOf(item), S);
   let pts = [[0, 0], [S, 0], [S, a], [a, a], [a, S], [0, S]];
   for (let i = 0; i < ((item.rot || 0) / 90) % 4; i++) pts = pts.map(([x, y]) => [S - y, x]);
   return pts;
@@ -477,7 +519,10 @@ export function rotateAbout(it, rot) {
 export function upgradePlanItem(it) {
   const d = ITEMS[it.type];
   if (d?.fronted) it.cd ??= d.cd;
-  if (d?.fronted && d.cd === 57 && it.cd === 57.5) it.cd = 57; // the old standard carcass depth: units are now 590 mm deep with the door
+  if (d?.fronted && d.run === 'base' && (it.cd === 57.5 || it.cd === 57)) it.cd = d.cd; // older carcass depths (575, 570) become the range's 565
+  if (d?.fronted && d.run === 'wall' && it.cd === 31) it.cd = d.cd; // wall units were 310: now the range's 290
+  if (d?.hgt && it.hgt === undefined) it.hgt = d.hgt;
+  if (d?.panel && (it.ud === 59 || it.ud === 59.5)) { it.ud = PANEL_DEPTH; applyRot(it); } // end panels follow the unit depth
   if (!d?.facing || it.uw != null) return;
   if (d.corner) { it.uw = it.ud = it.w; it.rot ??= 0; } else {
     const turned = Boolean(it.turn);
@@ -500,7 +545,8 @@ export function cabinetNumbers(floor) {
 /** One line for the key: "Base unit, 600 mm wide - Full height door". */
 export function cabinetText(it) {
   const d = ITEMS[it.type];
-  const parts = [`${d.label}, ${Math.round((it.uw ?? it.w) * 10)} mm wide`];
+  const parts = [`${kindOf(it)?.label ?? d.label}, ${Math.round((it.uw ?? it.w) * 10)} mm wide${it.hgt ? `, ${Math.round(it.hgt * 10)} mm high` : it.variant === 'midi' ? ', height not stated' : ''}`];
+  if (d.fronted && !d.corner && it.cd != null && it.cd !== d.cd) parts.push(`${Math.round(it.cd * 10)} mm carcass depth`);
   if (d.styles) parts.push(STYLES[it.style] || STYLES.door);
   if (d.patterns) parts.push(`doors ${it.pattern || PATTERNS[0]}`);
   if (d.blind) parts.push(`${Math.round(it.door * 10)} mm door, corner post ${Math.round((it.post ?? 7) * 10)} mm, blind end ${it.hand || 'right'}`);
@@ -558,7 +604,7 @@ export function blindPost(it, items) {
   const right = (it.hand || 'right') === 'right';
   let reach = 0; // how far the adjoining cabinet comes in along the blind end
   for (const o of items) {
-    if (o === it || o.roomId !== it.roomId || ITEMS[o.type].kind !== 'fixture' || ITEMS[o.type].run !== 'base') continue;
+    if (o === it || o.roomId !== it.roomId || ITEMS[o.type].kind !== 'fixture' || ITEMS[o.type].run !== ITEMS[it.type].run) continue;
     const [ua, va] = localPoint(it, o.dx, o.dy), [ub, vb] = localPoint(it, o.dx + o.w, o.dy + o.h);
     const u0 = Math.min(ua, ub), u1 = Math.max(ua, ub), v0 = Math.min(va, vb);
     if (v0 < it.ud - 5 || v0 > it.ud + 25) continue; // not standing against the front
@@ -635,6 +681,12 @@ export function setDepth(it, st) {
   const d = ITEMS[it.type];
   if (!d?.fronted) return false;
   it.cd ??= d.cd;
+  if (d.corner) { // an L-shaped corner unit: both arms are as deep as a unit with its door
+    const arm = Math.round((it.cd + GAP + frontCm(st)) * 100) / 100;
+    if (it.arm === arm) return false;
+    it.arm = arm;
+    return true;
+  }
   const ud = Math.round((it.cd + GAP + frontCm(st)) * 100) / 100;
   const ew = 0; // an appliance space is just the clear space; its end panels are separate End panel parts
   if (it.ud === ud && (it.ew || 0) === ew) return false;
@@ -661,7 +713,7 @@ export function refreshDepths(plan) {
 
 /** Where to put the number on a corner unit (inside one of its arms). */
 export function cornerLabelPoint(it) {
-  const a = Math.min(ITEMS[it.type].corner, it.w);
+  const a = Math.min(armOf(it), it.w);
   let p = [a / 2, a / 2];
   for (let i = 0; i < ((it.rot || 0) / 90) % 4; i++) p = [it.w - p[1], p[0]];
   return p;
@@ -764,7 +816,7 @@ export function cabinetShapes(it, st) {
     return { c, x: Math.min(x1, x2), y: Math.min(y1, y2), w: Math.abs(x2 - x1), h: Math.abs(y2 - y1) };
   };
   const out = [rect('carcass', 0, 0, uw, cd)];
-  if (d.styles || d.blind) {
+  if ((d.styles || d.blind) && d.run !== 'wall') {
     // open top: rear rail, front rail and the cavity between them (shelf and base below)
     out.push(rect('cavity', t, 0.6, uw - t, cd), rect('rail', t, 0.6, uw - t, 0.6 + 7), rect('rail', t, cd - 7, uw - t, cd));
   }
@@ -827,7 +879,7 @@ export function migratePanels(plan) {
       const rot = (owner.rot || 0) % 360;
       const it = newPlanItem('endpanel', { roomId: p.roomId, rot, manual: true, level: p.level === 'wall' ? 'wall' : undefined });
       it.uw = Math.round(Math.min(p.w, p.h) * 100) / 100;
-      it.ud = Math.round(Math.max(p.w, p.h) * 100) / 100;
+      it.ud = p.level === 'wall' ? Math.round(Math.max(p.w, p.h) * 100) / 100 : PANEL_DEPTH; // base-level panels line up with the doors
       applyRot(it);
       it.dx = p.x;
       it.dy = p.y;
@@ -847,4 +899,64 @@ export function migratePanels(plan) {
   }
   plan.panelsV2 = true;
   return true;
+}
+
+// ---------- the kinds offered in the pickers (Base units, Wall units, Tall housing) ----------
+// A kind is a way of making one of the item types above: the widths it comes in (cm), values it sets (preset), and
+// choices to offer (options). Widths come from the stock range (js/data/cabinets.js); our own options are kept on top.
+const W = RANGE.widths;
+const HEIGHTS_WALL = { key: 'hgt', label: 'Height', values: [[36, 'Half height 360 mm'], [72, 'Full height 720 mm'], [90, 'Extra tall 900 mm']] };
+const HEIGHTS_WALL2 = { key: 'hgt', label: 'Height', values: [[72, 'Full height 720 mm'], [90, 'Extra tall 900 mm']] };
+const DEPTHS_WALL = { key: 'cd', label: 'Depth', values: [[29, 'Standard 290 mm'], [39, 'Deep 390 mm']] };
+const HEIGHTS_TALL = { key: 'hgt', label: 'Height', values: [[194.2, 'Standard 1942 mm'], [212.2, 'Extra tall 2122 mm']] };
+const HAND = { key: 'hand', label: 'Handing', values: [['left', 'Left hand (LH)'], ['right', 'Right hand (RH)']] };
+export const KINDS = {
+  'base-door': { type: 'base', label: 'Base unit', sizes: BASE_SIZES, preset: { style: 'door' } },
+  'base-drawerline': { type: 'base', label: 'Drawer-line unit', sizes: cm(W.baseDrawerLine), preset: { style: 'drawerline' } },
+  'base-2drawer': { type: 'base', label: '2 drawer unit', sizes: cm(W.base2Drawer), preset: { style: 'drawers2' } },
+  'base-3drawer': { type: 'base', label: '3 drawer unit', sizes: cm(W.base3Drawer), preset: { style: 'drawers' } },
+  'base-4drawer': { type: 'base', label: '4 drawer unit', sizes: cm(W.base4Drawer), preset: { style: 'drawers4' } },
+  'base-corner': { type: 'cornerbase', label: 'Corner base unit', sizes: [90, 100] },
+  'base-carousel': { type: 'cornerbase', label: 'Corner carousel base unit', sizes: cm(W.carousel), preset: { variant: 'carousel' }, options: [{ key: 'line', label: 'Front', values: [['HL', 'Door front'], ['DL', 'Drawer-line front']] }] },
+  'base-blind': { type: 'blindcorner', label: 'Blind corner base unit', sizes: [80, 100] },
+  'base-belfast': { type: 'base', label: 'Belfast sink base unit', sizes: cm(W.belfast), preset: { style: 'door', variant: 'belfast' } },
+  'base-oven': { type: 'base', label: 'Built-under oven housing', sizes: cm(W.builtUnderOven), preset: { style: 'door', variant: 'oven' } },
+  'base-curved': { type: 'base', label: 'Curved base unit', sizes: cm(W.baseCurved), preset: { style: 'door', variant: 'curved' }, options: [HAND] },
+  'wall-std': { type: 'wallunit', label: 'Wall unit', sizes: WALL_SIZES, sizesBy: { key: 'hgt', map: { 36: union(cm(W.wallHalf), [30, 40, 50, 60, 80, 90, 100]) } }, options: [{ ...HEIGHTS_WALL, def: 72 }, DEPTHS_WALL] },
+  'wall-corner': { type: 'cornerwall', label: 'Corner wall unit', sizes: [60, 63.1, 65, 73.1], sizesBy: { key: 'cd', map: { 29: [60, 63.1, 65], 39: [73.1] } }, options: [HEIGHTS_WALL2, DEPTHS_WALL] },
+  'wall-blind': { type: 'blindwall', label: 'Blind corner wall unit', sizes: [80, 90, 100] },
+  'wall-bridging': { type: 'wallunit', label: 'Bridging unit', sizes: cm(W.bridging), preset: { variant: 'bridging', hgt: 36 } },
+  'wall-hob': { type: 'wallunit', label: 'Hob wall unit', sizes: cm(W.hob), preset: { variant: 'hob' } },
+  'wall-microwave': { type: 'wallunit', label: 'Microwave housing wall unit', sizes: cm(W.microwave), preset: { variant: 'microwave' }, options: [HEIGHTS_WALL2] },
+  'wall-wine': { type: 'wallunit', label: 'Wine rack wall unit', sizes: cm(W.wine), preset: { variant: 'wine' } },
+  'wall-curved': { type: 'wallunit', label: 'Curved wall unit', sizes: cm(W.curved), preset: { variant: 'curved' }, options: [HAND] },
+  'tall-larder': { type: 'larder', label: 'Larder unit', sizes: union(cm(W.larder), ITEMS.larder.sizes), options: [HEIGHTS_TALL] },
+  'tall-oven': { type: 'ovenhousing', label: 'Oven housing', sizes: [60] },
+  'tall-apptower': { type: 'ovenhousing', label: 'Appliance tower', sizes: cm(W.applianceTower), preset: { variant: 'tower' } },
+  'tall-midi': { type: 'ovenhousing', label: 'Midi appliance tower', sizes: cm(W.midiTower), preset: { variant: 'midi', hgt: null } },
+  'tall-fridge': { type: 'fridgefreezer', label: 'Fridge / freezer housing', sizes: [55, 60, 70] },
+  'tall-corner': { type: 'towercorner', label: 'Larder top corner tower', sizes: cm(W.topCornerTower), options: [HEIGHTS_TALL] },
+};
+
+/** The kind an existing item was made from (matching its type, variant and, for base units, its style), or null. */
+export function kindOf(it) {
+  for (const [key, k] of Object.entries(KINDS)) {
+    if (k.type !== it.type) continue;
+    const p = k.preset || {};
+    if ((p.variant ?? null) !== (it.variant ?? null)) continue;
+    if (p.style != null && p.style !== it.style) continue;
+    return { key, ...k };
+  }
+  return null;
+}
+/** The widths a kind offers (cm), given the options chosen so far (for example half height has no 200 mm). */
+export function sizesFor(kind, props = {}) {
+  const by = kind.sizesBy;
+  return (by && by.map[props[by.key]]) || kind.sizes;
+}
+/** The first value of each option, or the one marked def: what a new unit of this kind starts with. */
+export function optionDefaults(kind) {
+  const out = {};
+  for (const o of kind.options || []) out[o.key] = o.def ?? o.values[0][0];
+  return out;
 }

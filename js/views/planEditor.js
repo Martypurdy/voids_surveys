@@ -10,9 +10,10 @@ import {
   ITEMS, PALETTE, ROOM_NAMES, FLOOR_NAMES, newPlanRoom, newFloor, newPlanItem, roomFigures, floorArea, planArea,
   metres, sqm, openingGeometry, nearestWall, wallSnap, wallLine, roomAt, bounds, settleItem, legend, cornerPoints, snapToUnits, isStructure,
   STYLES, PATTERNS, DOOR_OPTIONS, APPLIANCES, applyRot, rotateAbout, cabinetNumbers, cabinetText, frontEdge, cornerLabelPoint, autoRotate, clearSpot,
-  blindGeometry, refreshPosts, panelLines, setDepth, refreshDepths, PANEL_THICKNESSES, PANEL_DEPTH,
+  blindGeometry, curvedOutline, refreshPosts, panelLines, KINDS, kindOf, sizesFor, optionDefaults, setDepth, refreshDepths, PANEL_THICKNESSES, PANEL_DEPTH,
   cabinetShapes, badgePoint, featureTags, placementDims, wallCorners, WALL_NAMES, DOOR_SIZES, WINDOW_SIZES, hingeSide, setHinge, radiatorWall, nearestRoom, clampItem, autoRadiator, snapToWallCentre, centreOpening,
 } from '../plan.js';
+import { iconSvg, hasIcon, captionFor, captionForKind, unitPicture } from '../catalogue.js';
 import { shownLine, measureOffset, newMeasure, measureLength, measureAngle, mmText, snapTape, endAtLength, setLength, measureHit, placeAtEnd, refAt, syncMeasures, rootEnd } from '../measure.js';
 
 const SNAP = 5; // cm
@@ -123,6 +124,13 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       const x = X(r.x + it.dx), y = Y(r.y + it.dy), w = it.w * s, hh = it.h * s;
       const cls = `fx${d.dashed ? ' dashed' : ''}${d.panel ? ' panel' : ''}${isSel(it) ? ' sel glow' : ''}`; // selected units glow soft purple; end panels are solid boards
       const line = (c, a) => `<line class="${c}" x1="${x + a[0] * s}" y1="${y + a[1] * s}" x2="${x + a[2] * s}" y2="${y + a[3] * s}"/>`;
+      if (it.variant === 'curved' && !d.corner) { // a curved end unit: the front corner on its handing side is rounded off
+        const { poly, front, divider } = curvedOutline(it);
+        const at = (pts) => pts.map(([px, py]) => `${x + px * s},${y + py * s}`).join(' ');
+        out.push(`<polygon class="${cls}" points="${at(poly)}"/>`, `<polyline class="cdiv" fill="none" points="${at(divider)}"/>`, `<polyline class="front" fill="none" points="${at(front)}"/>`);
+        if (d.cab) { const [bpx, bpy] = badgePoint(it); if (Math.min(w, hh) > 14) badge(x + bpx * s, y + bpy * s, nums.get(it.id)); }
+        continue;
+      }
       if (d.corner) {
         out.push(`<polygon class="${cls}" points="${cornerPoints(it).map(([px, py]) => `${x + px * s},${y + py * s}`).join(' ')}"/>`);
         const [lx, ly] = cornerLabelPoint(it);
@@ -920,24 +928,38 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     }
   };
 
-  // ----- cabinets: choose the width and type, then the unit lands in the room ready to drag -----
-  const cabinetDialog = async (type) => {
+  // ----- cabinets: choose the kind, then width and options, and the unit lands in the room ready to drag -----
+  /** A plain tool with a width list (appliance space, fillers) behaves like a kind with nothing to choose. */
+  const plainKind = (type) => ({ type, label: ITEMS[type].label, sizes: ITEMS[type].sizes });
+  const kindFor = (arg) => (typeof arg === 'string' ? KINDS[arg] || plainKind(arg) : arg);
+  const cabinetDialog = async (kind) => {
+    const type = kind.type;
     const d = ITEMS[type];
-    let width = d.sizes.includes(d.w) ? d.w : d.sizes[0];
+    const opt = optionDefaults(kind); // the choices made in the dialog (height, depth, handing …)
+    const props = () => ({ ...(kind.preset || {}), ...opt });
+    const sizesNow = () => sizesFor(kind, props());
+    let width = sizesNow().includes(d.w) ? d.w : sizesNow()[0];
     let door = null, hand = 'right';
     const doorsFor = (n) => DOOR_OPTIONS[n] || [Math.round(n / 2)];
     const doorOptions = (n) => doorsFor(n).map((m) => h('option', { value: String(m) }, `${m * 10} mm`));
     const parts = [];
     let doorField = null;
     let useOther = false;
-    const customInput = h('input', { type: 'text', inputmode: 'decimal', 'aria-label': 'Width in mm' });
+    const pic = h('div', { class: 'unit-pic' });
+    const refreshPic = () => {
+      const typed = useOther ? num(customInput.value) / 10 : NaN;
+      pic.innerHTML = unitPicture(type, { ...props(), width: typed > 0.5 ? typed : width, hand: kind.options?.some((o) => o.key === 'hand') ? opt.hand : hand, door, pattern: PATTERNS[0] });
+    };
+    const customInput = h('input', { type: 'text', inputmode: 'decimal', 'aria-label': 'Width in mm', oninput: () => refreshPic() });
     const customLabel = h('label', { class: 'field' }, h('span', { class: 'field-label' }, 'Width (mm)'), customInput);
     customLabel.hidden = true;
-    const widthField = selectField('Width', String(width), [...d.sizes.map((n) => [String(n), `${n * 10} mm`]), ['other', 'Other…']], (v) => {
+    const widthOptions = () => [...sizesNow().map((n) => h('option', { value: String(n) }, `${Math.round(n * 10)} mm`)), h('option', { value: 'other' }, 'Other…')];
+    const widthField = selectField('Width', String(width), [...sizesNow().map((n) => [String(n), `${Math.round(n * 10)} mm`]), ['other', 'Other…']], (v) => {
       useOther = v === 'other';
       customLabel.hidden = !useOther;
       if (useOther) {
         customInput.focus();
+        refreshPic();
         return;
       }
       width = Number(v);
@@ -947,31 +969,49 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
         door = doorsFor(width).slice(-1)[0];
         sel.value = String(door);
       }
+      refreshPic();
     }, { placeholder: null });
     parts.push(widthField, customLabel);
+    // a choice such as height or depth can change which widths exist (half height has no 200 mm; a deep corner unit is 731)
+    const refillWidths = () => {
+      const sel = widthField.querySelector('select');
+      const list = sizesNow();
+      if (!useOther && !list.includes(width)) width = list[0];
+      sel.replaceChildren(...widthOptions());
+      sel.value = useOther ? 'other' : String(width);
+      refreshPic();
+    };
+    for (const o of kind.options || []) {
+      parts.push(selectField(o.label, String(opt[o.key]), o.values.map(([v, l]) => [String(v), l]), (v) => {
+        opt[o.key] = typeof o.values[0][0] === 'number' ? Number(v) : v;
+        refillWidths();
+      }, { placeholder: null }));
+    }
     if (d.blind) {
       door = doorsFor(width).slice(-1)[0];
-      doorField = selectField('Door width', String(door), doorsFor(width).map((m) => [String(m), `${m * 10} mm`]), (v) => { door = Number(v); }, { placeholder: null });
-      parts.push(doorField, selectField('Blind end (seen from the front)', 'right', [['right', 'Right'], ['left', 'Left']], (v) => { hand = v; }, { placeholder: null }));
+      doorField = selectField('Door width', String(door), doorsFor(width).map((m) => [String(m), `${m * 10} mm`]), (v) => { door = Number(v); refreshPic(); }, { placeholder: null });
+      parts.push(doorField, selectField('Blind end (seen from the front)', 'right', [['right', 'Right'], ['left', 'Left']], (v) => { hand = v; refreshPic(); }, { placeholder: null }));
     }
-    const choices = d.styles ? Object.entries(STYLES).map(([value, label]) => ({ value, label }))
-      : d.patterns ? PATTERNS.map((p) => ({ value: p, label: `Doors ${p}` }))
-        : d.space ? APPLIANCES.map((a) => ({ value: a, label: a }))
-          : [{ value: 'add', label: 'Add' }];
+    refreshPic();
+    parts.unshift(pic);
+    const card = (label, node) => h('span', { class: 'cat-card-in cat-row' }, node, h('span', { class: 'cat-name' }, label)); // a small drawing and the name; the button text stays just the name
+    const choices = d.patterns ? PATTERNS.map((p) => ({ value: p, label: card(`Doors ${p}`, picNode(type, { ...props(), pattern: p, width: 60, labels: false })), name: `Doors ${p}` }))
+      : d.space ? APPLIANCES.map((a) => ({ value: a, label: a }))
+        : [{ value: 'add', label: 'Add' }];
     const v = await choose({
-      title: d.label,
-      message: d.styles ? 'Pick the width, then the type of unit.'
-        : d.patterns ? 'Pick the width, then the door pattern (upper door / lower door).'
-          : d.space ? 'Pick the width, then what goes in the space. End panels are added either side.'
-            : d.blind ? 'Pick the width, the door width and which end is blind. The corner post sizes itself to the cabinet beside it.'
+      title: kind.label,
+      message: d.patterns ? 'Pick the width, then the door pattern (upper door / lower door).'
+        : d.space ? 'Pick the width, then what goes in the space.'
+          : d.blind ? 'Pick the width, the door width and which end is blind. The corner post sizes itself to the cabinet beside it.'
+            : kind.options?.length ? 'Pick the width and the options, then Add.'
               : 'Pick the width.',
       content: h('div', null, ...parts),
-      buttons: [...choices.map((c) => ({ ...c, class: 'btn-primary btn-big' })), { label: 'Cancel', value: null }],
+      buttons: [...choices.map((c) => ({ ...c, class: c.name ? 'cat-card cat-card-row' : 'btn-primary btn-big' })), { label: 'Cancel', value: null }],
     });
     if (!v) return null;
     const typed = useOther ? num(customInput.value) / 10 : NaN; // typed in mm, kept in cm
     const finalWidth = typed > 0.5 ? Math.round(typed * 10) / 10 : width;
-    return { width: finalWidth, choice: v, door: d.blind ? Math.min(door, finalWidth - 20) : door, hand };
+    return { width: finalWidth, choice: v, door: d.blind ? Math.min(door, finalWidth - 20) : door, hand, props: props() };
   };
   /** A new unit with the size and options chosen in the cabinet dialog (pick is null for plain fixtures). */
   const makeCabinet = (type, pick, roomId) => {
@@ -980,10 +1020,10 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     if (pick) {
       it.uw = pick.width;
       if (d.corner) it.ud = pick.width;
-      if (d.styles) it.style = pick.choice;
       if (d.patterns) it.pattern = pick.choice;
       if (d.space) it.appliance = pick.choice;
       if (d.blind) { it.door = pick.door; it.hand = pick.hand; }
+      Object.assign(it, pick.props || {}); // what the kind sets (style, variant, height, depth, handing)
     }
     setDepth(it, plan.settings); // carcass + gap + door front (and the end panels of an appliance space)
     applyRot(it);
@@ -1035,7 +1075,29 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     renderAll();
     toast('End panel added – drag it against the end of a unit');
   };
-  const addCabinet = async (type) => {
+  /** A family button (Base units, Wall units, Tall housing): pick the kind from picture cards, then size and options as usual. */
+  const addFamily = async (menuType) => {
+    const fam = ITEMS[menuType];
+    placing = null;
+    renderToolbar();
+    const v = await choose({
+      title: fam.label,
+      message: fam.pick,
+      content: null,
+      buttons: [
+        ...fam.variants.map((key) => {
+          const k = KINDS[key];
+          const pic = picNode(k.type, { ...(k.preset || {}), ...optionDefaults(k), width: k.sizes.reduce((a, b) => (Math.abs(b - 60) < Math.abs(a - 60) ? b : a)), labels: false }); // drawn at the width nearest 600 mm
+          return { value: key, class: 'cat-card', label: h('span', { class: 'cat-card-in' }, pic, h('span', { class: 'cat-name' }, k.label), h('span', { class: 'cat-sub' }, captionForKind(k))) };
+        }),
+        { label: 'Cancel', value: null },
+      ],
+    });
+    if (v) addCabinet(v);
+  };
+  const addCabinet = async (arg) => {
+    const kindObj = kindFor(arg);
+    const type = kindObj.type;
     const d = ITEMS[type];
     const f = floor();
     if (!f.rooms.length) return toast('Add the rooms on the Room dimensions tab first');
@@ -1043,7 +1105,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     const r = roomAt(f.rooms, centre.x, centre.y) || f.rooms[0]; // the room in view
     placing = null;
     renderToolbar();
-    const pick = await cabinetDialog(type);
+    const pick = await cabinetDialog(kindObj);
     if (!pick) return;
     remember();
     const it = makeCabinet(type, pick, r.id);
@@ -1055,7 +1117,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     save();
     renderAll();
     const n = cabinetNumbers(f).get(it.id);
-    toast(n ? `No. ${n} added – drag it into place` : `${d.label} added – drag it into place`);
+    toast(n ? `No. ${n} added – drag it into place` : `${kindObj.label} added – drag it into place`);
   };
 
   // ----- floors (whole property plans) -----
@@ -1126,13 +1188,27 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
   const orderedTools = () => {
     const all = PALETTE[kind].filter(editable);
     if (dims) return sortBySaved(all);
-    const isPart = (t) => ITEMS[t].cab || ITEMS[t].filler || ITEMS[t].panel;
+    const isPart = (t) => ITEMS[t].cab || ITEMS[t].filler || ITEMS[t].panel || ITEMS[t].menu;
     const parts = sortBySaved(all.filter(isPart));
     const rest = sortBySaved(all.filter((t) => !isPart(t)));
     return parts.length && rest.length ? ['||', ...parts, '|', ...rest] : sortBySaved(all);
   };
+  /** A drawing of a unit, to its real proportions, as an element (null for things with no drawing). */
+  const picNode = (type, opts) => {
+    const html = unitPicture(type, opts);
+    if (!html) return null;
+    const div = h('div', { class: 'unit-pic' });
+    div.innerHTML = html;
+    return div;
+  };
+  const iconEl = (t) => {
+    const span = document.createElement('span');
+    span.className = 'cat-ico';
+    span.innerHTML = iconSvg(t);
+    return span;
+  };
   const toolKeys = () => orderedTools().filter((t) => t !== '||' && t !== '|');
-  const groupOf = (t) => (dims ? 'all' : (ITEMS[t].cab || ITEMS[t].filler || ITEMS[t].panel) ? 'parts' : 'rest'); // buttons are reordered within their own group
+  const groupOf = (t) => (dims ? 'all' : (ITEMS[t].cab || ITEMS[t].filler || ITEMS[t].panel || ITEMS[t].menu) ? 'parts' : 'rest'); // buttons are reordered within their own group
   const moveTool = (t, dir) => { // one place earlier (-1) or later (+1) within its group
     const keys = toolKeys();
     const g = keys.filter((k) => groupOf(k) === groupOf(t));
@@ -1145,8 +1221,9 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
   };
   const pressTool = (t) => {
     if (suppressClick || reordering) return;
+    if (ITEMS[t].menu) return addFamily(t); // base units, wall units and tall housings each share one button: pick which kind
     if (ITEMS[t].panel) return addPanel(t); // end panels ask their thickness
-    if (ITEMS[t].sizes) return addCabinet(t); // units ask their size first, then land in the room
+    if (ITEMS[t].sizes) return addCabinet(plainKind(t)); // units ask their size first, then land in the room
     tape.on = false; // the tape and "tap to place" use the same banner
     tape.pending = null;
     placing = placing === t ? null : t;
@@ -1157,10 +1234,13 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     if (reordering) {
       return h('span', { class: 'plan-tool-re' },
         h('button', { type: 'button', class: 'btn-small', 'aria-label': `Move ${ITEMS[t].label} earlier`, onclick: () => moveTool(t, -1) }, '◀'),
-        h('span', { class: 'plan-tool-name' }, label),
+        hasIcon(t) ? iconEl(t) : null,
+        h('span', { class: 'plan-tool-name' }, ITEMS[t].label),
         h('button', { type: 'button', class: 'btn-small', 'aria-label': `Move ${ITEMS[t].label} later`, onclick: () => moveTool(t, 1) }, '▶'));
     }
-    return h('button', { type: 'button', class: 'btn-small plan-tool', 'data-tool': t, 'data-grp': groupOf(t), title: 'Drag to put it where you want it', 'aria-pressed': String(placing === t), onclick: () => pressTool(t) }, label);
+    const card = hasIcon(t); // units and fittings show as little catalogue cards: a drawing, the name, the sizes
+    return h('button', { type: 'button', class: `btn-small plan-tool${card ? ' cat' : ''}`, 'data-tool': t, 'data-label': ITEMS[t].label, 'data-grp': groupOf(t), title: 'Drag to put it where you want it', 'aria-pressed': String(placing === t), onclick: () => pressTool(t) },
+      card ? [iconEl(t), h('span', { class: 'cat-name' }, ITEMS[t].label), h('span', { class: 'cat-sub' }, captionFor(t))] : label);
   };
   const renderToolbar = () => {
     toolbar.replaceChildren(...[
@@ -1285,7 +1365,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
   const panel = h('div', { class: 'plan-panel card card-body' });
   const field = (label, value, oninput, opts = {}) => {
     let edited = false; // the first change after tapping in is one undo step
-    const input = h('input', { type: 'text', value, inputmode: opts.inputmode, list: opts.list, autocapitalize: opts.cap, 'aria-label': label, onfocus: () => { opts.onfocus?.(); edited = false; }, oninput: (e) => { if (!edited) { edited = true; remember(); } oninput(e.target.value); renderCanvas(); renderSummary(); save(); } });
+    const input = h('input', { type: 'text', value, inputmode: opts.inputmode, list: opts.list, autocapitalize: opts.cap, 'aria-label': label, onfocus: () => { opts.onfocus?.(); edited = false; }, oninput: (e) => { if (!edited) { edited = true; remember(); } oninput(e.target.value); livePic?.(); renderCanvas(); renderSummary(); save(); } });
     return h('label', { class: 'field' }, h('span', { class: 'field-label' }, label), input);
   };
   const delBtn = (label, fn) => h('button', { type: 'button', class: 'btn-danger btn-small', onclick: fn }, label);
@@ -1309,10 +1389,11 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
   /** Put a unit against the end of a tape: inside (back along the tape) or outside (beyond the end). */
   let tapeUnit = null;
   const placeUnitAtEnd = async (m, side) => {
-    const type = tapeUnit;
+    const kindObj = kindFor(tapeUnit);
+    const type = kindObj.type;
     const d = ITEMS[type];
     const f = floor();
-    const pick = d.sizes ? await cabinetDialog(type) : null;
+    const pick = d.sizes ? await cabinetDialog(kindObj) : null;
     if (d.sizes && !pick) return;
     remember();
     const it = makeCabinet(type, pick, f.rooms[0].id);
@@ -1321,7 +1402,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     sel = { type: 'item', id: it.id };
     save();
     renderAll();
-    toast(`${d.label} placed ${side === 'inside' ? 'inside' : 'outside'} the end of the tape`);
+    toast(`${kindObj.label} placed ${side === 'inside' ? 'inside' : 'outside'} the end of the tape`);
   };
   const CORNER = { nw: 'north-west', ne: 'north-east', sw: 'south-west', se: 'south-east' };
   const refName = (f, ref) => {
@@ -1348,11 +1429,13 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       h('p', { class: 'hint' }, 'Drag the line or its label sideways to pull it off the plan: it stays parallel, with thin dotted lines back to where it is measured from. An end dropped on a corner stays attached and follows it when the room or unit moves; drop it in the open to let go. Drag either end to re-measure it (it clicks onto straight and 22.5° / 45° lines; hold Alt to float freely). Typing a length moves the far end.'),
     ];
     if (!dims) {
-      const types = orderedTools().filter((t) => ITEMS[t]?.kind === 'fixture' && t !== 'radiator');
+      const types = orderedTools().filter((t) => ITEMS[t]?.kind === 'fixture' && t !== 'radiator').flatMap((t) => (ITEMS[t].menu ? ITEMS[t].variants : [t])); // the family buttons stand for their kinds (kind keys); plain tools are item types
+      const nameOf = (t) => (KINDS[t] ? KINDS[t].label : ITEMS[t].label);
+      const emojiOf = (t) => ITEMS[KINDS[t]?.type || t].emoji;
       if (!types.includes(tapeUnit)) tapeUnit = types[0] || null;
       if (tapeUnit) {
         parts.push(
-          selectField('Unit to fit at the far end', tapeUnit, types.map((t) => [t, `${ITEMS[t].emoji} ${ITEMS[t].label}`]), (v) => { tapeUnit = v; }, { placeholder: null }),
+          selectField('Unit to fit at the far end', tapeUnit, types.map((t) => [t, `${emojiOf(t)} ${nameOf(t)}`]), (v) => { tapeUnit = v; }, { placeholder: null }),
           h('div', { class: 'btn-row' },
             h('button', { type: 'button', class: 'btn-small btn-primary', title: 'The unit sits back along the tape, its edge on the far end', onclick: () => placeUnitAtEnd(m, 'inside') }, '◂│ Inside the end'),
             h('button', { type: 'button', class: 'btn-small btn-primary', title: 'The unit sits beyond the far end, its edge on it', onclick: () => placeUnitAtEnd(m, 'outside') }, '│▸ Outside the end')));
@@ -1363,8 +1446,10 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     panel.replaceChildren(...parts);
     showInfo();
   };
+  let livePic = null; // redraws the selected unit's picture while a size is being typed
   const renderPanel = () => {
     const f = floor();
+    livePic = null;
     if (sel?.type === 'measure') {
       const m = measureById(sel.id);
       if (!m) { sel = null; return renderPanel(); }
@@ -1440,7 +1525,16 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       if (!it) { sel = null; return renderPanel(); }
       const d = ITEMS[it.type];
       const removeIt = delBtn('Delete', () => { remember(); f.items.splice(f.items.indexOf(it), 1); sel = null; save(); renderAll(); });
-      const parts = [h('strong', null, `${d.emoji} ${d.label}`)];
+      const parts = [h('strong', null, `${d.emoji} ${kindOf(it)?.label ?? d.label}`)];
+      livePic = null;
+      if (d.kind === 'fixture') { // the unit as a drawing, to its real proportions, following what you set below
+        const opts = () => ({ width: it.uw ?? it.w, style: it.style, pattern: it.pattern, hand: it.hand, door: it.door, appliance: it.appliance, thickness: d.panel ? it.uw : undefined });
+        const pic = picNode(it.type, opts());
+        if (pic) {
+          parts.push(pic);
+          livePic = () => { pic.innerHTML = unitPicture(it.type, opts()); };
+        }
+      }
       if (d.kind === 'wall') {
         const change = (fn) => { remember(); fn(); save(); renderAll(); };
         if (it.type === 'door') {
@@ -1476,7 +1570,9 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
           };
           if (d.sizes) {
             const widthNow = it.uw;
-            const opts = d.sizes.includes(widthNow) ? d.sizes : [...d.sizes, widthNow].sort((x, y) => x - y);
+            const itKind = kindOf(it);
+            const sizeList = itKind ? sizesFor(itKind, it) : d.sizes; // the widths this kind (and height / depth) comes in
+            const opts = sizeList.includes(widthNow) ? sizeList : [...sizeList, widthNow].sort((x, y) => x - y);
             const custom = field(d.corner ? 'Size (mm)' : 'Width (mm)', String(Math.round(widthNow * 10)), (v) => { const n = num(v) / 10; if (n > minCm) { setWidth(Math.round(n * 10) / 10); refit(); } }, { inputmode: 'decimal' });
             custom.hidden = true;
             parts.push(selectField('Unit width', String(widthNow), [...opts.map((n) => [String(n), `${n * 10} mm`]), ['other', 'Other…']], (v) => {
@@ -1490,6 +1586,23 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
               refit();
               renderAll();
             }, { placeholder: null }), custom);
+            for (const o of itKind?.options || []) { // this kind's own choices: height, depth, handing, front
+              if (o.key === 'hand' && d.blind) continue;
+              const cur = it[o.key] ?? o.def ?? o.values[0][0];
+              const vals = o.values.some(([v]) => v === cur) ? o.values : [...o.values, [cur, String(cur)]];
+              parts.push(selectField(o.label, String(cur), vals.map(([v, l]) => [String(v), l]), (v) => {
+                remember();
+                it[o.key] = typeof o.values[0][0] === 'number' ? Number(v) : v;
+                if (o.key === 'cd') setDepth(it, plan.settings);
+                const list = sizesFor(itKind, it);
+                if (!list.includes(it.uw)) setWidth(list[0]); // e.g. a deep corner unit is 731, a standard one 631
+                refit();
+                renderAll();
+              }, { placeholder: null }));
+            }
+            if (d.hgt && !(itKind?.options || []).some((o) => o.key === 'hgt')) {
+              parts.push(field('Height (mm)', it.hgt != null ? String(Math.round(it.hgt * 10)) : '', (v) => { const n = num(v) / 10; if (n > 10) it.hgt = Math.round(n * 10) / 10; }, { inputmode: 'decimal' }));
+            }
             if (!d.corner) {
               parts.push(d.fronted
                 ? field('Carcass depth (mm)', String(Math.round(it.cd * 10)), (v) => { const n = num(v) / 10; if (n > 5) { it.cd = Math.round(n * 10) / 10; setDepth(it, plan.settings); refit(); } }, { inputmode: 'decimal' })

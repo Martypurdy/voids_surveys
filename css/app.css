@@ -1703,3 +1703,45 @@ a.form-card { text-decoration: none; color: inherit; }
 .plan-tool-re { display: inline-flex; align-items: center; gap: 2px; border: 1px dashed var(--border); border-radius: 10px; padding: 1px 2px; }
 .plan-tool-re .plan-tool-name { font-size: .8rem; padding: 0 4px; }
 .plan-reorder[aria-pressed="true"] { background: var(--primary); color: #fff; border-color: transparent; }
+
+/* Designer: the catalogue look of the tool buttons */
+.cat-ico { display: block; width: 100%; aspect-ratio: 1; }
+.cat-svg { display: block; }
+.cat-ico .bd, .unit-pic .bd { fill: var(--plan-fx); stroke: var(--plan-wall); stroke-width: 1.7; stroke-linejoin: round; }
+.cat-ico .dr, .unit-pic .dr { fill: var(--plan-room); stroke: var(--plan-wall); stroke-width: 1.4; stroke-linejoin: round; }
+.cat-ico .dr.ghost, .unit-pic .dr.ghost { stroke-dasharray: 3 2.5; fill: var(--plan-fx); }
+.cat-ico .sp, .unit-pic .sp { fill: none; stroke: var(--plan-wall); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.cat-ico .dk, .unit-pic .dk { fill: var(--plan-wall); stroke: none; }
+.cat-ico .gl, .unit-pic .gl { fill: var(--plan-win); fill-opacity: .4; stroke: var(--plan-wall); stroke-width: 1.2; }
+.cat-ico .ln, .unit-pic .ln { fill: none; stroke: var(--plan-wall); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.cat-ico .ln.lt, .unit-pic .ln.lt { stroke-width: 1; opacity: .55; }
+.cat-ico .ln.pk, .unit-pic .ln.pk { stroke: var(--primary); stroke-width: 2.2; }
+.plan-tools .plan-tool.cat { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 0; width: 68px; min-height: 0; height: auto; padding: 4px 2px 3px; white-space: normal; text-align: center; line-height: 1.08; border-radius: 9px; }
+.plan-tools .plan-tool.cat .cat-ico { width: 34px; height: 34px; }
+.plan-tool.cat .cat-name { font-size: .66rem; font-weight: 700; }
+.plan-tool.cat .cat-sub { font-size: .56rem; font-weight: 500; opacity: .7; }
+.plan-tool-re .cat-ico { width: 28px; height: 28px; flex: none; }
+.dialog-buttons .cat-card { flex: 1 1 96px; display: flex; flex-direction: column; align-items: center; padding: 8px 4px; height: auto; }
+.cat-card-in { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.cat-card .cat-ico { width: 64px; height: 64px; }
+.cat-card .cat-name { font-size: .8rem; font-weight: 700; }
+.cat-card .cat-sub { font-size: .68rem; opacity: .72; }
+.cat-ico .sp2, .unit-pic .sp2 { fill: var(--plan-grid-m); stroke: var(--plan-wall); stroke-width: 1.2; }
+
+/* Designer: the picture of the unit you are choosing or have selected */
+.unit-pic { display: flex; justify-content: center; margin: 4px 0 10px; }
+.unit-pic-svg { max-width: 100%; height: auto; overflow: visible; }
+.unit-pic .pic-t { fill: var(--plan-dim); font-size: 10px; font-weight: 700; }
+.dialog-buttons .cat-card-row { flex-basis: 100%; }
+.cat-card-in.cat-row { flex-direction: row; justify-content: flex-start; gap: 12px; width: 100%; }
+.cat-card-in.cat-row .unit-pic { margin: 0; flex: none; }
+.cat-card-in.cat-row .unit-pic-svg { height: 64px; width: auto; }
+.cat-card-in.cat-row .cat-name { font-size: .9rem; }
+
+/* Designer: a long list of kinds in a picker scrolls inside the dialog, two or three cards across */
+dialog .dialog-buttons:has(.cat-card) { display: flex; flex-direction: row; flex-wrap: wrap; gap: 8px; max-height: 58vh; overflow-y: auto; }
+dialog .dialog-buttons:has(.cat-card) .cat-card { flex: 1 1 120px; }
+dialog .dialog-buttons:has(.cat-card) > button:not(.cat-card) { flex: 1 1 100%; }
+.cat-card .unit-pic { margin: 0 0 2px; }
+.cat-card .unit-pic-svg { height: 72px; width: auto; max-width: 100%; }
+.plan-svg .cdiv { stroke: var(--plan-wall); stroke-width: 1.2; pointer-events: none; }

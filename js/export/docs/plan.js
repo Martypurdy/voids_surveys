@@ -2,7 +2,7 @@
 import { addressLines, fmtDateTime } from '../../model.js';
 import {
   ITEMS, roomFigures, floorArea, planArea, metres, sqm, featureTags, describeFeature, serviceInfo, cabinetNumbers, cabinetText,
-  panelLines, settingsLine, refreshDepths, openingGeometry, radiatorWall, wallCorners, hingeSide, WALL_NAMES,
+  panelLines, settingsLine, refreshDepths, kindOf, STYLES, openingGeometry, radiatorWall, wallCorners, hingeSide, WALL_NAMES,
 } from '../../plan.js';
 
 const mm = (cm) => Math.round(cm * 10);
@@ -120,13 +120,13 @@ export function planWorkbook(job) {
   if (V.length > 1) sheets.push({ name: 'Services', cols: [{ w: 8 }, { w: 24 }, { w: 14 }, { w: 20 }, { w: 80 }], rows: V, freeze: { row: 1 } });
 
   // cabinets: numbers match the drawing's key
-  const C = [head(['No.', 'Floor', 'Room', 'Unit', 'Level', 'Width (mm)', 'Carcass depth (mm)', 'Overall depth (mm)', 'Type / doors', 'Blind end', 'Door (mm)', 'Description'])];
+  const C = [head(['No.', 'Floor', 'Room', 'Unit', 'Level', 'Width (mm)', 'Height (mm)', 'Carcass depth (mm)', 'Overall depth (mm)', 'Type / doors', 'Blind end', 'Door (mm)', 'Description'])];
   for (const c of floors) for (const it of c.cabinets) {
     const d = ITEMS[it.type];
-    C.push([{ v: c.nums.get(it.id), s: 'num' }, cell(c.floor.name), cell(c.roomOf(it.roomId).name), cell(d.label), cell(d.run === 'wall' ? 'Wall' : 'Base / tall'), { v: mm(it.uw), s: 'num' },
-      { v: it.cd != null ? mm(it.cd) : '', s: 'num' }, { v: mm(it.ud), s: 'num' }, cell(d.styles ? it.style || 'door' : d.patterns ? `doors ${it.pattern || ''}` : d.space ? it.appliance || '' : ''), cell(d.blind ? it.hand || 'right' : ''), { v: d.blind ? mm(it.door) : '', s: 'num' }, cell(cabinetText(it))]);
+    C.push([{ v: c.nums.get(it.id), s: 'num' }, cell(c.floor.name), cell(c.roomOf(it.roomId).name), cell(kindOf(it)?.label ?? d.label), cell(d.run === 'wall' ? 'Wall' : 'Base / tall'), { v: mm(it.uw), s: 'num' }, { v: it.hgt != null ? mm(it.hgt) : '', s: 'num' },
+      { v: it.cd != null ? mm(it.cd) : '', s: 'num' }, { v: mm(it.ud), s: 'num' }, cell(d.styles ? STYLES[it.style] || it.style || 'door' : d.patterns ? `doors ${it.pattern || ''}` : d.space ? it.appliance || '' : ''), cell(d.blind ? it.hand || 'right' : ''), { v: d.blind ? mm(it.door) : '', s: 'num' }, cell(cabinetText(it))]);
   }
-  if (C.length > 1) sheets.push({ name: 'Cabinets', cols: [{ w: 6 }, { w: 14 }, { w: 18 }, { w: 24 }, { w: 12 }, { w: 12 }, { w: 16 }, { w: 16 }, { w: 18 }, { w: 10 }, { w: 11 }, { w: 70 }], rows: C, freeze: { row: 1 }, autoFilter: `A1:L${C.length}` });
+  if (C.length > 1) sheets.push({ name: 'Cabinets', cols: [{ w: 6 }, { w: 14 }, { w: 18 }, { w: 28 }, { w: 12 }, { w: 12 }, { w: 12 }, { w: 16 }, { w: 16 }, { w: 18 }, { w: 10 }, { w: 11 }, { w: 70 }], rows: C, freeze: { row: 1 }, autoFilter: `A1:M${C.length}` });
 
   const P = [head(['Item', 'Floor'])];
   for (const c of floors) for (const t of c.panels) P.push([cell(t), cell(c.floor.name)]);
