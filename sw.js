@@ -1,6 +1,6 @@
 // Service worker: precache the app shell, serve it cache-first so the app works offline.
 // Bump VERSION whenever any file below changes, so devices pick up the update.
-const VERSION = 'v108';
+const VERSION = 'v109';
 const CACHE = `voids-${VERSION}`;
 
 const ASSETS = [
@@ -36,6 +36,7 @@ const ASSETS = [
   'js/views/defectLists.js',
   'js/views/settings.js',
   'js/theme.js',
+  'js/update.js',
   'js/views/syncDemo.js',
   'js/views/jobList.js',
   'js/properties.js',

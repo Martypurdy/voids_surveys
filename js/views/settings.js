@@ -10,6 +10,7 @@ import { refresh } from '../router.js';
 import { defectListEditor } from './defectLists.js';
 import { openSyncDemo } from './syncDemo.js';
 import { getTheme, setTheme } from '../theme.js';
+import { updateNow } from '../update.js';
 
 // Defect lists are part of the app; the other two are proposed add-on features.
 const TABS = [
@@ -38,7 +39,7 @@ export default async function settings(root, { tab } = {}) {
     }, label, addOn ? h('span', { class: 'addon-pill' }, 'Add-on') : null)));
 
   const body = tab === 'defects' ? defectsTab(lib) : tab === 'sor' ? sorTab(lib) : tab === 'rollout' ? rolloutTab() : tab === 'development' ? developmentTab() : tab === 'branding' ? brandingTab() : syncTab();
-  root.append(pageHeader('Settings', { back: '#/' }), appearance(), scrollTabs(nav), h('div', { class: 'content' }, body));
+  root.append(pageHeader('Settings', { back: '#/', actions: h('button', { type: 'button', class: 'btn update-btn', title: 'Check for a newer version and switch to it', onclick: (e) => updateNow(e.currentTarget) }, '⟳ Update') }), appearance(), scrollTabs(nav), h('div', { class: 'content' }, body));
 }
 
 /** Light / Dark / Auto switch, always at the top of Settings. */
