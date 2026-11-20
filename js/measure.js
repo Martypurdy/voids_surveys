@@ -10,6 +10,19 @@ export const ANGLE_TOL = 3; // degrees either side of a step that still snaps
 
 // ra / rb (optional): what each end is attached to (see featurePoints); an attached end follows it when it moves.
 export const newMeasure = (a, b, ra = null, rb = null) => ({ id: newId(), a: { x: a.x, y: a.y }, b: { x: b.x, y: b.y }, ...(ra ? { ra } : {}), ...(rb ? { rb } : {}) });
+// off (optional, cm): how far the dimension line is pulled sideways from its two reference points a and b, along the
+// line's own normal, so it stays parallel to what it measures. Dotted extension lines join it back to the references.
+export const measureOffset = (m) => m.off || 0;
+/** Unit vector at right angles to a → b. */
+export function measureNormal(m) {
+  const l = Math.hypot(m.b.x - m.a.x, m.b.y - m.a.y) || 1;
+  return { x: -(m.b.y - m.a.y) / l, y: (m.b.x - m.a.x) / l };
+}
+/** The dimension line as drawn: the references moved sideways by the offset. */
+export function shownLine(m) {
+  const n = measureNormal(m), o = measureOffset(m);
+  return { a: { x: m.a.x + n.x * o, y: m.a.y + n.y * o }, b: { x: m.b.x + n.x * o, y: m.b.y + n.y * o }, n, o };
+}
 export const measureLength = (m) => Math.hypot(m.b.x - m.a.x, m.b.y - m.a.y);
 /** Direction a → b in degrees, 0 = east, 90 = south (screen style), folded to 0–180 for display. */
 export const measureAngle = (m) => {
@@ -185,11 +198,12 @@ export function setLength(m, cm) {
 export function measureHit(m, w, tolEnd, tolLine, withLine) {
   if (Math.hypot(w.x - m.a.x, w.y - m.a.y) <= tolEnd) return 'a';
   if (Math.hypot(w.x - m.b.x, w.y - m.b.y) <= tolEnd) return 'b';
-  if (!withLine) return null;
-  const dx = m.b.x - m.a.x, dy = m.b.y - m.a.y, l2 = dx * dx + dy * dy;
+  if (!withLine && !m.off) return null; // a tape pulled off the plan can always be picked up by its line
+  const { a, b } = shownLine(m);
+  const dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
   if (l2 < 1e-6) return null;
-  const t = Math.max(0, Math.min(1, ((w.x - m.a.x) * dx + (w.y - m.a.y) * dy) / l2));
-  return Math.hypot(w.x - (m.a.x + dx * t), w.y - (m.a.y + dy * t)) <= tolLine ? 'line' : null;
+  const t = Math.max(0, Math.min(1, ((w.x - a.x) * dx + (w.y - a.y) * dy) / l2));
+  return Math.hypot(w.x - (a.x + dx * t), w.y - (a.y + dy * t)) <= tolLine ? 'line' : null;
 }
 
 /**

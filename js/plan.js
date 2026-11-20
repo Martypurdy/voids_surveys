@@ -326,7 +326,8 @@ export function bounds(floor, withPoints = true) {
     b.maxY = Math.max(b.maxY, r.y + it.dy + 20);
   }
   for (const m of floor.measures || []) { // tape measures count too, so they are in view and on the printed plan
-    for (const e of [m.a, m.b]) {
+    const n = Math.hypot(m.b.x - m.a.x, m.b.y - m.a.y) || 1, o = m.off || 0, sx = (-(m.b.y - m.a.y) / n) * o, sy = ((m.b.x - m.a.x) / n) * o;
+    for (const e of [m.a, m.b, { x: m.a.x + sx, y: m.a.y + sy }, { x: m.b.x + sx, y: m.b.y + sy }]) {
       b.minX = Math.min(b.minX, e.x);
       b.minY = Math.min(b.minY, e.y);
       b.maxX = Math.max(b.maxX, e.x);

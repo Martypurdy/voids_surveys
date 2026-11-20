@@ -13,7 +13,7 @@ import {
   blindGeometry, refreshPosts, endPanels, panelLines, setDepth, refreshDepths,
   cabinetShapes, badgePoint, featureTags, placementDims, wallCorners, WALL_NAMES, DOOR_SIZES, WINDOW_SIZES, hingeSide, setHinge, radiatorWall, nearestRoom, clampItem,
 } from '../plan.js';
-import { newMeasure, measureLength, measureAngle, mmText, snapTape, endAtLength, setLength, measureHit, placeAtEnd, refAt, syncMeasures } from '../measure.js';
+import { shownLine, measureOffset, newMeasure, measureLength, measureAngle, mmText, snapTape, endAtLength, setLength, measureHit, placeAtEnd, refAt, syncMeasures } from '../measure.js';
 
 const SNAP = 5; // cm
 const MIN_ROOM = 50; // cm
@@ -210,9 +210,16 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     for (const m of measures()) {
       const on = sel?.type === 'measure' && sel.id === m.id;
       const ax = X(m.a.x), ay = Y(m.a.y), bx = X(m.b.x), by = Y(m.b.y);
-      out.push(`<line class="tape-l${on ? ' sel' : ''}" x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}"/>`);
+      const sh = shownLine(m); // the dimension line as drawn, pulled off its reference points by m.off
+      const sax = X(sh.a.x), say = Y(sh.a.y), sbx = X(sh.b.x), sby = Y(sh.b.y);
+      if (Math.abs(sh.o) * s > 3) { // thin dotted extension lines from the references out to the dimension line
+        const ex = sh.n.x * Math.sign(sh.o) * 5, ey = sh.n.y * Math.sign(sh.o) * 5; // run a little past it
+        out.push(`<line class="tape-ext" x1="${ax}" y1="${ay}" x2="${sax + ex}" y2="${say + ey}"/><line class="tape-ext" x1="${bx}" y1="${by}" x2="${sbx + ex}" y2="${sby + ey}"/>`);
+      }
+      out.push(`<line class="tape-l${on ? ' sel' : ''}" x1="${sax}" y1="${say}" x2="${sbx}" y2="${sby}"/>`);
+      if (Math.abs(sh.o) * s > 3) out.push(`<circle class="tape-tick" cx="${sax}" cy="${say}" r="2.5"/><circle class="tape-tick" cx="${sbx}" cy="${sby}" r="2.5"/>`);
       out.push(`<circle class="tape-e${on ? ' sel' : ''}${m.ra ? ' att' : ''}" cx="${ax}" cy="${ay}" r="${on ? 6 : 4}"/><circle class="tape-e${on ? ' sel' : ''}${m.rb ? ' att' : ''}" cx="${bx}" cy="${by}" r="${on ? 6 : 4}"/>`);
-      out.push(tapeLabel(m.a, m.b, mmText(measureLength(m)), on ? 'sel' : ''));
+      out.push(tapeLabel(sh.a, sh.b, mmText(measureLength(m)), on ? 'sel' : ''));
     }
     if (tape.pending) {
       const { a, b } = tape.pending;
@@ -457,9 +464,11 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
   const measureAt = (p) => {
     const w = toWorld(p);
     for (const m of [...measures()].reverse()) {
+      if (tape.on && sel?.id !== m.id) continue; // with the tape out, only the selected one can be picked up, so a new one can start on an old one's corner
       const part = measureHit(m, w, 14 / view.s, 8 / view.s, tape.on);
       if (part) return { m, part };
-      const mid = { x: (m.a.x + m.b.x) / 2, y: (m.a.y + m.b.y) / 2 };
+      const sh = shownLine(m);
+      const mid = { x: (sh.a.x + sh.b.x) / 2, y: (sh.a.y + sh.b.y) / 2 };
       if (Math.hypot(w.x - mid.x, w.y - mid.y) <= 16 / view.s) return { m, part: 'line' };
     }
     return null;
@@ -494,7 +503,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     if (mh) { // pick up a tape: an end re-measures it, the body or label moves the whole tape
       sel = { type: 'measure', id: mh.m.id };
       drag = mh.part === 'line'
-        ? { kind: 'mmove', m: mh.m, a0: { ...mh.m.a }, b0: { ...mh.m.b }, w0: w, p0: p, snapshot }
+        ? { kind: 'moff', m: mh.m, off0: measureOffset(mh.m), w0: w, p0: p, snapshot }
         : { kind: 'mend', m: mh.m, end: mh.part, p0: p, snapshot };
       renderCanvas();
       renderPanel();
@@ -591,11 +600,13 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     }
     const w = toWorld(p);
     const dx = w.x - drag.w0.x, dy = w.y - drag.w0.y;
-    if (drag.kind === 'mmove') {
-      delete drag.m.ra; // carried across the plan, so it lets go of its corners
-      delete drag.m.rb;
-      drag.m.a = { x: drag.a0.x + dx, y: drag.a0.y + dy };
-      drag.m.b = { x: drag.b0.x + dx, y: drag.b0.y + dy };
+    if (drag.kind === 'moff') { // pull the dimension line sideways only: it stays parallel to what it measures
+      const n = shownLine(drag.m).n;
+      let off = drag.off0 + dx * n.x + dy * n.y;
+      if (Math.abs(off) * view.s < 6) off = 0; // clicks back onto the line it measures
+      drag.m.off = off ? Math.round(off * 10) / 10 : 0;
+      if (!off) delete drag.m.off;
+      renderPanel();
       return renderCanvas();
     }
     if (drag.kind === 'room') {
@@ -1036,8 +1047,9 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       h('strong', null, '📏 Tape measure'),
       field('Length (mm)', String(Math.round(measureLength(m) * 10)), (v) => { const n = num(v); if (n > 0) { setLength(m, n / 10); showInfo(); } }, { inputmode: 'decimal' }),
       info,
+      field('Pulled off the line (mm; + or –)', String(Math.round(measureOffset(m) * 10)), (v) => { const n = num(v); if (Number.isFinite(n)) { if (n) m.off = n / 10; else delete m.off; } }, { inputmode: 'decimal' }),
       attached,
-      h('p', { class: 'hint' }, 'An end dropped on a corner stays attached and follows it when the room or unit moves; drop it in the open to let go. Drag either end to re-measure it (it clicks onto straight and 22.5° / 45° lines; hold Alt to float freely). Typing a length moves the far end.'),
+      h('p', { class: 'hint' }, 'Drag the line or its label sideways to pull it off the plan: it stays parallel, with thin dotted lines back to where it is measured from. An end dropped on a corner stays attached and follows it when the room or unit moves; drop it in the open to let go. Drag either end to re-measure it (it clicks onto straight and 22.5° / 45° lines; hold Alt to float freely). Typing a length moves the far end.'),
     ];
     if (!dims) {
       const types = orderedTools().filter((t) => ITEMS[t]?.kind === 'fixture' && t !== 'radiator');

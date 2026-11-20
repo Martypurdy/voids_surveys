@@ -1686,3 +1686,5 @@ a.form-card { text-decoration: none; color: inherit; }
 :root[data-theme="dark"] .plan-banner.tape-on { background: #4a3c00; color: #ffe27a; }
 .plan-svg .tape-e.att { fill: #1f1f1f; stroke: #f2b705; stroke-width: 2.5; }
 .plan-svg .tape-e.att.sel { stroke: var(--primary); }
+.plan-svg .tape-ext { stroke: #b98600; stroke-width: 1; stroke-dasharray: 1.5 3; pointer-events: none; }
+.plan-svg .tape-tick { fill: #f2b705; stroke: #1f1f1f; stroke-width: 1; pointer-events: none; }

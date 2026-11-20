@@ -1126,10 +1126,20 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
     }
     // tape measures: amber line with end ticks and the length alongside, drawn over everything else
     for (const m of f.measures || []) {
-      const x1 = px(m.a.x), y1 = py(m.a.y), x2 = px(m.b.x), y2 = py(m.b.y);
       const len = Math.hypot(m.b.x - m.a.x, m.b.y - m.a.y);
       if (len < 1) continue;
+      const nrm = { x: -(m.b.y - m.a.y) / len, y: (m.b.x - m.a.x) / len }, off = m.off || 0; // pulled off the plan along its normal
+      const x1 = px(m.a.x + nrm.x * off), y1 = py(m.a.y + nrm.y * off), x2 = px(m.b.x + nrm.x * off), y2 = py(m.b.y + nrm.y * off);
       const ux = (x2 - x1) / (len * k), uy = (y2 - y1) / (len * k); // unit vector on the page (mm)
+      if (Math.abs(off * k) > 1) { // thin dotted lines back to the points it measures
+        const sg = Math.sign(off);
+        doc.setDrawColor(214, 150, 0);
+        doc.setLineWidth(0.12);
+        doc.setLineDashPattern([0.4, 0.7], 0);
+        doc.line(px(m.a.x), py(m.a.y), x1 + nrm.x * sg * 1.5, y1 + nrm.y * sg * 1.5);
+        doc.line(px(m.b.x), py(m.b.y), x2 + nrm.x * sg * 1.5, y2 + nrm.y * sg * 1.5);
+        doc.setLineDashPattern([], 0);
+      }
       doc.setDrawColor(214, 150, 0);
       doc.setLineWidth(0.45);
       doc.setLineDashPattern([], 0);
