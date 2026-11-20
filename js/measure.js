@@ -12,6 +12,12 @@ export const ANGLE_TOL = 3; // degrees either side of a step that still snaps
 export const newMeasure = (a, b, ra = null, rb = null) => ({ id: newId(), a: { x: a.x, y: a.y }, b: { x: b.x, y: b.y }, ...(ra ? { ra } : {}), ...(rb ? { rb } : {}) });
 // off (optional, cm): how far the dimension line is pulled sideways from its two reference points a and b, along the
 // line's own normal, so it stays parallel to what it measures. Dotted extension lines join it back to the references.
+/**
+ * Each tape belongs to the page it was made on: 'dimensions' (Room dimensions, printed page 1) or 'plan' (Floor plan,
+ * printed page 2), and shows only there, so the two pages keep their own measurements. A tape with no page (made
+ * before this was added) counts as 'dimensions'.
+ */
+export const measuresOn = (floor, page) => (floor.measures || []).filter((m) => (m.page || 'dimensions') === page);
 export const measureOffset = (m) => m.off || 0;
 /** Unit vector at right angles to a → b. */
 export function measureNormal(m) {

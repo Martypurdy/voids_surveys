@@ -42,7 +42,8 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
   // Tape measure: always on offer. mode 'drag' = click / drag from point to point; mode 'type' = click a start,
   // type the length, and that sets the end. pending = the line being made; hover = last pointer spot.
   const tape = { on: false, mode: 'drag', pending: null, typed: '', hover: null, snap: null, dir: null };
-  const measures = () => (floor().measures ||= []);
+  const allMeasures = () => (floor().measures ||= []);
+  const measures = () => allMeasures().filter((m) => (m.page || 'dimensions') === section); // each tab keeps its own tapes
   const measureById = (mid) => measures().find((m) => m.id === mid);
 
   // ----- undo -----
@@ -75,7 +76,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
 
   const fit = () => {
     const W = canvas.clientWidth || 360, H = canvas.clientHeight || 400;
-    const b = bounds(floor());
+    const b = bounds(floor(), true, section);
     if (!b) {
       view = { s: W / 600, tx: W * 0.08, ty: H * 0.08 };
     } else {
@@ -452,7 +453,8 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     if (m && measureLength(m) >= 1) {
       remember();
       const made = newMeasure(m.a, m.b, refAt(floor(), m.a), refAt(floor(), m.b)); // an end that lands on a corner stays attached to it
-      measures().push(made);
+      made.page = section;
+      allMeasures().push(made);
       sel = { type: 'measure', id: made.id };
       save();
     }
@@ -1003,10 +1005,10 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
   };
   const delBtn = (label, fn) => h('button', { type: 'button', class: 'btn-danger btn-small', onclick: fn }, label);
   const deleteMeasure = (mid) => {
-    const i = measures().findIndex((m) => m.id === mid);
+    const i = allMeasures().findIndex((m) => m.id === mid);
     if (i < 0) return;
     remember();
-    measures().splice(i, 1);
+    allMeasures().splice(i, 1);
     sel = null;
     save();
     renderAll();

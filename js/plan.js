@@ -308,7 +308,7 @@ export function wallSnap(rooms, x, y, maxDist) {
 export const roomAt = (rooms, x, y) => [...rooms].reverse().find((r) => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h);
 
 /** Extent of a floor's rooms, or null when empty. */
-export function bounds(floor, withPoints = true) {
+export function bounds(floor, withPoints = true, page = null) { // page: also take in the tapes made on 'dimensions' or 'plan'
   if (!floor.rooms.length) return null;
   const b = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
   for (const r of floor.rooms) {
@@ -325,7 +325,7 @@ export function bounds(floor, withPoints = true) {
     b.maxX = Math.max(b.maxX, r.x + it.dx + 20);
     b.maxY = Math.max(b.maxY, r.y + it.dy + 20);
   }
-  for (const m of floor.measures || []) { // tape measures count too, so they are in view and on the printed plan
+  for (const m of page ? (floor.measures || []).filter((q) => (q.page || 'dimensions') === page) : []) { // tape measures count too, so they are in view and on the printed plan
     const n = Math.hypot(m.b.x - m.a.x, m.b.y - m.a.y) || 1, o = m.off || 0, sx = (-(m.b.y - m.a.y) / n) * o, sy = ((m.b.x - m.a.x) / n) * o;
     for (const e of [m.a, m.b, { x: m.a.x + sx, y: m.a.y + sy }, { x: m.b.x + sx, y: m.b.y + sy }]) {
       b.minX = Math.min(b.minX, e.x);

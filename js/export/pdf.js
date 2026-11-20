@@ -3,7 +3,7 @@ import { addressLines, jobTitle, fmtDate, fmtDateTime, slug, todayLocal, allPhot
 import { usedRows, usedMaterials, rowNumbers, materialSource, repairPhotos, rowPhotoNumbers } from '../repair.js';
 import { fileBase } from '../properties.js';
 import { ITEMS, roomFigures, floorArea, planArea, metres, sqm, openingGeometry, bounds, legend, cornerPoints, cabinetNumbers, cabinetText, frontEdge, cornerLabelPoint, blindGeometry, endPanels, panelLines, refreshPosts, refreshDepths, settingsLine, cabinetShapes, badgePoint, featureTags, describeFeature, serviceInfo } from '../plan.js';
-import { syncMeasures } from '../measure.js';
+import { syncMeasures, measuresOn } from '../measure.js';
 import { sheetTotals, lineTotals, isBlankLine, gbp, money, LABOUR_BASIS } from '../pricing.js';
 import { UNITS, defectInfo, isSorCode, qtyText as unitQty } from '../data/parts.js';
 import { FEATURES, featuresOf } from '../data/features.js';
@@ -955,7 +955,7 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
 
   /** Drawing size for a floor: scaled to fit the area (at most 1:25). */
   function floorSize(f, aw, ah, withPoints = true) {
-    const b = bounds(f, withPoints) || { minX: 0, minY: 0, maxX: 100, maxY: 100 };
+    const b = bounds(f, withPoints, withPoints ? 'dimensions' : 'plan') || { minX: 0, minY: 0, maxX: 100, maxY: 100 };
     const pad = 30; // cm round the edge for labels
     const bw = b.maxX - b.minX + pad * 2, bh = b.maxY - b.minY + pad * 2;
     const k = Math.min(aw / bw, ah / bh, 0.4); // mm per cm (0.4 = 1:25)
@@ -1125,7 +1125,7 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
       if (hh > 10) doc.text(metres(r.h), x + 3, yy + hh / 2, { align: 'center', angle: 90 });
     }
     // tape measures: amber line with end ticks and the length alongside, drawn over everything else
-    for (const m of f.measures || []) {
+    for (const m of measuresOn(f, mode === 'room' ? 'dimensions' : 'plan')) { // each printed page has its own tapes
       const len = Math.hypot(m.b.x - m.a.x, m.b.y - m.a.y);
       if (len < 1) continue;
       const nrm = { x: -(m.b.y - m.a.y) / len, y: (m.b.x - m.a.x) / len }, off = m.off || 0; // pulled off the plan along its normal
