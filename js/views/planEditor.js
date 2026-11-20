@@ -13,7 +13,7 @@ import {
   blindGeometry, refreshPosts, endPanels, panelLines, setDepth, refreshDepths,
   cabinetShapes, badgePoint, featureTags, placementDims, wallCorners, WALL_NAMES, DOOR_SIZES, WINDOW_SIZES, hingeSide, setHinge, radiatorWall, nearestRoom, clampItem,
 } from '../plan.js';
-import { shownLine, measureOffset, newMeasure, measureLength, measureAngle, mmText, snapTape, endAtLength, setLength, measureHit, placeAtEnd, refAt, syncMeasures } from '../measure.js';
+import { shownLine, measureOffset, newMeasure, measureLength, measureAngle, mmText, snapTape, endAtLength, setLength, measureHit, placeAtEnd, refAt, syncMeasures, rootEnd } from '../measure.js';
 
 const SNAP = 5; // cm
 const MIN_ROOM = 50; // cm
@@ -44,6 +44,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
   const tape = { on: false, mode: 'drag', pending: null, typed: '', hover: null, snap: null, dir: null };
   const allMeasures = () => (floor().measures ||= []);
   const measures = () => allMeasures().filter((m) => (m.page || 'dimensions') === section); // each tab keeps its own tapes
+  const group = () => (sel?.type === 'measure' ? sel.ids || [sel.id] : []); // the selected tapes (shift-click adds more)
   const measureById = (mid) => measures().find((m) => m.id === mid);
 
   // ----- undo -----
@@ -209,7 +210,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       return `<g transform="translate(${mx} ${my}) rotate(${ang})"><rect class="tape-lbl ${cls}" x="${-wd / 2}" y="-9" width="${wd}" height="18" rx="9"/><text class="tape-t" x="0" y="0">${esc(text)}</text></g>`;
     };
     for (const m of measures()) {
-      const on = sel?.type === 'measure' && sel.id === m.id;
+      const on = group().includes(m.id);
       const ax = X(m.a.x), ay = Y(m.a.y), bx = X(m.b.x), by = Y(m.b.y);
       const sh = shownLine(m); // the dimension line as drawn, pulled off its reference points by m.off
       const sax = X(sh.a.x), say = Y(sh.a.y), sbx = X(sh.b.x), sby = Y(sh.b.y);
@@ -444,6 +445,16 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     const len = typedCm();
     tape.pending.b = tape.mode === 'type' && len > 0 ? endAtLength(from, s, len) : { x: s.x, y: s.y };
   };
+  /** Carry on from the end of a tape: a new one starts exactly there, joined to it (it follows that end if it moves). */
+  const startChain = (m, end) => {
+    const from = { x: m[end].x, y: m[end].y };
+    tape.pending = { a: from, b: { ...from }, ra: { tape: m.id, end } };
+    tape.snap = null;
+    tape.typed = '';
+    tape.hover = null;
+    renderBanner();
+    renderCanvas();
+  };
   const cancelTape = () => { tape.pending = null; tape.typed = ''; tape.snap = null; tape.hover = null; renderBanner(); renderCanvas(); };
   const commitTape = () => {
     const m = tape.pending;
@@ -452,7 +463,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     tape.snap = null;
     if (m && measureLength(m) >= 1) {
       remember();
-      const made = newMeasure(m.a, m.b, refAt(floor(), m.a), refAt(floor(), m.b)); // an end that lands on a corner stays attached to it
+      const made = newMeasure(m.a, m.b, m.ra || refAt(floor(), m.a), refAt(floor(), m.b)); // an end that lands on a corner stays attached to it
       made.page = section;
       allMeasures().push(made);
       sel = { type: 'measure', id: made.id };
@@ -463,11 +474,12 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     renderCanvas();
   };
   /** The tape end or body under the pointer (ends always; the body and the length label too). */
-  const measureAt = (p) => {
+  const measureAt = (p, shift = false) => {
     const w = toWorld(p);
     for (const m of [...measures()].reverse()) {
-      if (tape.on && sel?.id !== m.id) continue; // with the tape out, only the selected one can be picked up, so a new one can start on an old one's corner
-      const part = measureHit(m, w, 14 / view.s, 8 / view.s, tape.on);
+      if (tape.on && !shift && !group().includes(m.id)) continue; // with the tape out, only the selected one can be picked up, so a new one can start on an old one's corner
+      const part = measureHit(m, w, 14 / view.s, 8 / view.s, tape.on || shift);
+      if (part === 'a' || part === 'b') { const r = rootEnd(floor(), m, part); return { m: r.m, part: r.end }; } // a joint belongs to the tape that owns it
       if (part) return { m, part };
       const sh = shownLine(m);
       const mid = { x: (sh.a.x + sh.b.x) / 2, y: (sh.a.y + sh.b.y) / 2 };
@@ -477,6 +489,11 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
   };
 
   svg.addEventListener('pointerdown', (e) => {
+    if (e.button === 2 && tape.on) { // right button puts the tape away (and drops a line half made)
+      drag = null;
+      setTape(false);
+      return;
+    }
     svg.setPointerCapture(e.pointerId);
     pointers.set(e.pointerId, pt(e));
     if (pointers.size === 2) {
@@ -501,12 +518,25 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       commitTape();
       return;
     }
-    const mh = measureAt(p);
-    if (mh) { // pick up a tape: an end re-measures it, the body or label moves the whole tape
-      sel = { type: 'measure', id: mh.m.id };
-      drag = mh.part === 'line'
-        ? { kind: 'moff', m: mh.m, off0: measureOffset(mh.m), w0: w, p0: p, snapshot }
-        : { kind: 'mend', m: mh.m, end: mh.part, p0: p, snapshot };
+    const mh = measureAt(p, e.shiftKey);
+    if (mh) {
+      if (e.shiftKey) { // Shift-click adds a tape to the group, or takes it out
+        const ids = new Set(group());
+        if (ids.has(mh.m.id)) ids.delete(mh.m.id); else ids.add(mh.m.id);
+        const list = [...ids];
+        sel = list.length ? { type: 'measure', id: ids.has(mh.m.id) ? mh.m.id : list[list.length - 1], ids: list } : null;
+        renderCanvas();
+        renderPanel();
+        return;
+      }
+      if (mh.part === 'line') { // pull the line sideways; if it is one of a group, the whole group is pulled
+        if (!group().includes(mh.m.id)) sel = { type: 'measure', id: mh.m.id, ids: [mh.m.id] };
+        const items = measures().filter((q) => group().includes(q.id)).map((q) => ({ m: q, off0: measureOffset(q), n: shownLine(q).n }));
+        drag = { kind: 'moff', items, w0: w, p0: p, snapshot };
+      } else { // an end re-measures that tape (with the tape out, a plain click on it carries on from it)
+        sel = { type: 'measure', id: mh.m.id, ids: [mh.m.id] };
+        drag = { kind: 'mend', m: mh.m, end: mh.part, p0: p, snapshot, chain: tape.on };
+      }
       renderCanvas();
       renderPanel();
       return;
@@ -602,12 +632,12 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     }
     const w = toWorld(p);
     const dx = w.x - drag.w0.x, dy = w.y - drag.w0.y;
-    if (drag.kind === 'moff') { // pull the dimension line sideways only: it stays parallel to what it measures
-      const n = shownLine(drag.m).n;
-      let off = drag.off0 + dx * n.x + dy * n.y;
-      if (Math.abs(off) * view.s < 6) off = 0; // clicks back onto the line it measures
-      drag.m.off = off ? Math.round(off * 10) / 10 : 0;
-      if (!off) delete drag.m.off;
+    if (drag.kind === 'moff') { // pull the dimension lines sideways only: each stays parallel to what it measures, so a pull across moves only the tapes that run the other way
+      for (const it of drag.items) {
+        let off = it.off0 + dx * it.n.x + dy * it.n.y;
+        if (Math.abs(off) * view.s < 6) off = 0; // clicks back onto the line it measures
+        if (off) it.m.off = Math.round(off * 10) / 10; else delete it.m.off;
+      }
       renderPanel();
       return renderCanvas();
     }
@@ -657,6 +687,12 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     clearTimeout(pressTimer);
     pointers.delete(e.pointerId);
     if (!drag) return;
+    if (drag.kind === 'mend' && drag.chain && !drag.moved && e.type === 'pointerup') { // clicked (not dragged) an end: carry on from it
+      const d = drag;
+      drag = null;
+      startChain(d.m, d.end);
+      return;
+    }
     if (drag.kind === 'tape') { // dragged from point to point: done. Just clicked: the line follows the pointer to a second click.
       const dragged = drag.moved && tape.mode === 'drag' && e.type === 'pointerup';
       drag = null;
@@ -914,7 +950,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
   };
 
   // ----- the banner over the plan: placing something, or the tape measure -----
-  const tapeBtn = h('button', { type: 'button', class: 'btn-small tape-btn', title: 'Tape measure (M)', onclick: () => setTape(!tape.on) }, '📏 Tape');
+  const tapeBtn = h('button', { type: 'button', class: 'btn-small tape-btn', title: 'Tape measure (M). Right-click on the plan puts it away', onclick: () => setTape(!tape.on) }, '📏 Tape');
   const setTape = (on) => {
     tape.on = on;
     tape.pending = null;
@@ -944,7 +980,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       } else if (tape.pending) {
         msg = 'Move to the end point and click (Alt = no snapping)';
       } else {
-        msg = tape.mode === 'type' ? 'Click where the measurement starts' : 'Click or drag from one point to another (Alt = no snapping)';
+        msg = tape.mode === 'type' ? 'Click where the measurement starts' : 'Click or drag from one point to another (Alt = no snapping). Click the end of a tape to carry on from it. Shift-click to select several. Right-click puts the tape away';
       }
       banner.hidden = false;
       banner.classList.add('tape-on');
@@ -1004,6 +1040,14 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     return h('label', { class: 'field' }, h('span', { class: 'field-label' }, label), input);
   };
   const delBtn = (label, fn) => h('button', { type: 'button', class: 'btn-danger btn-small', onclick: fn }, label);
+  const deleteMeasures = (ids) => {
+    if (!ids.length) return;
+    remember();
+    floor().measures = allMeasures().filter((m) => !ids.includes(m.id));
+    sel = null;
+    save();
+    renderAll();
+  };
   const deleteMeasure = (mid) => {
     const i = allMeasures().findIndex((m) => m.id === mid);
     if (i < 0) return;
@@ -1032,6 +1076,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
   };
   const CORNER = { nw: 'north-west', ne: 'north-east', sw: 'south-west', se: 'south-east' };
   const refName = (f, ref) => {
+    if (ref.tape) return 'the end of the measurement before it';
     if (ref.room) return `${f.rooms.find((r) => r.id === ref.room)?.name || 'room'} ${CORNER[ref.c]} corner`;
     const it = f.items.find((i) => i.id === ref.item);
     return it ? ITEMS[it.type].label.toLowerCase() : 'a unit';
@@ -1074,6 +1119,13 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     if (sel?.type === 'measure') {
       const m = measureById(sel.id);
       if (!m) { sel = null; return renderPanel(); }
+      const ids = group().filter((i) => measureById(i));
+      if (ids.length > 1) {
+        return panel.replaceChildren(
+          h('strong', null, `📏 ${ids.length} measurements selected`),
+          h('p', { class: 'hint' }, 'Drag any selected line sideways to pull them all together (each keeps to its own direction). Shift-click a measurement to add it or take it out; click an empty spot to let go.'),
+          h('div', { class: 'btn-row' }, delBtn(`Delete ${ids.length} measurements`, () => deleteMeasures(ids))));
+      }
       return renderMeasurePanel(m);
     }
     if (sel?.type === 'room') {
@@ -1439,7 +1491,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     } else if ((e.key === 'Delete' || e.key === 'Backspace') && sel) {
       e.preventDefault();
       const f = floor();
-      if (sel.type === 'measure') return deleteMeasure(sel.id);
+      if (sel.type === 'measure') return deleteMeasures(group());
       if (sel.type === 'item') {
         const i = f.items.findIndex((x) => x.id === sel.id);
         if (i < 0) return;

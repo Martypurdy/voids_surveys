@@ -82,9 +82,29 @@ export function refAt(floor, p, tol = 0.3) {
   return best ? { ...best.ref } : null;
 }
 
+/**
+ * Joined tapes: a tape that carries on from another starts with ra = { tape: id, end: 'a' | 'b' }, so it follows that
+ * end when it is moved. rootEnd follows such links back to the tape that owns the point, so dragging a joint moves
+ * the joint (and so every tape joined to it) rather than just the latest tape's copy of it.
+ */
+export function rootEnd(floor, m, end) {
+  for (let guard = 0; guard < 50; guard++) {
+    const ref = end === 'a' ? m.ra : m.rb;
+    const o = ref?.tape && (floor.measures || []).find((q) => q.id === ref.tape);
+    if (!o) break;
+    m = o;
+    end = ref.end;
+  }
+  return { m, end };
+}
+
 /** Where a ref is now, or null when what it pointed at has gone. */
 export function resolveRef(floor, ref) {
   if (!ref) return null;
+  if (ref.tape) {
+    const o = (floor.measures || []).find((q) => q.id === ref.tape);
+    return o ? { ...o[ref.end] } : null;
+  }
   if (ref.room) {
     const r = floor.rooms.find((q) => q.id === ref.room);
     if (!r) return null;
@@ -102,12 +122,14 @@ export function resolveRef(floor, ref) {
 
 /** Pull every attached tape end to where its corner now is; an end whose corner has gone is let go where it was. */
 export function syncMeasures(floor) {
-  for (const m of floor.measures || []) {
-    for (const end of ['a', 'b']) {
-      const key = end === 'a' ? 'ra' : 'rb';
-      if (!m[key]) continue;
-      const pt = resolveRef(floor, m[key]);
-      if (pt) m[end] = pt; else delete m[key];
+  for (let pass = 0; pass < 3; pass++) { // a joined tape follows one that may itself be following a corner
+    for (const m of floor.measures || []) {
+      for (const end of ['a', 'b']) {
+        const key = end === 'a' ? 'ra' : 'rb';
+        if (!m[key]) continue;
+        const pt = resolveRef(floor, m[key]);
+        if (pt) m[end] = pt; else delete m[key];
+      }
     }
   }
 }
