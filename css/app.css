@@ -1745,3 +1745,4 @@ dialog .dialog-buttons:has(.cat-card) > button:not(.cat-card) { flex: 1 1 100%; 
 .cat-card .unit-pic { margin: 0 0 2px; }
 .cat-card .unit-pic-svg { height: 72px; width: auto; max-width: 100%; }
 .plan-svg .cdiv { stroke: var(--plan-wall); stroke-width: 1.2; pointer-events: none; }
+.plan-svg .fx.panel.dashed { fill: none; stroke: var(--plan-wall); stroke-width: 2.6; stroke-dasharray: 5 3; }

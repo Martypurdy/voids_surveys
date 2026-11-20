@@ -58,6 +58,10 @@ export const ITEMS = {
   // An end panel is a loose decorative board against the exposed end of a unit. It is its own part: it never changes the unit's size.
   // uw = its thickness (16, 18 or 22 mm), ud = its depth (585 mm, the same as a base unit with its door).
   endpanel: { kind: 'fixture', panel: true, label: 'End panel', emoji: '▌', w: 1.8, h: 58.5, run: 'base' },
+  // A wall end panel: the same loose board for the exposed end of a wall unit. hgt = its height (cm, the wall unit's:
+  // 360 / 720 / 900), ext = how far it extends below the unit (cm, 0 to hide lighting or line up with a pelmet), ud = its depth
+  // (310 mm for a standard wall unit with its door, 410 mm for a deep one).
+  endpanelwall: { kind: 'fixture', panel: true, dashed: true, label: 'Wall end panel', emoji: '▌', w: 1.8, h: 31, hgt: 72, run: 'wall' },
   sink: { kind: 'fixture', label: 'Sink', emoji: '🚰', w: 100, h: 55, run: 'base' },
   hob: { kind: 'fixture', label: 'Hob', emoji: '🍳', w: 60, h: 55, run: 'base' },
   oven: { kind: 'fixture', label: 'Oven', emoji: '♨️', w: 60, h: 60, run: 'base' },
@@ -79,6 +83,8 @@ export const APPLIANCES = ['Oven / cooker', 'Dishwasher', 'Washing machine', 'Fr
 export const GAP = 0.2; // cm between the carcass and its door / drawer front
 export const DEFAULT_SETTINGS = { front: 18, board: 18 }; // mm: door / drawer fronts; fillers and new end panels
 export const PANEL_THICKNESSES = [16, 18, 22]; // mm: the common end panel boards
+export const PANEL_DEPTH_WALL = [31, 41]; // cm: standard and deep wall units with their doors
+export const PANEL_HEIGHTS_WALL = [[36, 'Half height 360 mm'], [72, 'Full height 720 mm'], [90, 'Extra tall 900 mm']];
 export const PANEL_DEPTH = 58.5; // cm (585 mm: 565 carcass + 2 gap + 18 door, so it lines up with the doors)
 const frontCm = (st) => (st?.front ?? DEFAULT_SETTINGS.front) / 10;
 const boardCm = (st) => (st?.board ?? DEFAULT_SETTINGS.board) / 10;
@@ -649,12 +655,14 @@ export function panelLines(floor, st) {
   const groups = new Map();
   for (const it of floor.items) {
     if (!ITEMS[it.type]?.panel) continue;
-    const k = `${Math.round(it.uw * 10)}|${Math.round(it.ud * 10)}`;
+    const k = `${it.type}|${Math.round(it.uw * 10)}|${Math.round(it.ud * 10)}|${it.hgt != null ? Math.round(it.hgt * 10) : ''}|${Math.round((it.ext || 0) * 10)}`;
     groups.set(k, (groups.get(k) || 0) + 1);
   }
   for (const [k, n] of groups) {
-    const [thick, depth] = k.split('|');
-    lines.push(`${n} x end panel, ${thick} mm thick, ${depth} mm deep`);
+    const [type, thick, depth, hgt, ext] = k.split('|');
+    lines.push(type === 'endpanelwall'
+      ? `${n} x wall end panel, ${thick} mm thick, ${depth} mm deep, ${hgt} mm high${Number(ext) > 0 ? `, extends ${ext} mm below the unit` : ''}`
+      : `${n} x end panel, ${thick} mm thick, ${depth} mm deep`);
   }
   const fillers = new Map();
   for (const it of floor.items) {

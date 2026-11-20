@@ -10,7 +10,7 @@ import {
   ITEMS, PALETTE, ROOM_NAMES, FLOOR_NAMES, newPlanRoom, newFloor, newPlanItem, roomFigures, floorArea, planArea,
   metres, sqm, openingGeometry, nearestWall, wallSnap, wallLine, roomAt, bounds, settleItem, legend, cornerPoints, snapToUnits, isStructure,
   STYLES, PATTERNS, DOOR_OPTIONS, APPLIANCES, applyRot, rotateAbout, cabinetNumbers, cabinetText, frontEdge, cornerLabelPoint, autoRotate, clearSpot,
-  blindGeometry, curvedOutline, refreshPosts, panelLines, KINDS, kindOf, sizesFor, optionDefaults, setDepth, refreshDepths, PANEL_THICKNESSES, PANEL_DEPTH,
+  blindGeometry, curvedOutline, refreshPosts, panelLines, KINDS, kindOf, sizesFor, optionDefaults, setDepth, refreshDepths, PANEL_THICKNESSES, PANEL_DEPTH, PANEL_DEPTH_WALL, PANEL_HEIGHTS_WALL,
   cabinetShapes, badgePoint, featureTags, placementDims, wallCorners, WALL_NAMES, DOOR_SIZES, WINDOW_SIZES, hingeSide, setHinge, radiatorWall, nearestRoom, clampItem, autoRadiator, snapToWallCentre, centreOpening,
 } from '../plan.js';
 import { iconSvg, hasIcon, captionFor, captionForKind, unitPicture } from '../catalogue.js';
@@ -1030,35 +1030,63 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     return it;
   };
   /** The End panel button: pick the thickness, and the panel lands beside the selected unit (or in the room, ready to drag). */
-  const addPanel = async (type) => {
-    const d = ITEMS[type];
+  const addPanel = async () => {
     const f = floor();
     if (!f.rooms.length) return toast('Add the rooms on the Room dimensions tab first');
     placing = null;
     renderToolbar();
     const board = Math.round((plan.settings.board || 18));
     let thick = PANEL_THICKNESSES.includes(board) ? board : 18;
+    const sel1 = igroup().length === 1 ? f.items.find((i) => i.id === igroup()[0]) : null; // one unit selected: the panel suits it
+    const onWall = Boolean(sel1 && ITEMS[sel1.type].run === 'wall' && ITEMS[sel1.type].kind === 'fixture' && !ITEMS[sel1.type].panel);
+    let fits = onWall ? 'endpanelwall' : 'endpanel';
+    let hgtW = onWall && sel1.hgt ? sel1.hgt : 72;
+    let depthW = onWall && sel1.ud >= 36 ? PANEL_DEPTH_WALL[1] : PANEL_DEPTH_WALL[0];
+    let belowMm = 0;
+    const pic = h('div', { class: 'unit-pic' });
+    const msg = h('p', null);
+    const refresh = () => {
+      const wall = fits === 'endpanelwall';
+      wallBox.hidden = !wall;
+      msg.textContent = wall
+        ? `A loose board for the exposed end of a wall unit, ${Math.round(depthW * 10)} mm deep so it lines up with the doors. It never changes the unit's size.`
+        : `A loose board for the exposed end of a base unit, ${Math.round(PANEL_DEPTH * 10)} mm deep, floor to worktop. It never changes the unit's size.`;
+      pic.innerHTML = unitPicture(fits, { thickness: thick / 10, hgt: hgtW, ext: belowMm / 10 });
+    };
+    const belowInput = h('input', { type: 'text', inputmode: 'decimal', value: '0', 'aria-label': 'Extend below in mm', oninput: (e) => { const n = num(e.target.value); belowMm = Number.isFinite(n) && n > 0 ? Math.min(n, 150) : 0; refresh(); } });
+    const wallBox = h('div', null,
+      selectField('Height', String(hgtW), PANEL_HEIGHTS_WALL.map(([v, l]) => [String(v), l]), (x) => { hgtW = Number(x); refresh(); }, { placeholder: null }),
+      selectField('Depth', String(depthW), [[PANEL_DEPTH_WALL[0], 'Standard wall unit 310 mm'], [PANEL_DEPTH_WALL[1], 'Deep wall unit 410 mm']].map(([v, l]) => [String(v), l]), (x) => { depthW = Number(x); refresh(); }, { placeholder: null }),
+      h('label', { class: 'field' }, h('span', { class: 'field-label' }, 'Extend below the unit (mm, optional)'), belowInput),
+      h('p', { class: 'hint' }, 'A drop of 20 to 40 mm hides under-cabinet lighting or lines up with a pelmet.'));
+    const content = h('div', null, pic, msg,
+      selectField('Fits', fits, [['endpanel', 'Base unit (floor to worktop)'], ['endpanelwall', 'Wall unit']], (x) => { fits = x; refresh(); }, { placeholder: null }),
+      selectField('Thickness', String(thick), PANEL_THICKNESSES.map((n) => [String(n), `${n} mm`]), (x) => { thick = Number(x); refresh(); }, { placeholder: null }),
+      wallBox);
+    refresh();
     const v = await choose({
-      title: d.label,
-      message: `An end panel is a loose board for the exposed end of a unit, ${PANEL_DEPTH * 10} mm deep. It is its own part and never changes the unit's size.`,
-      content: h('div', null, selectField('Thickness', String(thick), PANEL_THICKNESSES.map((n) => [String(n), `${n} mm`]), (x) => { thick = Number(x); }, { placeholder: null })),
+      title: 'End panel',
+      content,
       buttons: [{ label: 'Add', value: 'add', class: 'btn-primary btn-big' }, { label: 'Cancel', value: null }],
     });
     if (v !== 'add') return;
+    const type = fits;
+    const d = ITEMS[type];
     const centre = toWorld({ x: (canvas.clientWidth || 360) / 2, y: (canvas.clientHeight || 400) / 2 });
     const beside = igroup().length === 1 ? f.items.find((i) => i.id === igroup()[0]) : null; // one unit selected: put it against that unit
     const r = (beside && roomById(beside.roomId)) || roomAt(f.rooms, centre.x, centre.y) || f.rooms[0];
     remember();
     const it = newPlanItem(type, { roomId: r.id });
     it.uw = thick / 10;
-    it.ud = PANEL_DEPTH;
+    it.ud = type === 'endpanelwall' ? depthW : PANEL_DEPTH;
+    if (type === 'endpanelwall') { it.hgt = hgtW; it.ext = belowMm / 10; }
     applyRot(it);
     clearSpot(r, f.items, it);
     if (beside && ITEMS[beside.type].kind === 'fixture' && !ITEMS[beside.type].panel) {
       it.rot = beside.rot || 0; // same way round as the unit, back to back with it
       applyRot(it);
       const across = (it.rot % 180 === 0);
-      const free = (x, y) => f.items.every((o) => o === it || o.roomId !== r.id || ITEMS[o.type].kind !== 'fixture' || ITEMS[o.type].run !== 'base' || x >= o.dx + o.w - 0.01 || x + it.w <= o.dx + 0.01 || y >= o.dy + o.h - 0.01 || y + it.h <= o.dy + 0.01);
+      const free = (x, y) => f.items.every((o) => o === it || o.roomId !== r.id || ITEMS[o.type].kind !== 'fixture' || ITEMS[o.type].run !== d.run || x >= o.dx + o.w - 0.01 || x + it.w <= o.dx + 0.01 || y >= o.dy + o.h - 0.01 || y + it.h <= o.dy + 0.01);
       const backY = (it.rot === 180 ? beside.dy + beside.h - it.h : beside.dy), backX = (it.rot === 90 ? beside.dx + beside.w - it.w : beside.dx);
       const spots = across
         ? [[beside.dx + beside.w, backY], [beside.dx - it.w, backY]]
@@ -1073,7 +1101,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     sel = { type: 'item', id: it.id, ids: [it.id] };
     save();
     renderAll();
-    toast('End panel added – drag it against the end of a unit');
+    toast(`${d.label} added – drag it against the end of a unit`);
   };
   /** A family button (Base units, Wall units, Tall housing): pick the kind from picture cards, then size and options as usual. */
   const addFamily = async (menuType) => {
@@ -1222,7 +1250,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
   const pressTool = (t) => {
     if (suppressClick || reordering) return;
     if (ITEMS[t].menu) return addFamily(t); // base units, wall units and tall housings each share one button: pick which kind
-    if (ITEMS[t].panel) return addPanel(t); // end panels ask their thickness
+    if (ITEMS[t].panel) return addPanel(); // end panels ask what they fit and their thickness
     if (ITEMS[t].sizes) return addCabinet(plainKind(t)); // units ask their size first, then land in the room
     tape.on = false; // the tape and "tap to place" use the same banner
     tape.pending = null;
@@ -1528,7 +1556,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       const parts = [h('strong', null, `${d.emoji} ${kindOf(it)?.label ?? d.label}`)];
       livePic = null;
       if (d.kind === 'fixture') { // the unit as a drawing, to its real proportions, following what you set below
-        const opts = () => ({ width: it.uw ?? it.w, style: it.style, pattern: it.pattern, hand: it.hand, door: it.door, appliance: it.appliance, thickness: d.panel ? it.uw : undefined });
+        const opts = () => ({ width: it.uw ?? it.w, style: it.style, pattern: it.pattern, hand: it.hand, door: it.door, appliance: it.appliance, thickness: d.panel ? it.uw : undefined, variant: it.variant, hgt: it.hgt, ext: it.ext });
         const pic = picNode(it.type, opts());
         if (pic) {
           parts.push(pic);
@@ -1614,6 +1642,10 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
             parts.push(
               selectField('Thickness', String(thickNow), thicks.map((n) => [String(n), `${n} mm`]), (v) => { remember(); it.uw = Number(v) / 10; refit(); renderAll(); }, { placeholder: null }),
               field('Depth (mm)', String(Math.round(it.ud * 10)), (v) => { const n = num(v) / 10; if (n > 5) { it.ud = Math.round(n * 10) / 10; refit(); } }, { inputmode: 'decimal' }),
+              ...(it.type === 'endpanelwall' ? [
+                selectField('Height', String(it.hgt ?? 72), (PANEL_HEIGHTS_WALL.some(([v]) => v === it.hgt) ? PANEL_HEIGHTS_WALL : [...PANEL_HEIGHTS_WALL, [it.hgt, `${Math.round(it.hgt * 10)} mm`]]).map(([v, l]) => [String(v), l]), (v) => { remember(); it.hgt = Number(v); save(); renderAll(); }, { placeholder: null }),
+                field('Extend below the unit (mm)', String(Math.round((it.ext || 0) * 10)), (v) => { const n = num(v); it.ext = Number.isFinite(n) && n > 0 ? Math.min(n, 150) / 10 : 0; }, { inputmode: 'decimal' }),
+              ] : []),
               h('p', { class: 'hint' }, `A loose board for the exposed end of a unit, ${Math.round(it.ud * 10)} mm deep so it lines up with the doors. Drag it against the unit's end and it closes up flush; the unit itself keeps its size.`));
           } else {
             parts.push(h('div', { class: 'grid-2' },

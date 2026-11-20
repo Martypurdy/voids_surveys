@@ -128,6 +128,16 @@ export function unitPicture(type, o = {}) {
     return door(x, y, ww, hhh) + vh(x + ww - 7, y + 6);
   };
 
+  if (d.panel && isWall) { // a wall end panel: a board hanging beside a wall unit; a dashed drop shows how far it extends below
+    const tcm = o.thickness ?? uw;
+    const t = Math.max(tcm * 3, 6);
+    const board = (o.hgt ?? d.hgt ?? 72) * 1;
+    const drop = (o.ext ?? 0) * 1;
+    out.push(ln(x0 + 24, y0 - 6, x0 + 24, y0, 'ln'), rc('dk', x0 + 20, y0, t, board, 1));
+    if (drop > 0) out.push(`<rect class="sp" x="${x0 + 20}" y="${(y0 + board).toFixed(1)}" width="${t.toFixed(1)}" height="${drop.toFixed(1)}"/>`);
+    const label = labels ? `<text class="pic-t" x="${x0 + 20 + t + 8}" y="${y0 + board / 2}">${Math.round((o.hgt ?? d.hgt ?? 72) * 10)} mm high</text><text class="pic-t" x="${x0 + 20 + t + 8}" y="${y0 + board / 2 + 13}">${Math.round(tcm * 10)} mm thick${drop > 0 ? ', +' + Math.round(drop * 10) + ' below' : ''}</text>` : '';
+    return `<svg class="unit-pic-svg" viewBox="0 0 190 ${(y0 + board + drop + 20).toFixed(0)}" width="190" height="${(y0 + board + drop + 20).toFixed(0)}" aria-hidden="true">${out.join('')}${label}</svg>`;
+  }
   if (d.panel) {
     const t = Math.max((o.thickness ?? uw) * 1.12 * 3, 6); // thickness exaggerated so it reads
     const target = 104;

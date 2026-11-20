@@ -994,7 +994,8 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
       doc.setLineWidth(0.25);
       doc.setDrawColor(70, 80, 90);
       if (d.dashed) doc.setLineDashPattern([1, 0.8], 0);
-      doc.setFillColor(...(d.panel ? [40, 48, 56] : [236, 241, 246])); // end panels are solid boards
+      doc.setFillColor(...(d.panel ? [40, 48, 56] : [236, 241, 246])); // end panels are solid boards (a wall one: a heavy dashed outline)
+      if (d.panel && d.dashed) doc.setLineWidth(0.6);
       if (d.corner) {
         const pts = cornerPoints(it).map(([ux, uy]) => [px(r.x + it.dx + ux), py(r.y + it.dy + uy)]);
         doc.lines(pts.slice(1).concat([pts[0]]).map((p, i) => [p[0] - pts[i][0], p[1] - pts[i][1]]), pts[0][0], pts[0][1], [1, 1], d.dashed ? 'S' : 'FD', true);
