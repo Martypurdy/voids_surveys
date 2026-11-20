@@ -86,7 +86,8 @@ export const ROOM_NAMES = ['Living room', 'Kitchen', 'Kitchen / diner', 'Dining 
 export const FLOOR_NAMES = ['Ground floor', 'First floor', 'Second floor', 'Loft', 'Basement'];
 
 export const newPlanRoom = ({ name = 'Room', w = 300, h = 300, x = 0, y = 0 } = {}) => ({ id: newId(), name, x, y, w, h, height: '' });
-export const newFloor = (name) => ({ id: newId(), name, rooms: [], items: [] });
+// measures: tape measurements kept on the floor, { id, a: {x, y}, b: {x, y} } (see measure.js). Older floors get the list when first used.
+export const newFloor = (name) => ({ id: newId(), name, rooms: [], items: [], measures: [] });
 
 export function newPlan(kind = 'property') {
   const k = PLAN_KINDS[kind] ? kind : 'property';
@@ -323,6 +324,14 @@ export function bounds(floor, withPoints = true) {
     b.minY = Math.min(b.minY, r.y + it.dy - 20);
     b.maxX = Math.max(b.maxX, r.x + it.dx + 20);
     b.maxY = Math.max(b.maxY, r.y + it.dy + 20);
+  }
+  for (const m of floor.measures || []) { // tape measures count too, so they are in view and on the printed plan
+    for (const e of [m.a, m.b]) {
+      b.minX = Math.min(b.minX, e.x);
+      b.minY = Math.min(b.minY, e.y);
+      b.maxX = Math.max(b.maxX, e.x);
+      b.maxY = Math.max(b.maxY, e.y);
+    }
   }
   return b;
 }

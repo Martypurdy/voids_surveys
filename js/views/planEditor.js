@@ -13,6 +13,7 @@ import {
   blindGeometry, refreshPosts, endPanels, panelLines, setDepth, refreshDepths,
   cabinetShapes, badgePoint, featureTags, placementDims, wallCorners, WALL_NAMES, DOOR_SIZES, WINDOW_SIZES, hingeSide, setHinge, radiatorWall, nearestRoom, clampItem,
 } from '../plan.js';
+import { newMeasure, measureLength, measureAngle, mmText, snapTape, endAtLength, setLength, measureHit, placeAtEnd, refAt, syncMeasures } from '../measure.js';
 
 const SNAP = 5; // cm
 const MIN_ROOM = 50; // cm
@@ -38,6 +39,11 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
   let sel = null; // { type: 'room' | 'item', id }
   let placing = null; // item type waiting for a tap
   let fitted = false;
+  // Tape measure: always on offer. mode 'drag' = click / drag from point to point; mode 'type' = click a start,
+  // type the length, and that sets the end. pending = the line being made; hover = last pointer spot.
+  const tape = { on: false, mode: 'drag', pending: null, typed: '', hover: null, snap: null, dir: null };
+  const measures = () => (floor().measures ||= []);
+  const measureById = (mid) => measures().find((m) => m.id === mid);
 
   // ----- undo -----
   const history = [];
@@ -95,6 +101,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     for (let y = wy0; y <= wy1; y += step) out.push(`<line class="g${y % 100 === 0 ? ' gm' : ''}" x1="0" y1="${Y(y)}" x2="${W}" y2="${Y(y)}"/>`);
 
     const f = floor();
+    syncMeasures(f); // attached tape ends follow their corners
     for (const r of f.rooms) {
       out.push(`<rect class="room${sel?.type === 'room' && sel.id === r.id ? ' sel' : ''}" x="${X(r.x)}" y="${Y(r.y)}" width="${r.w * s}" height="${r.h * s}"/>`);
     }
@@ -190,6 +197,35 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       }
       if (w > 50) out.push(`<text class="dim" x="${x + w / 2}" y="${y + 13}">${metres(r.w)}</text>`);
       if (hh > 50) out.push(`<text class="dim" transform="translate(${x + 12} ${y + hh / 2}) rotate(-90)">${metres(r.h)}</text>`);
+    }
+    // Tape measures: yellow tape with the length in the middle; the selected one shows its end handles.
+    const tapeLabel = (a, b, text, cls) => {
+      const mx = X((a.x + b.x) / 2), my = Y((a.y + b.y) / 2);
+      let ang = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
+      if (ang > 90) ang -= 180;
+      if (ang < -90) ang += 180;
+      const wd = text.length * 6.6 + 12;
+      return `<g transform="translate(${mx} ${my}) rotate(${ang})"><rect class="tape-lbl ${cls}" x="${-wd / 2}" y="-9" width="${wd}" height="18" rx="9"/><text class="tape-t" x="0" y="0">${esc(text)}</text></g>`;
+    };
+    for (const m of measures()) {
+      const on = sel?.type === 'measure' && sel.id === m.id;
+      const ax = X(m.a.x), ay = Y(m.a.y), bx = X(m.b.x), by = Y(m.b.y);
+      out.push(`<line class="tape-l${on ? ' sel' : ''}" x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}"/>`);
+      out.push(`<circle class="tape-e${on ? ' sel' : ''}${m.ra ? ' att' : ''}" cx="${ax}" cy="${ay}" r="${on ? 6 : 4}"/><circle class="tape-e${on ? ' sel' : ''}${m.rb ? ' att' : ''}" cx="${bx}" cy="${by}" r="${on ? 6 : 4}"/>`);
+      out.push(tapeLabel(m.a, m.b, mmText(measureLength(m)), on ? 'sel' : ''));
+    }
+    if (tape.pending) {
+      const { a, b } = tape.pending;
+      const len = measureLength(tape.pending);
+      if (tape.snap?.angle != null) { // faint guide along the straight line, so you can see it has clicked on
+        const ux = (b.x - a.x) / (len || 1), uy = (b.y - a.y) / (len || 1), far = 4000 / view.s;
+        out.push(`<line class="tape-guide" x1="${X(a.x - ux * far)}" y1="${Y(a.y - uy * far)}" x2="${X(a.x + ux * far)}" y2="${Y(a.y + uy * far)}"/>`);
+      }
+      out.push(`<line class="tape-l pend" x1="${X(a.x)}" y1="${Y(a.y)}" x2="${X(b.x)}" y2="${Y(b.y)}"/><circle class="tape-e" cx="${X(a.x)}" cy="${Y(a.y)}" r="5"/>`);
+      if (tape.snap?.snap) out.push(`<circle class="tape-snap" cx="${X(b.x)}" cy="${Y(b.y)}" r="9"/>`);
+      if (len > 0.5) out.push(tapeLabel(a, b, `${mmText(len)}${tape.snap?.angle != null ? ` · ${tape.snap.angle}°` : ''}`, 'pend'));
+    } else if (tape.hover?.snap) {
+      out.push(`<circle class="tape-snap" cx="${X(tape.hover.x)}" cy="${Y(tape.hover.y)}" r="9"/>`);
     }
     // Corner handles (drag both ways) and edge-middle handles (one way only) on the selected room.
     if (sel?.type === 'room') {
@@ -389,6 +425,46 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
   let lastTap = null; // the previous tap on a door / window / radiator, for double-click
   const pt = (e) => { const b = svg.getBoundingClientRect(); return { x: e.clientX - b.left, y: e.clientY - b.top }; };
 
+  // ----- tape measure -----
+  const typedCm = () => { const n = num(tape.typed); return n > 0 ? n / 10 : NaN; };
+  /** Aim the line being made at the pointer (snapped); in "type" mode a typed length fixes how long it is. */
+  const tapeAim = (p, e) => {
+    const from = tape.pending.a;
+    const s = snapTape(floor(), toWorld(p), from, 10 / view.s, e.altKey);
+    tape.snap = s;
+    tape.dir = { x: s.x, y: s.y };
+    const len = typedCm();
+    tape.pending.b = tape.mode === 'type' && len > 0 ? endAtLength(from, s, len) : { x: s.x, y: s.y };
+  };
+  const cancelTape = () => { tape.pending = null; tape.typed = ''; tape.snap = null; tape.hover = null; renderBanner(); renderCanvas(); };
+  const commitTape = () => {
+    const m = tape.pending;
+    tape.pending = null;
+    tape.typed = '';
+    tape.snap = null;
+    if (m && measureLength(m) >= 1) {
+      remember();
+      const made = newMeasure(m.a, m.b, refAt(floor(), m.a), refAt(floor(), m.b)); // an end that lands on a corner stays attached to it
+      measures().push(made);
+      sel = { type: 'measure', id: made.id };
+      save();
+    }
+    renderBanner();
+    renderPanel();
+    renderCanvas();
+  };
+  /** The tape end or body under the pointer (ends always; the body and the length label too). */
+  const measureAt = (p) => {
+    const w = toWorld(p);
+    for (const m of [...measures()].reverse()) {
+      const part = measureHit(m, w, 14 / view.s, 8 / view.s, tape.on);
+      if (part) return { m, part };
+      const mid = { x: (m.a.x + m.b.x) / 2, y: (m.a.y + m.b.y) / 2 };
+      if (Math.hypot(w.x - mid.x, w.y - mid.y) <= 16 / view.s) return { m, part: 'line' };
+    }
+    return null;
+  };
+
   svg.addEventListener('pointerdown', (e) => {
     svg.setPointerCapture(e.pointerId);
     pointers.set(e.pointerId, pt(e));
@@ -408,8 +484,35 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       place(type, w);
       return;
     }
-    const hit = hitTest(p);
     const snapshot = JSON.stringify(plan.floors);
+    if (tape.pending) { // the second click of a click-click measure
+      tapeAim(p, e);
+      commitTape();
+      return;
+    }
+    const mh = measureAt(p);
+    if (mh) { // pick up a tape: an end re-measures it, the body or label moves the whole tape
+      sel = { type: 'measure', id: mh.m.id };
+      drag = mh.part === 'line'
+        ? { kind: 'mmove', m: mh.m, a0: { ...mh.m.a }, b0: { ...mh.m.b }, w0: w, p0: p, snapshot }
+        : { kind: 'mend', m: mh.m, end: mh.part, p0: p, snapshot };
+      renderCanvas();
+      renderPanel();
+      return;
+    }
+    if (tape.on) {
+      const s = snapTape(floor(), w, null, 10 / view.s, e.altKey);
+      tape.pending = { a: { x: s.x, y: s.y }, b: { x: s.x, y: s.y } };
+      tape.snap = null;
+      tape.typed = '';
+      sel = null;
+      drag = { kind: 'tape', p0: p, moved: false };
+      renderBanner();
+      renderPanel();
+      renderCanvas();
+      return;
+    }
+    const hit = hitTest(p);
     if (hit?.kind === 'handle') {
       const start = floor().items.filter((it) => it.roomId === hit.room.id).map((it) => ({ it, dx: it.dx, dy: it.dy, at: it.at }));
       drag = { kind: 'resize', room: hit.room, corner: hit.corner, o: { ...hit.room }, start, w0: w, p0: p, snapshot };
@@ -443,7 +546,15 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
   });
 
   svg.addEventListener('pointermove', (e) => {
-    if (!pointers.has(e.pointerId)) return;
+    if (!pointers.has(e.pointerId)) { // a mouse moving over the plan with the tape out
+      if (tape.on && e.pointerType === 'mouse') {
+        const p = pt(e);
+        if (tape.pending) tapeAim(p, e);
+        else tape.hover = snapTape(floor(), toWorld(p), null, 10 / view.s, e.altKey);
+        renderCanvas();
+      }
+      return;
+    }
     pointers.set(e.pointerId, pt(e));
     if (!drag) return;
     if (drag.kind === 'pinch') {
@@ -464,8 +575,29 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       view.ty = drag.v0.ty + (p.y - drag.p0.y);
       return renderCanvas();
     }
+    if (drag.kind === 'tape') {
+      tapeAim(p, e);
+      return renderCanvas();
+    }
+    if (drag.kind === 'mend') {
+      const other = drag.end === 'a' ? drag.m.b : drag.m.a;
+      const sn = snapTape(floor(), toWorld(p), other, 10 / view.s, e.altKey);
+      drag.m[drag.end] = { x: sn.x, y: sn.y };
+      const ref = refAt(floor(), sn), key = drag.end === 'a' ? 'ra' : 'rb';
+      if (ref) drag.m[key] = ref; else delete drag.m[key]; // dropped on a corner: attached; dropped in the open: free
+      tape.hover = sn;
+      renderPanel();
+      return renderCanvas();
+    }
     const w = toWorld(p);
     const dx = w.x - drag.w0.x, dy = w.y - drag.w0.y;
+    if (drag.kind === 'mmove') {
+      delete drag.m.ra; // carried across the plan, so it lets go of its corners
+      delete drag.m.rb;
+      drag.m.a = { x: drag.a0.x + dx, y: drag.a0.y + dy };
+      drag.m.b = { x: drag.b0.x + dx, y: drag.b0.y + dy };
+      return renderCanvas();
+    }
     if (drag.kind === 'room') {
       const r = drag.room;
       r.x = snap(drag.o.x + dx);
@@ -506,11 +638,18 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       renderSummary();
     }
     drag = null;
+    if (tape.hover) { tape.hover = null; renderCanvas(); }
   };
   const endPointer = (e) => {
     clearTimeout(pressTimer);
     pointers.delete(e.pointerId);
     if (!drag) return;
+    if (drag.kind === 'tape') { // dragged from point to point: done. Just clicked: the line follows the pointer to a second click.
+      const dragged = drag.moved && tape.mode === 'drag' && e.type === 'pointerup';
+      drag = null;
+      if (dragged) commitTape();
+      return;
+    }
     if (e.type === 'pointerup' && drag.kind === 'item' && drag.button === 2 && !drag.moved && dims) {
       const it = drag.item; // a right-click on a door, window or radiator edits it
       drag = null;
@@ -646,6 +785,22 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     const finalWidth = typed > 0.5 ? Math.round(typed * 10) / 10 : width;
     return { width: finalWidth, choice: v, door: d.blind ? Math.min(door, finalWidth - 20) : door, hand };
   };
+  /** A new unit with the size and options chosen in the cabinet dialog (pick is null for plain fixtures). */
+  const makeCabinet = (type, pick, roomId) => {
+    const d = ITEMS[type];
+    const it = newPlanItem(type, { roomId });
+    if (pick) {
+      it.uw = pick.width;
+      if (d.corner) it.ud = pick.width;
+      if (d.styles) it.style = pick.choice;
+      if (d.patterns) it.pattern = pick.choice;
+      if (d.space) it.appliance = pick.choice;
+      if (d.blind) { it.door = pick.door; it.hand = pick.hand; }
+    }
+    setDepth(it, plan.settings); // carcass + gap + door front (and the end panels of an appliance space)
+    applyRot(it);
+    return it;
+  };
   const addCabinet = async (type) => {
     const d = ITEMS[type];
     const f = floor();
@@ -657,15 +812,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     const pick = await cabinetDialog(type);
     if (!pick) return;
     remember();
-    const it = newPlanItem(type, { roomId: r.id });
-    it.uw = pick.width;
-    if (d.corner) it.ud = pick.width;
-    if (d.styles) it.style = pick.choice;
-    if (d.patterns) it.pattern = pick.choice;
-    if (d.space) it.appliance = pick.choice;
-    if (d.blind) { it.door = pick.door; it.hand = pick.hand; }
-    setDepth(it, plan.settings); // carcass + gap + door front (and the end panels of an appliance space)
-    applyRot(it);
+    const it = makeCabinet(type, pick, r.id);
     clearSpot(r, f.items, it); // the middle of the room, or the nearest clear space
     autoRotate(r, it);
     settleItem(r, it);
@@ -744,17 +891,64 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
         'aria-pressed': String(placing === t),
         onclick: () => {
           if (ITEMS[t].sizes) return addCabinet(t); // units ask their size first, then land in the room
+          tape.on = false; // the tape and "tap to place" use the same banner
+          tape.pending = null;
           placing = placing === t ? null : t;
           renderToolbar();
         },
       }, `${ITEMS[t].emoji} ${ITEMS[t].label}`)))].filter(Boolean));
-    if (placing) {
+    renderBanner();
+  };
+
+  // ----- the banner over the plan: placing something, or the tape measure -----
+  const tapeBtn = h('button', { type: 'button', class: 'btn-small tape-btn', title: 'Tape measure (M)', onclick: () => setTape(!tape.on) }, '📏 Tape');
+  const setTape = (on) => {
+    tape.on = on;
+    tape.pending = null;
+    tape.typed = '';
+    tape.hover = null;
+    if (on) placing = null;
+    renderToolbar();
+    renderCanvas();
+  };
+  const renderBanner = () => {
+    tapeBtn.setAttribute('aria-pressed', String(tape.on));
+    if (tape.on) {
+      const modeBtn = (v, label) => h('button', { type: 'button', class: 'btn-small', 'aria-pressed': String(tape.mode === v), onclick: () => { tape.mode = v; tape.pending = null; tape.typed = ''; renderBanner(); renderCanvas(); } }, label);
+      let msg;
+      let typedBox = null;
+      if (tape.mode === 'type' && tape.pending) {
+        msg = 'Type the length, aim with the mouse, then press Enter or click';
+        typedBox = h('input', { type: 'text', inputmode: 'decimal', class: 'tape-input', placeholder: 'mm', 'aria-label': 'Length in millimetres', value: tape.typed, oninput: (e) => {
+          tape.typed = e.target.value;
+          const len = typedCm();
+          if (len > 0) tape.pending.b = endAtLength(tape.pending.a, tape.dir || { x: tape.pending.a.x + 1, y: tape.pending.a.y }, len);
+          renderCanvas();
+        }, onkeydown: (e) => {
+          if (e.key === 'Enter') { e.preventDefault(); if (typedCm() > 0) commitTape(); } else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cancelTape(); }
+        } });
+        setTimeout(() => typedBox.focus(), 0);
+      } else if (tape.pending) {
+        msg = 'Move to the end point and click (Alt = no snapping)';
+      } else {
+        msg = tape.mode === 'type' ? 'Click where the measurement starts' : 'Click or drag from one point to another (Alt = no snapping)';
+      }
+      banner.hidden = false;
+      banner.classList.add('tape-on');
+      banner.replaceChildren(...[
+        h('span', null, '📏 ', msg),
+        typedBox,
+        h('span', { class: 'tape-modes' }, modeBtn('drag', 'Measure'), modeBtn('type', 'Type length')),
+        h('button', { type: 'button', class: 'btn-small', onclick: () => setTape(false) }, 'Done')].filter(Boolean));
+    } else if (placing) {
       const d = ITEMS[placing];
+      banner.classList.remove('tape-on');
       banner.hidden = false;
       banner.replaceChildren(
         h('span', null, d.kind === 'wall' ? `Tap a wall to place the ${d.label.toLowerCase()}` : `Tap inside the room where the ${d.label.toLowerCase()} goes`),
         h('button', { type: 'button', class: 'btn-small', onclick: () => { placing = null; renderToolbar(); } }, 'Cancel'));
     } else {
+      banner.classList.remove('tape-on');
       banner.hidden = true;
     }
   };
@@ -797,8 +991,77 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     return h('label', { class: 'field' }, h('span', { class: 'field-label' }, label), input);
   };
   const delBtn = (label, fn) => h('button', { type: 'button', class: 'btn-danger btn-small', onclick: fn }, label);
+  const deleteMeasure = (mid) => {
+    const i = measures().findIndex((m) => m.id === mid);
+    if (i < 0) return;
+    remember();
+    measures().splice(i, 1);
+    sel = null;
+    save();
+    renderAll();
+  };
+  /** Put a unit against the end of a tape: inside (back along the tape) or outside (beyond the end). */
+  let tapeUnit = null;
+  const placeUnitAtEnd = async (m, side) => {
+    const type = tapeUnit;
+    const d = ITEMS[type];
+    const f = floor();
+    const pick = d.sizes ? await cabinetDialog(type) : null;
+    if (d.sizes && !pick) return;
+    remember();
+    const it = makeCabinet(type, pick, f.rooms[0].id);
+    if (!placeAtEnd(f, m, it, side)) return;
+    f.items.push(it);
+    sel = { type: 'item', id: it.id };
+    save();
+    renderAll();
+    toast(`${d.label} placed ${side === 'inside' ? 'inside' : 'outside'} the end of the tape`);
+  };
+  const CORNER = { nw: 'north-west', ne: 'north-east', sw: 'south-west', se: 'south-east' };
+  const refName = (f, ref) => {
+    if (ref.room) return `${f.rooms.find((r) => r.id === ref.room)?.name || 'room'} ${CORNER[ref.c]} corner`;
+    const it = f.items.find((i) => i.id === ref.item);
+    return it ? ITEMS[it.type].label.toLowerCase() : 'a unit';
+  };
+  const renderMeasurePanel = (m) => {
+    const info = h('p', { class: 'plan-figures' });
+    const attached = h('p', { class: 'hint' });
+    const f0 = floor();
+    const showInfo = () => {
+      const dx = Math.abs(m.b.x - m.a.x), dy = Math.abs(m.b.y - m.a.y);
+      info.textContent = `Angle ${measureAngle(m)}° · across ${mmText(dx)} · down ${mmText(dy)}`;
+      attached.textContent = `Start ${m.ra ? `attached to ${refName(f0, m.ra)}` : 'free'} · End ${m.rb ? `attached to ${refName(f0, m.rb)}` : 'free'}`;
+    };
+    const parts = [
+      h('strong', null, '📏 Tape measure'),
+      field('Length (mm)', String(Math.round(measureLength(m) * 10)), (v) => { const n = num(v); if (n > 0) { setLength(m, n / 10); showInfo(); } }, { inputmode: 'decimal' }),
+      info,
+      attached,
+      h('p', { class: 'hint' }, 'An end dropped on a corner stays attached and follows it when the room or unit moves; drop it in the open to let go. Drag either end to re-measure it (it clicks onto straight and 22.5° / 45° lines; hold Alt to float freely). Typing a length moves the far end.'),
+    ];
+    if (!dims) {
+      const types = orderedTools().filter((t) => ITEMS[t]?.kind === 'fixture' && t !== 'radiator');
+      if (!types.includes(tapeUnit)) tapeUnit = types[0] || null;
+      if (tapeUnit) {
+        parts.push(
+          selectField('Unit to fit at the far end', tapeUnit, types.map((t) => [t, `${ITEMS[t].emoji} ${ITEMS[t].label}`]), (v) => { tapeUnit = v; }, { placeholder: null }),
+          h('div', { class: 'btn-row' },
+            h('button', { type: 'button', class: 'btn-small btn-primary', title: 'The unit sits back along the tape, its edge on the far end', onclick: () => placeUnitAtEnd(m, 'inside') }, '◂│ Inside the end'),
+            h('button', { type: 'button', class: 'btn-small btn-primary', title: 'The unit sits beyond the far end, its edge on it', onclick: () => placeUnitAtEnd(m, 'outside') }, '│▸ Outside the end')));
+      }
+    }
+    else parts.push(h('p', { class: 'hint' }, 'Units can be fitted to the end of a tape on the Floor plan tab.'));
+    parts.push(h('div', { class: 'btn-row' }, delBtn('Delete measurement', () => deleteMeasure(m.id))));
+    panel.replaceChildren(...parts);
+    showInfo();
+  };
   const renderPanel = () => {
     const f = floor();
+    if (sel?.type === 'measure') {
+      const m = measureById(sel.id);
+      if (!m) { sel = null; return renderPanel(); }
+      return renderMeasurePanel(m);
+    }
     if (sel?.type === 'room') {
       const r = roomById(sel.id);
       if (!r) { sel = null; return renderPanel(); }
@@ -1018,6 +1281,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
   };
 
   const zoomBtns = h('div', { class: 'plan-zoom' },
+    tapeBtn,
     h('button', { type: 'button', class: 'btn-small', 'aria-label': 'Zoom in', onclick: () => zoomBy(1.25) }, '＋'),
     h('button', { type: 'button', class: 'btn-small', 'aria-label': 'Zoom out', onclick: () => zoomBy(0.8) }, '－'),
     h('button', { type: 'button', class: 'btn-small', onclick: fit }, '⤢ Fit'),
@@ -1148,7 +1412,11 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
       e.preventDefault();
       if (history.length) undo();
+    } else if (e.key.toLowerCase() === 'm' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      setTape(!tape.on);
     } else if (e.key === 'Escape') {
+      if (tape.pending) return cancelTape(); // first Esc drops the line being made, the next puts the tape away
+      if (tape.on) setTape(false);
       placing = null;
       sel = null;
       renderToolbar();
@@ -1157,6 +1425,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     } else if ((e.key === 'Delete' || e.key === 'Backspace') && sel) {
       e.preventDefault();
       const f = floor();
+      if (sel.type === 'measure') return deleteMeasure(sel.id);
       if (sel.type === 'item') {
         const i = f.items.findIndex((x) => x.id === sel.id);
         if (i < 0) return;

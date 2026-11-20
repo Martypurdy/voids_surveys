@@ -3,6 +3,7 @@ import { addressLines, jobTitle, fmtDate, fmtDateTime, slug, todayLocal, allPhot
 import { usedRows, usedMaterials, rowNumbers, materialSource, repairPhotos, rowPhotoNumbers } from '../repair.js';
 import { fileBase } from '../properties.js';
 import { ITEMS, roomFigures, floorArea, planArea, metres, sqm, openingGeometry, bounds, legend, cornerPoints, cabinetNumbers, cabinetText, frontEdge, cornerLabelPoint, blindGeometry, endPanels, panelLines, refreshPosts, refreshDepths, settingsLine, cabinetShapes, badgePoint, featureTags, describeFeature, serviceInfo } from '../plan.js';
+import { syncMeasures } from '../measure.js';
 import { sheetTotals, lineTotals, isBlankLine, gbp, money, LABOUR_BASIS } from '../pricing.js';
 import { UNITS, defectInfo, isSorCode, qtyText as unitQty } from '../data/parts.js';
 import { FEATURES, featuresOf } from '../data/features.js';
@@ -970,6 +971,7 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
     const px = (x) => ox + x * k, py = (yy) => oy + yy * k;
     const room = (id) => f.rooms.find((r) => r.id === id);
     refreshPosts(f); // corner posts fit the cabinets beside them
+    syncMeasures(f); // tape ends attached to corners are where those corners are now
     const nums = cabinetNumbers(f);
     // rooms
     doc.setFillColor(250, 251, 252);
@@ -1121,6 +1123,25 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
       font(6.5, 'bold', [90, 98, 106]);
       doc.text(metres(r.w), x + w / 2, yy + 3, { align: 'center' });
       if (hh > 10) doc.text(metres(r.h), x + 3, yy + hh / 2, { align: 'center', angle: 90 });
+    }
+    // tape measures: amber line with end ticks and the length alongside, drawn over everything else
+    for (const m of f.measures || []) {
+      const x1 = px(m.a.x), y1 = py(m.a.y), x2 = px(m.b.x), y2 = py(m.b.y);
+      const len = Math.hypot(m.b.x - m.a.x, m.b.y - m.a.y);
+      if (len < 1) continue;
+      const ux = (x2 - x1) / (len * k), uy = (y2 - y1) / (len * k); // unit vector on the page (mm)
+      doc.setDrawColor(214, 150, 0);
+      doc.setLineWidth(0.45);
+      doc.setLineDashPattern([], 0);
+      doc.line(x1, y1, x2, y2);
+      doc.setLineWidth(0.35);
+      for (const [ex, ey] of [[x1, y1], [x2, y2]]) doc.line(ex - uy * 1.3, ey + ux * 1.3, ex + uy * 1.3, ey - ux * 1.3); // end ticks
+      let ang = (Math.atan2(y2 - y1, x2 - x1) * 180) / Math.PI;
+      if (ang > 90) ang -= 180;
+      if (ang < -90) ang += 180;
+      const rad = (ang * Math.PI) / 180, nx = Math.sin(rad), ny = -Math.cos(rad); // a nudge to the side of the line the text sits on
+      font(7, 'bold', [120, 80, 0]);
+      doc.text(`${Math.round(len * 10).toLocaleString('en-GB')} mm`, (x1 + x2) / 2 + nx * 1.4, (y1 + y2) / 2 + ny * 1.4 + 0.8, { align: 'center', angle: -ang });
     }
     // 1 m scale bar
     const by = area.y + hgt + 4, bx = area.x + (area.w - bw * k) / 2 + pad * k, bar = 100 * k; // under the plan, lined up with its left edge

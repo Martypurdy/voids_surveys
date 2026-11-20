@@ -1663,3 +1663,26 @@ a.form-card { text-decoration: none; color: inherit; }
 
 /* Settings: Update button in the top bar */
 .update-btn { min-height: 40px; padding: 0 12px; border-radius: 12px; font-weight: 600; white-space: nowrap; }
+
+/* Designer: tape measure */
+.plan-svg .tape-l { stroke: #f2b705; stroke-width: 3; stroke-linecap: round; pointer-events: none; }
+.plan-svg .tape-l.sel { stroke: var(--primary); stroke-width: 3.5; }
+.plan-svg .tape-l.pend { stroke-dasharray: 6 4; }
+.plan-svg .tape-e { fill: #f2b705; stroke: #1f1f1f; stroke-width: 1.5; pointer-events: none; }
+.plan-svg .tape-e.sel { fill: #fff; stroke: var(--primary); stroke-width: 2.5; }
+.plan-svg .tape-lbl { fill: #fff6cc; stroke: #1f1f1f; stroke-width: 1; pointer-events: none; }
+.plan-svg .tape-lbl.sel { stroke: var(--primary); stroke-width: 2; }
+.plan-svg .tape-t { fill: #1f1f1f; font-size: 11px; font-weight: 700; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+.plan-svg .tape-guide { stroke: #f2b705; stroke-width: 1; stroke-dasharray: 2 5; opacity: .8; pointer-events: none; }
+.plan-svg .tape-snap { fill: none; stroke: var(--primary); stroke-width: 2; pointer-events: none; }
+.plan-zoom .tape-btn[aria-pressed="true"], .tape-modes button[aria-pressed="true"] { background: #f2b705; color: #1f1f1f; border-color: #1f1f1f; }
+.plan-banner.tape-on { flex-wrap: wrap; justify-content: flex-start; background: #fff6cc; color: #3b2f00; }
+.plan-banner.tape-on > span:first-child { flex: 1 1 200px; }
+.tape-modes { display: inline-flex; gap: 4px; }
+.tape-input { width: 6.5em; padding: 4px 8px; font: inherit; border: 2px solid #1f1f1f; border-radius: 8px; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .plan-banner.tape-on { background: #4a3c00; color: #ffe27a; }
+}
+:root[data-theme="dark"] .plan-banner.tape-on { background: #4a3c00; color: #ffe27a; }
+.plan-svg .tape-e.att { fill: #1f1f1f; stroke: #f2b705; stroke-width: 2.5; }
+.plan-svg .tape-e.att.sel { stroke: var(--primary); }
