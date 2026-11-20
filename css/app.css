@@ -1695,3 +1695,11 @@ a.form-card { text-decoration: none; color: inherit; }
 .plan-svg .marq.win { fill: rgb(60 110 255 / .10); stroke: #3c6eff; }
 .plan-svg .marq.cross { fill: rgb(40 160 90 / .12); stroke: #28a05a; stroke-dasharray: 6 4; }
 .plan-svg .centre-guide { stroke: #9b7bff; stroke-width: 1.2; stroke-dasharray: 6 4; opacity: .85; pointer-events: none; }
+
+/* Designer: end panels are solid boards; the tool buttons can be reordered */
+.plan-svg .fx.panel { fill: var(--plan-wall); stroke: var(--plan-wall); }
+.plan-tool.dragging { opacity: .55; outline: 2px dashed var(--primary); cursor: grabbing; }
+.plan-tool { cursor: grab; }
+.plan-tool-re { display: inline-flex; align-items: center; gap: 2px; border: 1px dashed var(--border); border-radius: 10px; padding: 1px 2px; }
+.plan-tool-re .plan-tool-name { font-size: .8rem; padding: 0 4px; }
+.plan-reorder[aria-pressed="true"] { background: var(--primary); color: #fff; border-color: transparent; }

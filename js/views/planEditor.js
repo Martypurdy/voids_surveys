@@ -10,7 +10,7 @@ import {
   ITEMS, PALETTE, ROOM_NAMES, FLOOR_NAMES, newPlanRoom, newFloor, newPlanItem, roomFigures, floorArea, planArea,
   metres, sqm, openingGeometry, nearestWall, wallSnap, wallLine, roomAt, bounds, settleItem, legend, cornerPoints, snapToUnits, isStructure,
   STYLES, PATTERNS, DOOR_OPTIONS, APPLIANCES, applyRot, rotateAbout, cabinetNumbers, cabinetText, frontEdge, cornerLabelPoint, autoRotate, clearSpot,
-  blindGeometry, refreshPosts, endPanels, panelLines, setDepth, refreshDepths,
+  blindGeometry, refreshPosts, panelLines, setDepth, refreshDepths, PANEL_THICKNESSES, PANEL_DEPTH,
   cabinetShapes, badgePoint, featureTags, placementDims, wallCorners, WALL_NAMES, DOOR_SIZES, WINDOW_SIZES, hingeSide, setHinge, radiatorWall, nearestRoom, clampItem, autoRadiator, snapToWallCentre, centreOpening,
 } from '../plan.js';
 import { shownLine, measureOffset, newMeasure, measureLength, measureAngle, mmText, snapTape, endAtLength, setLength, measureHit, placeAtEnd, refAt, syncMeasures, rootEnd } from '../measure.js';
@@ -121,7 +121,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       const d = ITEMS[it.type];
       if (!r || d.kind !== 'fixture') continue;
       const x = X(r.x + it.dx), y = Y(r.y + it.dy), w = it.w * s, hh = it.h * s;
-      const cls = `fx${d.dashed ? ' dashed' : ''}${isSel(it) ? ' sel glow' : ''}`; // selected units glow soft purple
+      const cls = `fx${d.dashed ? ' dashed' : ''}${d.panel ? ' panel' : ''}${isSel(it) ? ' sel glow' : ''}`; // selected units glow soft purple; end panels are solid boards
       const line = (c, a) => `<line class="${c}" x1="${x + a[0] * s}" y1="${y + a[1] * s}" x2="${x + a[2] * s}" y2="${y + a[3] * s}"/>`;
       if (d.corner) {
         out.push(`<polygon class="${cls}" points="${cornerPoints(it).map(([px, py]) => `${x + px * s},${y + py * s}`).join(' ')}"/>`);
@@ -141,7 +141,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
         const [bpx, bpy] = badgePoint(it);
         if (Math.min(w, hh) > 14) badge(x + bpx * s, y + bpy * s - (d.space && hh > 40 ? 6 : 0), nums.get(it.id));
         if (d.space && w > 40 && hh > 40) out.push(`<text class="fx-t" x="${x + w / 2}" y="${y + hh / 2 + 12}" font-size="9">${esc(it.appliance || '')}</text>`);
-      } else if (!d.filler && w > 34 && hh > 13) {
+      } else if (!d.filler && !d.panel && w > 34 && hh > 13) {
         out.push(`<text class="fx-t" x="${x + w / 2}" y="${y + hh / 2}" font-size="${Math.min(11, hh * 0.45, w / d.label.length * 1.9)}">${esc(d.label)}</text>`);
       }
     }
@@ -150,13 +150,6 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       out.push(guide.axis === 'x'
         ? `<line class="centre-guide" x1="${X(gr.x + guide.at)}" y1="${Y(gr.y)}" x2="${X(gr.x + guide.at)}" y2="${Y(gr.y + gr.h)}"/>`
         : `<line class="centre-guide" x1="${X(gr.x)}" y1="${Y(gr.y + guide.at)}" x2="${X(gr.x + gr.w)}" y2="${Y(gr.y + guide.at)}"/>`);
-    }
-    // end panels (thin, drawn at least 3 px so they show when zoomed out)
-    for (const p of endPanels(f, plan.settings)) {
-      const r = roomById(p.roomId);
-      if (!r) continue;
-      const pw = Math.max(p.w * s, 3), ph = Math.max(p.h * s, 3);
-      out.push(`<rect class="endp" x="${X(r.x + p.x) - (pw - p.w * s) / 2}" y="${Y(r.y + p.y) - (ph - p.h * s) / 2}" width="${pw}" height="${ph}"/>`);
     }
     for (const it of f.items) {
       const r = roomById(it.roomId);
@@ -937,8 +930,8 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     const parts = [];
     let doorField = null;
     let useOther = false;
-    const customInput = h('input', { type: 'text', inputmode: 'decimal', 'aria-label': 'Width in cm' });
-    const customLabel = h('label', { class: 'field' }, h('span', { class: 'field-label' }, 'Width (cm)'), customInput);
+    const customInput = h('input', { type: 'text', inputmode: 'decimal', 'aria-label': 'Width in mm' });
+    const customLabel = h('label', { class: 'field' }, h('span', { class: 'field-label' }, 'Width (mm)'), customInput);
     customLabel.hidden = true;
     const widthField = selectField('Width', String(width), [...d.sizes.map((n) => [String(n), `${n * 10} mm`]), ['other', 'Other…']], (v) => {
       useOther = v === 'other';
@@ -976,7 +969,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       buttons: [...choices.map((c) => ({ ...c, class: 'btn-primary btn-big' })), { label: 'Cancel', value: null }],
     });
     if (!v) return null;
-    const typed = useOther ? num(customInput.value) : NaN;
+    const typed = useOther ? num(customInput.value) / 10 : NaN; // typed in mm, kept in cm
     const finalWidth = typed > 0.5 ? Math.round(typed * 10) / 10 : width;
     return { width: finalWidth, choice: v, door: d.blind ? Math.min(door, finalWidth - 20) : door, hand };
   };
@@ -995,6 +988,52 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     setDepth(it, plan.settings); // carcass + gap + door front (and the end panels of an appliance space)
     applyRot(it);
     return it;
+  };
+  /** The End panel button: pick the thickness, and the panel lands beside the selected unit (or in the room, ready to drag). */
+  const addPanel = async (type) => {
+    const d = ITEMS[type];
+    const f = floor();
+    if (!f.rooms.length) return toast('Add the rooms on the Room dimensions tab first');
+    placing = null;
+    renderToolbar();
+    const board = Math.round((plan.settings.board || 18));
+    let thick = PANEL_THICKNESSES.includes(board) ? board : 18;
+    const v = await choose({
+      title: d.label,
+      message: `An end panel is a loose board for the exposed end of a unit, ${PANEL_DEPTH * 10} mm deep. It is its own part and never changes the unit's size.`,
+      content: h('div', null, selectField('Thickness', String(thick), PANEL_THICKNESSES.map((n) => [String(n), `${n} mm`]), (x) => { thick = Number(x); }, { placeholder: null })),
+      buttons: [{ label: 'Add', value: 'add', class: 'btn-primary btn-big' }, { label: 'Cancel', value: null }],
+    });
+    if (v !== 'add') return;
+    const centre = toWorld({ x: (canvas.clientWidth || 360) / 2, y: (canvas.clientHeight || 400) / 2 });
+    const beside = igroup().length === 1 ? f.items.find((i) => i.id === igroup()[0]) : null; // one unit selected: put it against that unit
+    const r = (beside && roomById(beside.roomId)) || roomAt(f.rooms, centre.x, centre.y) || f.rooms[0];
+    remember();
+    const it = newPlanItem(type, { roomId: r.id });
+    it.uw = thick / 10;
+    it.ud = PANEL_DEPTH;
+    applyRot(it);
+    clearSpot(r, f.items, it);
+    if (beside && ITEMS[beside.type].kind === 'fixture' && !ITEMS[beside.type].panel) {
+      it.rot = beside.rot || 0; // same way round as the unit, back to back with it
+      applyRot(it);
+      const across = (it.rot % 180 === 0);
+      const free = (x, y) => f.items.every((o) => o === it || o.roomId !== r.id || ITEMS[o.type].kind !== 'fixture' || ITEMS[o.type].run !== 'base' || x >= o.dx + o.w - 0.01 || x + it.w <= o.dx + 0.01 || y >= o.dy + o.h - 0.01 || y + it.h <= o.dy + 0.01);
+      const backY = (it.rot === 180 ? beside.dy + beside.h - it.h : beside.dy), backX = (it.rot === 90 ? beside.dx + beside.w - it.w : beside.dx);
+      const spots = across
+        ? [[beside.dx + beside.w, backY], [beside.dx - it.w, backY]]
+        : [[backX, beside.dy + beside.h], [backX, beside.dy - it.h]];
+      const spot = spots.find(([x, y]) => x >= 0 && y >= 0 && x + it.w <= r.w && y + it.h <= r.h && free(x, y));
+      if (spot) { it.dx = spot[0]; it.dy = spot[1]; }
+    } else {
+      autoRotate(r, it);
+    }
+    settleItem(r, it);
+    f.items.push(it);
+    sel = { type: 'item', id: it.id, ids: [it.id] };
+    save();
+    renderAll();
+    toast('End panel added – drag it against the end of a unit');
   };
   const addCabinet = async (type) => {
     const d = ITEMS[type];
@@ -1069,31 +1108,95 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
 
   // ----- toolbar -----
   const toolbar = h('div', { class: 'plan-tools' });
+  // The order of the tool buttons is the user's own: drag a button to a new place (mouse), or press Reorder and use the
+  // arrows (touch). Saved per device, per kind of plan and tab, as a list of tool names; tools not in the list yet
+  // (new ones) go after the others in their own group.
+  const TOOL_ORDER_KEY = 'voids.planTools';
+  const orderKey = `${kind}:${section}`;
+  const savedOrder = () => { try { return JSON.parse(localStorage.getItem(TOOL_ORDER_KEY) || '{}')[orderKey] || []; } catch { return []; } };
+  const storeOrder = (list) => { try { const all = JSON.parse(localStorage.getItem(TOOL_ORDER_KEY) || '{}'); all[orderKey] = list; localStorage.setItem(TOOL_ORDER_KEY, JSON.stringify(all)); } catch { /* storage blocked */ } };
+  const sortBySaved = (tools) => {
+    const saved = savedOrder();
+    const rank = (t) => { const i = saved.indexOf(t); return i < 0 ? 1000 + tools.indexOf(t) : i; };
+    return [...tools].sort((a, b) => rank(a) - rank(b));
+  };
+  let reordering = false; // the arrows are showing
+  let suppressClick = false; // set for a moment after a drag, so letting go does not also press the button
   // Floor plan tab: cabinets and their parts first, then the appliances.
   const orderedTools = () => {
     const all = PALETTE[kind].filter(editable);
-    if (dims) return all;
-    const parts = all.filter((t) => ITEMS[t].cab || ITEMS[t].filler);
-    const rest = all.filter((t) => !(ITEMS[t].cab || ITEMS[t].filler));
-    return parts.length && rest.length ? ['||', ...parts, '|', ...rest] : all;
+    if (dims) return sortBySaved(all);
+    const isPart = (t) => ITEMS[t].cab || ITEMS[t].filler || ITEMS[t].panel;
+    const parts = sortBySaved(all.filter(isPart));
+    const rest = sortBySaved(all.filter((t) => !isPart(t)));
+    return parts.length && rest.length ? ['||', ...parts, '|', ...rest] : sortBySaved(all);
+  };
+  const toolKeys = () => orderedTools().filter((t) => t !== '||' && t !== '|');
+  const groupOf = (t) => (dims ? 'all' : (ITEMS[t].cab || ITEMS[t].filler || ITEMS[t].panel) ? 'parts' : 'rest'); // buttons are reordered within their own group
+  const moveTool = (t, dir) => { // one place earlier (-1) or later (+1) within its group
+    const keys = toolKeys();
+    const g = keys.filter((k) => groupOf(k) === groupOf(t));
+    const i = g.indexOf(t), j = i + dir;
+    if (j < 0 || j >= g.length) return;
+    [g[i], g[j]] = [g[j], g[i]];
+    let n = 0;
+    storeOrder(keys.map((k) => (groupOf(k) === groupOf(t) ? g[n++] : k)));
+    renderToolbar();
+  };
+  const pressTool = (t) => {
+    if (suppressClick || reordering) return;
+    if (ITEMS[t].panel) return addPanel(t); // end panels ask their thickness
+    if (ITEMS[t].sizes) return addCabinet(t); // units ask their size first, then land in the room
+    tape.on = false; // the tape and "tap to place" use the same banner
+    tape.pending = null;
+    placing = placing === t ? null : t;
+    renderToolbar();
+  };
+  const toolButton = (t) => {
+    const label = `${ITEMS[t].emoji} ${ITEMS[t].label}`;
+    if (reordering) {
+      return h('span', { class: 'plan-tool-re' },
+        h('button', { type: 'button', class: 'btn-small', 'aria-label': `Move ${ITEMS[t].label} earlier`, onclick: () => moveTool(t, -1) }, '◀'),
+        h('span', { class: 'plan-tool-name' }, label),
+        h('button', { type: 'button', class: 'btn-small', 'aria-label': `Move ${ITEMS[t].label} later`, onclick: () => moveTool(t, 1) }, '▶'));
+    }
+    return h('button', { type: 'button', class: 'btn-small plan-tool', 'data-tool': t, 'data-grp': groupOf(t), title: 'Drag to put it where you want it', 'aria-pressed': String(placing === t), onclick: () => pressTool(t) }, label);
   };
   const renderToolbar = () => {
     toolbar.replaceChildren(...[
       dims ? h('button', { type: 'button', class: 'btn-primary btn-small', onclick: addRoom }, '+ Room') : null,
-      ...orderedTools().map((t) => (t === '||' ? h('span', { class: 'plan-sep lead' }, 'Cabinets') : t === '|' ? h('span', { class: 'plan-sep' }, 'Appliances') : h('button', {
-        type: 'button',
-        class: 'btn-small plan-tool',
-        'aria-pressed': String(placing === t),
-        onclick: () => {
-          if (ITEMS[t].sizes) return addCabinet(t); // units ask their size first, then land in the room
-          tape.on = false; // the tape and "tap to place" use the same banner
-          tape.pending = null;
-          placing = placing === t ? null : t;
-          renderToolbar();
-        },
-      }, `${ITEMS[t].emoji} ${ITEMS[t].label}`)))].filter(Boolean));
+      ...orderedTools().map((t) => (t === '||' ? h('span', { class: 'plan-sep lead' }, 'Cabinets') : t === '|' ? h('span', { class: 'plan-sep' }, 'Appliances') : toolButton(t))),
+      h('button', { type: 'button', class: 'btn-small plan-reorder', 'aria-pressed': String(reordering), title: 'Put the buttons in your own order', onclick: () => { reordering = !reordering; renderToolbar(); } }, reordering ? '✓ Done' : '↕ Reorder')].filter(Boolean));
     renderBanner();
   };
+  // Mouse (or pen): press a tool button and drag it over another to swap places; the new order is kept.
+  toolbar.addEventListener('pointerdown', (e) => {
+    const btn = e.target.closest?.('.plan-tool');
+    if (!btn || e.button !== 0 || e.pointerType === 'touch' || reordering) return;
+    const from = { x: e.clientX, y: e.clientY };
+    let dragging = false;
+    const move = (ev) => {
+      if (!dragging && Math.hypot(ev.clientX - from.x, ev.clientY - from.y) < 6) return;
+      dragging = true;
+      btn.classList.add('dragging');
+      const under = document.elementFromPoint(ev.clientX, ev.clientY)?.closest?.('.plan-tool');
+      if (!under || under === btn || under.dataset.grp !== btn.dataset.grp) return;
+      if (under.compareDocumentPosition(btn) & Node.DOCUMENT_POSITION_FOLLOWING) under.before(btn); else under.after(btn);
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      if (!dragging) return;
+      suppressClick = true;
+      setTimeout(() => { suppressClick = false; }, 80);
+      storeOrder([...toolbar.querySelectorAll('.plan-tool')].map((b) => b.dataset.tool));
+      renderToolbar();
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+  });
 
   // ----- the banner over the plan: placing something, or the tape measure -----
   const tapeBtn = h('button', { type: 'button', class: 'btn-small tape-btn', title: 'Tape measure (M). Right-click on the plan puts it away', onclick: () => setTape(!tape.on) }, '📏 Tape');
@@ -1353,7 +1456,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
           if (leaves === 1) parts.push(selectField('Hinged on (seen from inside)', hingeSide(it), [['left', 'Left'], ['right', 'Right']], (v) => change(() => setHinge(it, v)), { placeholder: null }));
           parts.push(selectField('Opens', it.out ? 'out' : 'in', [['in', 'Into the room'], ['out', 'Out of the room']], (v) => change(() => { it.out = v === 'out'; }), { placeholder: null }));
         } else {
-          parts.push(field('Width (cm)', String(it.size), (v) => { const n = num(v); if (n > 10) it.size = Math.round(n); }, { inputmode: 'decimal' }));
+          parts.push(field('Width (mm)', String(Math.round(it.size * 10)), (v) => { const n = num(v) / 10; if (n > 10) it.size = Math.round(n * 10) / 10; }, { inputmode: 'decimal' }));
         }
         parts.push(h('div', { class: 'btn-row' },
           h('button', { type: 'button', class: 'btn-small btn-primary', onclick: () => editFeature(it) }, '✎ Edit details'),
@@ -1365,7 +1468,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
         const r = roomById(it.roomId);
         if (d.facing) {
           const refit = () => { applyRot(it); settleItem(r, it); snapToUnits(r, f.items, it); save(); };
-          const minCm = d.filler ? 0.5 : 5;
+          const minCm = d.filler ? 0.5 : 5; // (cm; people type millimetres)
           const setWidth = (n) => {
             it.uw = n;
             if (d.corner) it.ud = n;
@@ -1374,7 +1477,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
           if (d.sizes) {
             const widthNow = it.uw;
             const opts = d.sizes.includes(widthNow) ? d.sizes : [...d.sizes, widthNow].sort((x, y) => x - y);
-            const custom = field(d.corner ? 'Size (cm)' : 'Width (cm)', String(widthNow), (v) => { const n = num(v); if (n > minCm) { setWidth(d.filler ? Math.round(n * 10) / 10 : Math.round(n)); refit(); } }, { inputmode: 'decimal' });
+            const custom = field(d.corner ? 'Size (mm)' : 'Width (mm)', String(Math.round(widthNow * 10)), (v) => { const n = num(v) / 10; if (n > minCm) { setWidth(Math.round(n * 10) / 10); refit(); } }, { inputmode: 'decimal' });
             custom.hidden = true;
             parts.push(selectField('Unit width', String(widthNow), [...opts.map((n) => [String(n), `${n * 10} mm`]), ['other', 'Other…']], (v) => {
               if (v === 'other') {
@@ -1389,13 +1492,20 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
             }, { placeholder: null }), custom);
             if (!d.corner) {
               parts.push(d.fronted
-                ? field('Carcass depth (cm)', String(it.cd), (v) => { const n = num(v); if (n > 5) { it.cd = Math.round(n * 10) / 10; setDepth(it, plan.settings); refit(); } }, { inputmode: 'decimal' })
-                : field('Depth (cm)', String(it.ud), (v) => { const n = num(v); if (n > 5) { it.ud = Math.round(n); refit(); } }, { inputmode: 'decimal' }));
+                ? field('Carcass depth (mm)', String(Math.round(it.cd * 10)), (v) => { const n = num(v) / 10; if (n > 5) { it.cd = Math.round(n * 10) / 10; setDepth(it, plan.settings); refit(); } }, { inputmode: 'decimal' })
+                : field('Depth (mm)', String(Math.round(it.ud * 10)), (v) => { const n = num(v) / 10; if (n > 5) { it.ud = Math.round(n * 10) / 10; refit(); } }, { inputmode: 'decimal' }));
             }
+          } else if (d.panel) { // an end panel: its thickness (16 / 18 / 22 mm) and depth; it never changes the unit beside it
+            const thickNow = Math.round(it.uw * 10);
+            const thicks = PANEL_THICKNESSES.includes(thickNow) ? PANEL_THICKNESSES : [...PANEL_THICKNESSES, thickNow].sort((x, y) => x - y);
+            parts.push(
+              selectField('Thickness', String(thickNow), thicks.map((n) => [String(n), `${n} mm`]), (v) => { remember(); it.uw = Number(v) / 10; refit(); renderAll(); }, { placeholder: null }),
+              field('Depth (mm)', String(Math.round(it.ud * 10)), (v) => { const n = num(v) / 10; if (n > 5) { it.ud = Math.round(n * 10) / 10; refit(); } }, { inputmode: 'decimal' }),
+              h('p', { class: 'hint' }, `A loose board for the exposed end of a unit, ${Math.round(it.ud * 10)} mm deep so it lines up with the doors. Drag it against the unit's end and it closes up flush; the unit itself keeps its size.`));
           } else {
             parts.push(h('div', { class: 'grid-2' },
-              field('Width (cm)', String(it.uw), (v) => { const n = num(v); if (n > 5) { it.uw = Math.round(n); refit(); } }, { inputmode: 'decimal' }),
-              field('Depth (cm)', String(it.ud), (v) => { const n = num(v); if (n > 5) { it.ud = Math.round(n); refit(); } }, { inputmode: 'decimal' })));
+              field('Width (mm)', String(Math.round(it.uw * 10)), (v) => { const n = num(v) / 10; if (n > 5) { it.uw = Math.round(n * 10) / 10; refit(); } }, { inputmode: 'decimal' }),
+              field('Depth (mm)', String(Math.round(it.ud * 10)), (v) => { const n = num(v) / 10; if (n > 5) { it.ud = Math.round(n * 10) / 10; refit(); } }, { inputmode: 'decimal' })));
           }
           if (d.styles) parts.push(selectField('Type', it.style || 'door', Object.entries(STYLES), (v) => { remember(); it.style = v; save(); renderAll(); }, { placeholder: null }));
           if (d.patterns) parts.push(selectField('Door pattern', it.pattern || PATTERNS[0], PATTERNS, (v) => { remember(); it.pattern = v; save(); renderAll(); }, { placeholder: null }));
@@ -1408,23 +1518,13 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
               h('p', { class: 'hint' }, `Corner post: ${Math.round((it.post ?? 7) * 10)} mm – it resizes itself to meet the cabinet beside the blind end.`));
           }
           if (d.space) parts.push(selectField('Appliance', it.appliance || APPLIANCES[0], APPLIANCES, (v) => { remember(); it.appliance = v; save(); renderAll(); }, { placeholder: null }));
-          if (d.cab && !d.corner && !d.space) {
-            const ends = it.endL && it.endR ? 'both' : it.endL ? 'left' : it.endR ? 'right' : 'none';
-            parts.push(selectField('End panels (seen from the front)', ends, [['none', 'None'], ['left', 'Left end'], ['right', 'Right end'], ['both', 'Both ends']], (v) => {
-              remember();
-              it.endL = v === 'left' || v === 'both';
-              it.endR = v === 'right' || v === 'both';
-              save();
-              renderAll();
-            }, { placeholder: null }));
-          }
           if (d.fronted) {
             parts.push(h('p', { class: 'hint' }, d.space
-              ? `Clear space ${Math.round(it.uw * 10)} mm between two ${plan.settings.board} mm end panels (${Math.round((it.uw + it.ew) * 10)} mm in all).`
+              ? `Clear space ${Math.round(it.uw * 10)} mm. Add end panels beside it with the End panel button.`
               : `Depth on the plan: ${Math.round(it.ud * 10)} mm = ${Math.round(it.cd * 10)} mm carcass + 2 mm gap + ${plan.settings.front} mm front.`));
           }
           const n = cabinetNumbers(f).get(it.id);
-          parts.push(h('p', { class: 'hint' }, `${n ? `No. ${n} on the key. ` : d.filler ? 'Listed under the key. ' : ''}It turns its back to the nearest wall by itself – use Turn for a special detail.${d.space ? ' End panels are added either side automatically.' : ''}`));
+          parts.push(h('p', { class: 'hint' }, `${n ? `No. ${n} on the key. ` : d.filler ? 'Listed under the key. ' : ''}It turns its back to the nearest wall by itself – use Turn for a special detail.`));
           parts.push(h('div', { class: 'btn-row' },
             h('button', { type: 'button', class: 'btn-small', onclick: () => {
               remember();
@@ -1438,8 +1538,8 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
             removeIt));
         } else {
           parts.push(h('div', { class: 'grid-2' },
-            field('Width (cm)', String(it.w), (v) => { const n = num(v); if (n > 5) { it.w = Math.round(n); settleItem(r, it); } }, { inputmode: 'decimal' }),
-            field('Depth (cm)', String(it.h), (v) => { const n = num(v); if (n > 5) { it.h = Math.round(n); settleItem(r, it); } }, { inputmode: 'decimal' })));
+            field('Width (mm)', String(Math.round(it.w * 10)), (v) => { const n = num(v) / 10; if (n > 5) { it.w = Math.round(n * 10) / 10; settleItem(r, it); } }, { inputmode: 'decimal' }),
+            field('Depth (mm)', String(Math.round(it.h * 10)), (v) => { const n = num(v) / 10; if (n > 5) { it.h = Math.round(n * 10) / 10; settleItem(r, it); } }, { inputmode: 'decimal' })));
           parts.push(h('div', { class: 'btn-row' },
             it.type === 'radiator' ? h('button', { type: 'button', class: 'btn-small btn-primary', onclick: () => editFeature(it) }, '✎ Edit details') : null,
             h('button', { type: 'button', class: 'btn-small', onclick: () => { remember(); [it.w, it.h] = [it.h, it.w]; if (it.type === 'radiator') it.manual = true; settleItem(r, it); save(); renderAll(); } }, '⟳ Turn'),
@@ -1469,7 +1569,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
   const summary = h('div', { class: 'plan-summary' });
   const renderSummary = () => {
     const key = dims ? legend([floor()]) : []; // services are not shown over the layout
-    const appliances = dims ? [] : floor().items.filter((i) => ITEMS[i.type].facing && !ITEMS[i.type].cab && !ITEMS[i.type].filler);
+    const appliances = dims ? [] : floor().items.filter((i) => ITEMS[i.type].facing && !ITEMS[i.type].cab && !ITEMS[i.type].filler && !ITEMS[i.type].panel);
     const nums = cabinetNumbers(floor());
     const cabs = floor().items.filter((it) => nums.has(it.id));
     const extras = panelLines(floor(), plan.settings);
@@ -1487,7 +1587,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
   const renderSettings = () => {
     const st = plan.settings;
     settingsCard.hidden = dims || !PALETTE[kind].some((t) => ITEMS[t].fronted);
-    const options = (v) => [...new Set([18, 22, v])].sort((a, b) => a - b).map((n) => [String(n), `${n} mm`]);
+    const options = (v, list = [18, 22]) => [...new Set([...list, v])].sort((a, b) => a - b).map((n) => [String(n), `${n} mm`]);
     const change = (key, v) => {
       remember();
       st[key] = Number(v);
@@ -1498,7 +1598,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       h('strong', null, 'Board thickness'),
       h('div', { class: 'grid-2' },
         selectField('Doors and drawer fronts', String(st.front), options(st.front), (v) => change('front', v), { placeholder: null }),
-        selectField('End panels and fillers', String(st.board), options(st.board), (v) => change('board', v), { placeholder: null })));
+        selectField('Fillers and new end panels', String(st.board), options(st.board, PANEL_THICKNESSES), (v) => change('board', v), { placeholder: null })));
   };
 
   const renderAll = () => {

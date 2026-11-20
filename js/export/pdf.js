@@ -2,7 +2,7 @@
 import { addressLines, jobTitle, fmtDate, fmtDateTime, slug, todayLocal, allPhotoIds, worksSummary, roomStatus, roomAreas, serviceTitle, hasMeterDoor, isRtl, isPrice, isPlan, isRepair, isRams, isCalc, isDoc, formOf, textLines } from '../model.js';
 import { usedRows, usedMaterials, rowNumbers, materialSource, repairPhotos, rowPhotoNumbers } from '../repair.js';
 import { fileBase } from '../properties.js';
-import { ITEMS, roomFigures, floorArea, planArea, metres, sqm, openingGeometry, bounds, legend, cornerPoints, cabinetNumbers, cabinetText, frontEdge, cornerLabelPoint, blindGeometry, endPanels, panelLines, refreshPosts, refreshDepths, settingsLine, cabinetShapes, badgePoint, featureTags, describeFeature, serviceInfo } from '../plan.js';
+import { ITEMS, roomFigures, floorArea, planArea, metres, sqm, openingGeometry, bounds, legend, cornerPoints, cabinetNumbers, cabinetText, frontEdge, cornerLabelPoint, blindGeometry, panelLines, refreshPosts, refreshDepths, settingsLine, cabinetShapes, badgePoint, featureTags, describeFeature, serviceInfo } from '../plan.js';
 import { syncMeasures, measuresOn } from '../measure.js';
 import { sheetTotals, lineTotals, isBlankLine, gbp, money, LABOUR_BASIS } from '../pricing.js';
 import { UNITS, defectInfo, isSorCode, qtyText as unitQty } from '../data/parts.js';
@@ -936,7 +936,7 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
       }
       if (cabs.length || extras.length) c2.text(settingsLine(plan.settings), { size: 8, rgb: [110, 118, 126], gap: 1 });
       // appliances come after the cabinets and their parts
-      const appliances = units.filter((it) => ITEMS[it.type].facing && !ITEMS[it.type].cab && !ITEMS[it.type].filler);
+      const appliances = units.filter((it) => ITEMS[it.type].facing && !ITEMS[it.type].cab && !ITEMS[it.type].filler && !ITEMS[it.type].panel);
       if (appliances.length) {
         c2.heading('Appliances');
         for (const it of appliances) c2.text(`${ITEMS[it.type].label}, ${Math.round(it.uw * 10)} x ${Math.round(it.ud * 10)} mm`, { gap: 0.3 });
@@ -994,7 +994,7 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
       doc.setLineWidth(0.25);
       doc.setDrawColor(70, 80, 90);
       if (d.dashed) doc.setLineDashPattern([1, 0.8], 0);
-      doc.setFillColor(236, 241, 246);
+      doc.setFillColor(...(d.panel ? [40, 48, 56] : [236, 241, 246])); // end panels are solid boards
       if (d.corner) {
         const pts = cornerPoints(it).map(([ux, uy]) => [px(r.x + it.dx + ux), py(r.y + it.dy + uy)]);
         doc.lines(pts.slice(1).concat([pts[0]]).map((p, i) => [p[0] - pts[i][0], p[1] - pts[i][1]]), pts[0][0], pts[0][1], [1, 1], d.dashed ? 'S' : 'FD', true);
@@ -1037,7 +1037,7 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
       } else {
         doc.rect(bx, by, w, hh, d.dashed ? 'S' : 'FD');
         doc.setLineDashPattern([], 0);
-        if (d.facing && !d.space) {
+        if (d.facing && !d.space && !d.panel) {
           const [x1, y1, x2, y2] = frontEdge(it);
           doc.setDrawColor(...BRAND);
           doc.setLineWidth(d.cab ? 0.7 : 0.4);
@@ -1051,17 +1051,11 @@ export async function buildPdf(job, { includeCode = false, onProgress = () => {}
           font(6, 'normal', [60, 68, 76]);
           doc.text(clean(it.appliance || ''), bx + w / 2, by + hh / 2 + 4, { align: 'center' });
         }
-      } else if (!d.filler && w > 7 && hh > 2.5) {
+      } else if (!d.filler && !d.panel && w > 7 && hh > 2.5) {
         font(Math.min(6.5, hh * 2), 'normal', [40, 48, 56]);
         const label = doc.splitTextToSize(clean(mode === 'room' && tags.has(it.id) ? tags.get(it.id) : d.label), w - 1)[0];
         doc.text(label, bx + w / 2, by + hh / 2 + 0.8, { align: 'center' });
       }
-    }
-    // end panels (layout page)
-    doc.setFillColor(40, 48, 56);
-    for (const p of mode === 'layout' ? endPanels(f, job.plan.settings) : []) {
-      const r = room(p.roomId);
-      if (r) doc.rect(px(r.x + p.x), py(r.y + p.y), Math.max(p.w * k, 0.4), Math.max(p.h * k, 0.4), 'F');
     }
     // doors and windows
     for (const it of f.items) {
