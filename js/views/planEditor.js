@@ -237,6 +237,10 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     } else if (tape.hover?.snap) {
       out.push(`<circle class="tape-snap" cx="${X(tape.hover.x)}" cy="${Y(tape.hover.y)}" r="9"/>`);
     }
+    if (drag?.kind === 'marquee' && drag.moved) { // the selection box: solid when it will take only what is inside, dashed when it takes anything it touches
+      const q = drag.p0, r2 = drag.p1;
+      out.push(`<rect class="marq ${r2.y < q.y ? 'cross' : 'win'}" x="${Math.min(q.x, r2.x)}" y="${Math.min(q.y, r2.y)}" width="${Math.abs(r2.x - q.x)}" height="${Math.abs(r2.y - q.y)}"/>`);
+    }
     // Corner handles (drag both ways) and edge-middle handles (one way only) on the selected room.
     if (sel?.type === 'room') {
       const r = roomById(sel.id);
@@ -490,6 +494,13 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
   };
 
   svg.addEventListener('pointerdown', (e) => {
+    if (e.button === 1 || (e.button === 2 && e.shiftKey)) { // the mouse wheel held down, or Shift + the right button, moves the view
+      e.preventDefault();
+      svg.setPointerCapture(e.pointerId);
+      pointers.set(e.pointerId, pt(e));
+      if (pointers.size === 1) drag = { kind: 'pan', p0: pt(e), v0: { ...view }, button: e.button };
+      return;
+    }
     if (e.button === 2 && tape.on) { // right button puts the tape away (and drops a line half made)
       drag = null;
       setTape(false);
@@ -588,9 +599,12 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     } else if (hit?.kind === 'room') {
       sel = { type: 'room', id: hit.room.id };
       drag = { kind: 'room', room: hit.room, o: { x: hit.room.x, y: hit.room.y }, w0: w, p0: p, snapshot };
-    } else {
+    } else if (e.pointerType === 'touch') {
       sel = null;
-      drag = { kind: 'pan', p0: p, v0: { ...view } };
+      drag = { kind: 'pan', p0: p, v0: { ...view } }; // a finger still drags the view (there is no wheel button on a phone)
+    } else { // mouse or pen: drag a box round the units to select
+      if (!e.shiftKey) sel = null;
+      drag = { kind: 'marquee', p0: p, p1: p, shift: e.shiftKey, w0: w };
     }
     drag.button = e.button; // 2 = right button
     clearTimeout(pressTimer);
@@ -637,6 +651,10 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     if (drag.kind === 'pan') {
       view.tx = drag.v0.tx + (p.x - drag.p0.x);
       view.ty = drag.v0.ty + (p.y - drag.p0.y);
+      return renderCanvas();
+    }
+    if (drag.kind === 'marquee') {
+      drag.p1 = p;
       return renderCanvas();
     }
     if (drag.kind === 'tape') {
@@ -720,6 +738,26 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     clearTimeout(pressTimer);
     pointers.delete(e.pointerId);
     if (!drag) return;
+    if (drag.kind === 'marquee') { // a box drawn down: units wholly inside; drawn up: every unit it touches
+      const d = drag;
+      drag = null;
+      if (d.moved && e.type === 'pointerup') {
+        const a = toWorld(d.p0), b = toWorld(d.p1);
+        const x0 = Math.min(a.x, b.x), x1 = Math.max(a.x, b.x), y0 = Math.min(a.y, b.y), y1 = Math.max(a.y, b.y);
+        const touching = d.p1.y < d.p0.y;
+        const hits = floor().items.filter((it) => {
+          const r = roomById(it.roomId);
+          if (!r || ITEMS[it.type].kind !== 'fixture' || !editable(it.type)) return false;
+          const bx0 = r.x + it.dx, by0 = r.y + it.dy, bx1 = bx0 + it.w, by1 = by0 + it.h;
+          return touching ? bx1 >= x0 && bx0 <= x1 && by1 >= y0 && by0 <= y1 : bx0 >= x0 && bx1 <= x1 && by0 >= y0 && by1 <= y1;
+        }).map((it) => it.id);
+        const ids = [...new Set([...(d.shift ? igroup() : []), ...hits])];
+        sel = ids.length ? { type: 'item', id: ids[ids.length - 1], ids } : null;
+      }
+      renderCanvas();
+      renderPanel();
+      return;
+    }
     if (drag.kind === 'mend' && drag.chain && !drag.moved && e.type === 'pointerup') { // clicked (not dragged) an end: carry on from it
       const d = drag;
       drag = null;
@@ -760,6 +798,8 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     finishDrag();
   };
   svg.addEventListener('contextmenu', (e) => e.preventDefault());
+  svg.addEventListener('mousedown', (e) => { if (e.button === 1) e.preventDefault(); }); // no autoscroll circle when panning with the wheel button
+  svg.addEventListener('auxclick', (e) => e.preventDefault());
   svg.addEventListener('pointerup', endPointer);
   svg.addEventListener('pointercancel', endPointer);
   svg.addEventListener('wheel', (e) => {
