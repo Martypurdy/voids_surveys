@@ -11,7 +11,7 @@ import {
   metres, sqm, openingGeometry, nearestWall, wallSnap, wallLine, roomAt, bounds, settleItem, legend, cornerPoints, snapToUnits, isStructure,
   STYLES, PATTERNS, DOOR_OPTIONS, APPLIANCES, applyRot, rotateAbout, cabinetNumbers, cabinetText, frontEdge, cornerLabelPoint, autoRotate, clearSpot,
   blindGeometry, refreshPosts, endPanels, panelLines, setDepth, refreshDepths,
-  cabinetShapes, badgePoint, featureTags, placementDims, wallCorners, WALL_NAMES, DOOR_SIZES, WINDOW_SIZES, hingeSide, setHinge, radiatorWall, nearestRoom, clampItem,
+  cabinetShapes, badgePoint, featureTags, placementDims, wallCorners, WALL_NAMES, DOOR_SIZES, WINDOW_SIZES, hingeSide, setHinge, radiatorWall, nearestRoom, clampItem, autoRadiator, snapToWallCentre, centreOpening,
 } from '../plan.js';
 import { shownLine, measureOffset, newMeasure, measureLength, measureAngle, mmText, snapTape, endAtLength, setLength, measureHit, placeAtEnd, refAt, syncMeasures, rootEnd } from '../measure.js';
 
@@ -41,9 +41,11 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
   let fitted = false;
   // Tape measure: always on offer. mode 'drag' = click / drag from point to point; mode 'type' = click a start,
   // type the length, and that sets the end. pending = the line being made; hover = last pointer spot.
+  let guide = null; // the dashed line shown while a unit is clicked onto the middle of its wall: { room, axis, at }
   const tape = { on: false, mode: 'drag', pending: null, typed: '', hover: null, snap: null, dir: null };
   const allMeasures = () => (floor().measures ||= []);
   const measures = () => allMeasures().filter((m) => (m.page || 'dimensions') === section); // each tab keeps its own tapes
+  const rgroup = () => (sel?.type === 'room' ? sel.ids || [sel.id] : []); // the selected rooms (shift-click adds more)
   const igroup = () => (sel?.type === 'item' ? sel.ids || [sel.id] : []); // the selected units (shift-click adds more)
   const group = () => (sel?.type === 'measure' ? sel.ids || [sel.id] : []); // the selected tapes (shift-click adds more)
   const measureById = (mid) => measures().find((m) => m.id === mid);
@@ -106,7 +108,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     const f = floor();
     syncMeasures(f); // attached tape ends follow their corners
     for (const r of f.rooms) {
-      out.push(`<rect class="room${sel?.type === 'room' && sel.id === r.id ? ' sel' : ''}" x="${X(r.x)}" y="${Y(r.y)}" width="${r.w * s}" height="${r.h * s}"/>`);
+      out.push(`<rect class="room${rgroup().includes(r.id) ? ' sel glow' : ''}" x="${X(r.x)}" y="${Y(r.y)}" width="${r.w * s}" height="${r.h * s}"/>`);
     }
     const isSel = (it) => igroup().includes(it.id);
     refreshPosts(f);
@@ -143,6 +145,12 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
         out.push(`<text class="fx-t" x="${x + w / 2}" y="${y + hh / 2}" font-size="${Math.min(11, hh * 0.45, w / d.label.length * 1.9)}">${esc(d.label)}</text>`);
       }
     }
+    if (guide && drag?.kind === 'item') { // the middle of the wall the unit has clicked onto
+      const gr = guide.room;
+      out.push(guide.axis === 'x'
+        ? `<line class="centre-guide" x1="${X(gr.x + guide.at)}" y1="${Y(gr.y)}" x2="${X(gr.x + guide.at)}" y2="${Y(gr.y + gr.h)}"/>`
+        : `<line class="centre-guide" x1="${X(gr.x)}" y1="${Y(gr.y + guide.at)}" x2="${X(gr.x + gr.w)}" y2="${Y(gr.y + guide.at)}"/>`);
+    }
     // end panels (thin, drawn at least 3 px so they show when zoomed out)
     for (const p of endPanels(f, plan.settings)) {
       const r = roomById(p.roomId);
@@ -158,11 +166,11 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       out.push(`<line class="gap" ${seg}/>`);
       if (it.type === 'door') {
         for (const lf of g.leaves) {
-          out.push(`<line class="leaf${isSel(it) ? ' sel' : ''}" x1="${X(lf.hinge.x)}" y1="${Y(lf.hinge.y)}" x2="${X(lf.leaf.x)}" y2="${Y(lf.leaf.y)}"/>`);
-          out.push(`<polyline class="swing${isSel(it) ? ' sel' : ''}" points="${lf.arc.map((p) => `${X(p.x)},${Y(p.y)}`).join(' ')}"/>`);
+          out.push(`<line class="leaf${isSel(it) ? ' sel glow' : ''}" x1="${X(lf.hinge.x)}" y1="${Y(lf.hinge.y)}" x2="${X(lf.leaf.x)}" y2="${Y(lf.leaf.y)}"/>`);
+          out.push(`<polyline class="swing${isSel(it) ? ' sel glow' : ''}" points="${lf.arc.map((p) => `${X(p.x)},${Y(p.y)}`).join(' ')}"/>`);
         }
       } else {
-        out.push(`<line class="win${isSel(it) ? ' sel' : ''}" ${seg}/>`, `<line class="win-in" ${seg}/>`);
+        out.push(`<line class="win${isSel(it) ? ' sel glow' : ''}" ${seg}/>`, `<line class="win-in" ${seg}/>`);
       }
       if (dims && tags.has(it.id)) out.push(`<text class="tag" x="${X((g.a.x + g.b.x) / 2) + g.L.nx * 18}" y="${Y((g.a.y + g.b.y) / 2) + g.L.ny * 18}">${tags.get(it.id)}</text>`);
     }
@@ -171,7 +179,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       const d = ITEMS[it.type];
       if (!r || d.kind !== 'point' || !dims) continue; // services only show on Room dimensions; they get in the way of the layout
       const cx = X(r.x + it.dx), cy = Y(r.y + it.dy);
-      out.push(`<circle class="pt${isSel(it) ? ' sel' : ''}" cx="${cx}" cy="${cy}" r="13"/><text class="pt-t" x="${cx}" y="${cy}">${d.code}</text>`);
+      out.push(`<circle class="pt${isSel(it) ? ' sel glow' : ''}" cx="${cx}" cy="${cy}" r="13"/><text class="pt-t" x="${cx}" y="${cy}">${d.code}</text>`);
     }
     // Distances from the corners for the selected door / window / radiator.
     if (dims && sel?.type === 'item') {
@@ -219,10 +227,10 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
         const ex = sh.n.x * Math.sign(sh.o) * 5, ey = sh.n.y * Math.sign(sh.o) * 5; // run a little past it
         out.push(`<line class="tape-ext" x1="${ax}" y1="${ay}" x2="${sax + ex}" y2="${say + ey}"/><line class="tape-ext" x1="${bx}" y1="${by}" x2="${sbx + ex}" y2="${sby + ey}"/>`);
       }
-      out.push(`<line class="tape-l${on ? ' sel' : ''}" x1="${sax}" y1="${say}" x2="${sbx}" y2="${sby}"/>`);
+      out.push(`<line class="tape-l${on ? ' sel glow' : ''}" x1="${sax}" y1="${say}" x2="${sbx}" y2="${sby}"/>`);
       if (Math.abs(sh.o) * s > 3) out.push(`<circle class="tape-tick" cx="${sax}" cy="${say}" r="2.5"/><circle class="tape-tick" cx="${sbx}" cy="${sby}" r="2.5"/>`);
-      out.push(`<circle class="tape-e${on ? ' sel' : ''}${m.ra ? ' att' : ''}" cx="${ax}" cy="${ay}" r="${on ? 6 : 4}"/><circle class="tape-e${on ? ' sel' : ''}${m.rb ? ' att' : ''}" cx="${bx}" cy="${by}" r="${on ? 6 : 4}"/>`);
-      out.push(tapeLabel(sh.a, sh.b, mmText(measureLength(m)), on ? 'sel' : ''));
+      out.push(`<circle class="tape-e${on ? ' sel glow' : ''}${m.ra ? ' att' : ''}" cx="${ax}" cy="${ay}" r="${on ? 6 : 4}"/><circle class="tape-e${on ? ' sel glow' : ''}${m.rb ? ' att' : ''}" cx="${bx}" cy="${by}" r="${on ? 6 : 4}"/>`);
+      out.push(tapeLabel(sh.a, sh.b, mmText(measureLength(m)), on ? 'sel glow' : ''));
     }
     if (tape.pending) {
       const { a, b } = tape.pending;
@@ -242,7 +250,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       out.push(`<rect class="marq ${r2.y < q.y ? 'cross' : 'win'}" x="${Math.min(q.x, r2.x)}" y="${Math.min(q.y, r2.y)}" width="${Math.abs(r2.x - q.x)}" height="${Math.abs(r2.y - q.y)}"/>`);
     }
     // Corner handles (drag both ways) and edge-middle handles (one way only) on the selected room.
-    if (sel?.type === 'room') {
+    if (sel?.type === 'room' && rgroup().length <= 1) {
       const r = roomById(sel.id);
       if (r) for (const [cx, cy, id] of handles(r)) out.push(id.length === 2 ? `<circle class="handle" cx="${X(cx)}" cy="${Y(cy)}" r="9"/>` : `<rect class="handle mid" x="${X(cx) - 6}" y="${Y(cy) - 6}" width="12" height="12" rx="3"/>`);
     }
@@ -262,7 +270,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     const w = toWorld(p);
     const tol = 14 / view.s;
     const f = floor();
-    if (sel?.type === 'room') {
+    if (sel?.type === 'room' && rgroup().length <= 1) {
       const r = roomById(sel.id);
       const c = r && handles(r).find(([cx, cy]) => Math.hypot(w.x - cx, w.y - cy) < 20 / view.s); // corners come first, so they win at a tie
       if (c) return { kind: 'handle', room: r, corner: c[2] };
@@ -374,7 +382,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
         parts.push(
           mmField(`Distance from ${ca} corner (mm)`, () => rw().a, (v) => { if (horizontal()) it.dx = v; else it.dy = v; clampItem(r, it); }),
           mmField(`Distance from ${cb} corner (mm)`, () => rw().b, (v) => { if (horizontal()) it.dx = r.w - it.w - v; else it.dy = r.h - it.h - v; clampItem(r, it); }));
-        parts.push(h('button', { type: 'button', class: 'btn-small', onclick: () => { touch(); [it.w, it.h] = [it.h, it.w]; clampItem(r, it); live(); buildBody(); } }, '⟳ Turn it round'));
+        parts.push(h('button', { type: 'button', class: 'btn-small', onclick: () => { touch(); [it.w, it.h] = [it.h, it.w]; it.manual = true; clampItem(r, it); live(); buildBody(); } }, '⟳ Turn it round')); // turned by hand: it stops turning itself
       }
       body.replaceChildren(...parts);
     };
@@ -403,7 +411,8 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       const hit = wallSnap(f.rooms, w.x, w.y, 45 / view.s);
       if (!hit) return toast(`Tap on a wall to place the ${d.label.toLowerCase()}`);
       remember();
-      const it = newPlanItem(type, { roomId: hit.room.id, wall: hit.wall, at: Math.max(0, snap(hit.at - d.size / 2)), ...(type === 'door' && hit.out ? { out: true } : {}) });
+      const at0 = Math.max(0, snap(hit.at - d.size / 2));
+      const it = newPlanItem(type, { roomId: hit.room.id, wall: hit.wall, at: centreOpening(wallLine(hit.room, hit.wall).len, d.size, at0) ?? at0, ...(type === 'door' && hit.out ? { out: true } : {}) });
       f.items.push(it);
       sel = { type: 'item', id: it.id };
       save();
@@ -422,6 +431,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       it.dx = snap(w.x - r.x - (it.w || 0) / 2);
       it.dy = snap(w.y - r.y - (it.h || 0) / 2);
       autoRotate(r, it);
+      autoRadiator(r, it);
       settleItem(r, it);
       snapToUnits(r, f.items, it);
       f.items.push(it);
@@ -478,6 +488,16 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     renderPanel();
     renderCanvas();
   };
+  /** An item's outline on the plan (cm): units by their box, services by a small square, doors and windows by their opening. */
+  const itemBox = (it, r) => {
+    const d = ITEMS[it.type];
+    if (d.kind === 'wall') {
+      const g = openingGeometry(r, it);
+      return { x0: Math.min(g.a.x, g.b.x) - 4, y0: Math.min(g.a.y, g.b.y) - 4, x1: Math.max(g.a.x, g.b.x) + 4, y1: Math.max(g.a.y, g.b.y) + 4 };
+    }
+    const x = r.x + it.dx, y = r.y + it.dy;
+    return d.kind === 'point' ? { x0: x - 10, y0: y - 10, x1: x + 10, y1: y + 10 } : { x0: x, y0: y, x1: x + it.w, y1: y + it.h };
+  };
   /** The tape end or body under the pointer (ends always; the body and the length label too). */
   const measureAt = (p, shift = false) => {
     const w = toWorld(p);
@@ -506,7 +526,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       setTape(false);
       return;
     }
-    if (e.button === 2 && sel?.type === 'item') { // right button lets go of the selected unit(s); on the Room dimensions tab a door, window or radiator still opens for editing
+    if (e.button === 2 && sel && !tape.on) { // right button lets go of whatever is selected (units, rooms, tapes); on the Room dimensions tab a door, window or radiator still opens for editing
       const hit0 = hitTest(pt(e));
       const edits = dims && hit0?.kind === 'item' && (ITEMS[hit0.item.type].kind === 'wall' || hit0.item.type === 'radiator');
       if (!edits) { sel = null; renderCanvas(); renderPanel(); return; }
@@ -575,9 +595,8 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       const start = floor().items.filter((it) => it.roomId === hit.room.id).map((it) => ({ it, dx: it.dx, dy: it.dy, at: it.at }));
       drag = { kind: 'resize', room: hit.room, corner: hit.corner, o: { ...hit.room }, start, w0: w, p0: p, snapshot };
     } else if (hit?.kind === 'item') {
-      const isUnit = ITEMS[hit.item.type].kind === 'fixture';
-      if (e.shiftKey && isUnit) { // Shift-click adds a unit to the selection, or takes it out
-        const ids = new Set(igroup().filter((i) => { const q = floor().items.find((x) => x.id === i); return q && ITEMS[q.type].kind === 'fixture'; }));
+      if (e.shiftKey) { // Shift-click adds an item (unit, door, window, service, radiator) to the selection, or takes it out
+        const ids = new Set(igroup().filter((i) => floor().items.some((x) => x.id === i)));
         if (ids.has(hit.item.id)) ids.delete(hit.item.id); else ids.add(hit.item.id);
         const list = [...ids];
         sel = list.length ? { type: 'item', id: ids.has(hit.item.id) ? hit.item.id : list[list.length - 1], ids: list } : null;
@@ -585,8 +604,8 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
         renderPanel();
         return;
       }
-      if (isUnit && igroup().length > 1 && igroup().includes(hit.item.id)) { // pull the whole selection along together
-        const items = floor().items.filter((q) => igroup().includes(q.id)).map((q) => ({ it: q, dx0: q.dx, dy0: q.dy, room: roomById(q.roomId) })).filter((q) => q.room);
+      if (igroup().length > 1 && igroup().includes(hit.item.id)) { // pull the whole selection along together
+        const items = floor().items.filter((q) => igroup().includes(q.id)).map((q) => ({ it: q, dx0: q.dx, dy0: q.dy, at0: q.at, room: roomById(q.roomId) })).filter((q) => q.room);
         drag = { kind: 'igroup', items, w0: w, p0: p, snapshot };
         drag.button = e.button;
         renderCanvas();
@@ -597,8 +616,21 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       const r = roomById(hit.item.roomId);
       drag = { kind: 'item', item: hit.item, o: { ...hit.item, ax: r.x + (hit.item.dx || 0), ay: r.y + (hit.item.dy || 0) }, w0: w, p0: p, snapshot };
     } else if (hit?.kind === 'room') {
-      sel = { type: 'room', id: hit.room.id };
-      drag = { kind: 'room', room: hit.room, o: { x: hit.room.x, y: hit.room.y }, w0: w, p0: p, snapshot };
+      if (e.shiftKey) { // Shift-click adds a room to the selection, or takes it out
+        const ids = new Set(rgroup().filter((i) => roomById(i)));
+        if (ids.has(hit.room.id)) ids.delete(hit.room.id); else ids.add(hit.room.id);
+        const list = [...ids];
+        sel = list.length ? { type: 'room', id: ids.has(hit.room.id) ? hit.room.id : list[list.length - 1], ids: list } : null;
+        renderCanvas();
+        renderPanel();
+        return;
+      }
+      if (rgroup().length > 1 && rgroup().includes(hit.room.id)) { // move all the selected rooms together
+        drag = { kind: 'rgroup', room: hit.room, rooms: floor().rooms.filter((q) => rgroup().includes(q.id)).map((q) => ({ r: q, x0: q.x, y0: q.y })), w0: w, p0: p, snapshot };
+      } else {
+        sel = { type: 'room', id: hit.room.id, ids: [hit.room.id] };
+        drag = { kind: 'room', room: hit.room, o: { x: hit.room.x, y: hit.room.y }, w0: w, p0: p, snapshot };
+      }
     } else if (e.pointerType === 'touch') {
       sel = null;
       drag = { kind: 'pan', p0: p, v0: { ...view } }; // a finger still drags the view (there is no wheel button on a phone)
@@ -673,14 +705,38 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     }
     const w = toWorld(p);
     const dx = w.x - drag.w0.x, dy = w.y - drag.w0.y;
-    if (drag.kind === 'igroup') { // all selected units move by the same amount, staying in their rooms and keeping their arrangement
+    if (drag.kind === 'igroup') { // everything selected moves by the same amount: units keep their arrangement inside their rooms, doors and windows slide along their own walls, services follow
       let ddx = snap(dx), ddy = snap(dy);
-      const lo = (key, size) => Math.max(...drag.items.map((q) => -q[key]));
-      const hiX = Math.min(...drag.items.map((q) => q.room.w - q.it.w - q.dx0)), hiY = Math.min(...drag.items.map((q) => q.room.h - q.it.h - q.dy0));
-      const loX = lo('dx0'), loY = lo('dy0');
-      ddx = Math.max(Math.min(ddx, hiX), Math.min(loX, hiX));
-      ddy = Math.max(Math.min(ddy, hiY), Math.min(loY, hiY));
-      for (const q of drag.items) { q.it.dx = q.dx0 + ddx; q.it.dy = q.dy0 + ddy; }
+      const units = drag.items.filter((q) => ITEMS[q.it.type].kind === 'fixture');
+      if (units.length) {
+        const hiX = Math.min(...units.map((q) => q.room.w - q.it.w - q.dx0)), hiY = Math.min(...units.map((q) => q.room.h - q.it.h - q.dy0));
+        const loX = Math.max(...units.map((q) => -q.dx0)), loY = Math.max(...units.map((q) => -q.dy0));
+        ddx = Math.max(Math.min(ddx, hiX), Math.min(loX, hiX));
+        ddy = Math.max(Math.min(ddy, hiY), Math.min(loY, hiY));
+      }
+      for (const q of drag.items) {
+        const kind = ITEMS[q.it.type].kind;
+        if (kind === 'wall') {
+          const L = wallLine(q.room, q.it.wall);
+          const along = (ddx * (L.x2 - L.x1) + ddy * (L.y2 - L.y1)) / L.len;
+          q.it.at = Math.max(0, Math.min(L.len - q.it.size, q.at0 + along));
+        } else {
+          q.it.dx = q.dx0 + ddx;
+          q.it.dy = q.dy0 + ddy;
+          if (kind === 'point') settleItem(q.room, q.it);
+        }
+      }
+      return renderCanvas();
+    }
+    if (drag.kind === 'rgroup') { // the selected rooms move together (and snap edge to edge with rooms that are not moving)
+      const ddx = snap(dx), ddy = snap(dy), r0 = drag.rooms.find((q) => q.r === drag.room);
+      for (const q of drag.rooms) { q.r.x = q.x0 + ddx; q.r.y = q.y0 + ddy; }
+      if (r0) {
+        const bx = r0.r.x, by = r0.r.y;
+        snapToRooms(r0.r, drag.rooms.map((q) => q.r));
+        const cx = r0.r.x - bx, cy = r0.r.y - by;
+        for (const q of drag.rooms) if (q !== r0) { q.r.x += cx; q.r.y += cy; }
+      }
       return renderCanvas();
     }
     if (drag.kind === 'moff') { // pull the dimension lines sideways only: each stays parallel to what it measures, so a pull across moves only the tapes that run the other way
@@ -718,6 +774,7 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
         settleItem(r, it);
       }
     } else if (drag.kind === 'item') {
+      drag.noCentre = e.altKey;
       moveItem(drag.item, drag.o, w, dx, dy);
     }
     renderCanvas();
@@ -732,7 +789,9 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       renderSummary();
     }
     drag = null;
-    if (tape.hover) { tape.hover = null; renderCanvas(); }
+    guide = null;
+    tape.hover = null;
+    renderCanvas(); // clears the middle-of-wall guide
   };
   const endPointer = (e) => {
     clearTimeout(pressTimer);
@@ -747,8 +806,8 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
         const touching = d.p1.y < d.p0.y;
         const hits = floor().items.filter((it) => {
           const r = roomById(it.roomId);
-          if (!r || ITEMS[it.type].kind !== 'fixture' || !editable(it.type)) return false;
-          const bx0 = r.x + it.dx, by0 = r.y + it.dy, bx1 = bx0 + it.w, by1 = by0 + it.h;
+          if (!r || !editable(it.type)) return false;
+          const bx = itemBox(it, r), bx0 = bx.x0, by0 = bx.y0, bx1 = bx.x1, by1 = bx.y1;
           return touching ? bx1 >= x0 && bx0 <= x1 && by1 >= y0 && by0 <= y1 : bx0 >= x0 && bx1 <= x1 && by0 >= y0 && by1 <= y1;
         }).map((it) => it.id);
         const ids = [...new Set([...(d.shift ? igroup() : []), ...hits])];
@@ -812,8 +871,8 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
   }, { passive: false });
 
   /** Rooms snap edge-to-edge with their neighbours (within 20 cm). */
-  const snapToRooms = (r) => {
-    const others = floor().rooms.filter((o) => o !== r);
+  const snapToRooms = (r, moving = [r]) => {
+    const others = floor().rooms.filter((o) => !moving.includes(o));
     const near = (a, b) => Math.abs(a - b) <= 20;
     let bx = null, by = null;
     for (const o of others) {
@@ -840,6 +899,13 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
         drag.grab = Math.max(0, Math.min(it.size, along - o.at));
       }
       Object.assign(it, { roomId: hit.room.id, wall: hit.wall, at: Math.max(0, snap(hit.at - drag.grab)) });
+      guide = null;
+      const mid = !drag.noCentre && centreOpening(wallLine(hit.room, hit.wall).len, it.size, it.at); // clicks onto the middle of the wall (Alt = off)
+      if (mid != null && mid !== false) {
+        it.at = mid;
+        const across = hit.wall === 'n' || hit.wall === 's';
+        guide = { room: hit.room, axis: across ? 'x' : 'y', at: (across ? hit.room.w : hit.room.h) / 2 };
+      }
       if (it.type === 'door') it.out = hit.out; // dragged out of the room: it opens outwards
       if (hinge) setHinge(it, hinge); // keep the same hinge side (seen from inside) on the new wall
       return;
@@ -850,8 +916,15 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     it.dx = snap(cx - r.x - (it.w || 0) / 2);
     it.dy = snap(cy - r.y - (it.h || 0) / 2);
     autoRotate(r, it); // a cabinet brought up to a wall turns its back to it
+    autoRadiator(r, it); // a radiator runs along whichever wall it is taken to
     settleItem(r, it);
+    const before = [it.dx, it.dy];
     snapToUnits(r, f.items, it); // closes up against the unit next to it
+    guide = null;
+    if (!drag?.noCentre && it.dx === before[0] && it.dy === before[1]) { // not closed up against a neighbour: click onto the middle of the wall (Alt = off)
+      const g = snapToWallCentre(r, it);
+      if (g) guide = { room: r, ...g };
+    }
   };
 
   // ----- cabinets: choose the width and type, then the unit lands in the room ready to drag -----
@@ -1201,6 +1274,21 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
       }
       return renderMeasurePanel(m);
     }
+    if (sel?.type === 'room' && rgroup().filter((i) => roomById(i)).length > 1) {
+      const ids = rgroup().filter((i) => roomById(i));
+      return panel.replaceChildren(
+        h('strong', null, `${ids.length} rooms selected`),
+        h('p', { class: 'hint' }, 'Drag any selected room to move them all together. Shift-click a room to add it or take it out. Right-click, or press Esc, to let go of them.'),
+        h('div', { class: 'btn-row' }, delBtn(`Delete ${ids.length} rooms`, async () => {
+          if (!(await confirmDialog(`Delete ${ids.length} rooms and everything in them?`))) return;
+          remember();
+          f.rooms = f.rooms.filter((q) => !ids.includes(q.id));
+          f.items = f.items.filter((it) => !ids.includes(it.roomId));
+          sel = null;
+          save();
+          renderAll();
+        })));
+    }
     if (sel?.type === 'room') {
       const r = roomById(sel.id);
       if (!r) { sel = null; return renderPanel(); }
@@ -1240,9 +1328,9 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
     if (sel?.type === 'item' && igroup().filter((i) => f.items.some((x) => x.id === i)).length > 1) {
       const ids = igroup().filter((i) => f.items.some((x) => x.id === i));
       return panel.replaceChildren(
-        h('strong', null, `${ids.length} units selected`),
+        h('strong', null, `${ids.length} items selected`),
         h('p', { class: 'hint' }, 'Drag any selected unit to move them all together. Shift-click a unit to add it or take it out. Right-click, or press Esc, to let go of them.'),
-        h('div', { class: 'btn-row' }, delBtn(`Delete ${ids.length} units`, () => { remember(); f.items = f.items.filter((x) => !ids.includes(x.id)); sel = null; save(); renderAll(); })));
+        h('div', { class: 'btn-row' }, delBtn(`Delete ${ids.length} items`, () => { remember(); f.items = f.items.filter((x) => !ids.includes(x.id)); sel = null; save(); renderAll(); })));
     }
     if (sel?.type === 'item') {
       const it = f.items.find((i) => i.id === sel.id);
@@ -1354,7 +1442,8 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
             field('Depth (cm)', String(it.h), (v) => { const n = num(v); if (n > 5) { it.h = Math.round(n); settleItem(r, it); } }, { inputmode: 'decimal' })));
           parts.push(h('div', { class: 'btn-row' },
             it.type === 'radiator' ? h('button', { type: 'button', class: 'btn-small btn-primary', onclick: () => editFeature(it) }, '✎ Edit details') : null,
-            h('button', { type: 'button', class: 'btn-small', onclick: () => { remember(); [it.w, it.h] = [it.h, it.w]; settleItem(r, it); save(); renderAll(); } }, '⟳ Turn'),
+            h('button', { type: 'button', class: 'btn-small', onclick: () => { remember(); [it.w, it.h] = [it.h, it.w]; if (it.type === 'radiator') it.manual = true; settleItem(r, it); save(); renderAll(); } }, '⟳ Turn'),
+            it.type === 'radiator' && it.manual ? h('button', { type: 'button', class: 'btn-small', onclick: () => { remember(); it.manual = false; autoRadiator(r, it); settleItem(r, it); save(); renderAll(); } }, '↺ Run along the wall') : null,
             removeIt));
         }
       } else {
@@ -1581,13 +1670,14 @@ export default async function planEditor(root, { id, mode = 'layout' }) {
         save();
         renderAll();
       } else {
-        const r = roomById(sel.id);
-        if (!r) return;
-        confirmDialog(`Delete “${r.name}” and everything in it?`).then((ok) => {
+        const ids = rgroup().filter((i) => roomById(i));
+        if (!ids.length) return;
+        const r = roomById(ids[0]);
+        confirmDialog(ids.length > 1 ? `Delete ${ids.length} rooms and everything in them?` : `Delete “${r.name}” and everything in it?`).then((ok) => {
           if (!ok) return;
           remember();
-          f.rooms.splice(f.rooms.indexOf(r), 1);
-          f.items = f.items.filter((it) => it.roomId !== r.id);
+          f.rooms = f.rooms.filter((q) => !ids.includes(q.id));
+          f.items = f.items.filter((it) => !ids.includes(it.roomId));
           sel = null;
           save();
           renderAll();

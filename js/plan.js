@@ -375,6 +375,45 @@ export function clampItem(room, item) {
   item.dy = Math.max(0, Math.min(item.dy, room.h - (item.h || 0)));
 }
 
+/** A door or window sliding along a wall: where its start (at) goes so its middle is on the middle of the wall, if close; else null. */
+export function centreOpening(wallLen, size, at, tol = 15) {
+  const c = (wallLen - size) / 2;
+  return Math.abs(at - c) <= tol ? c : null;
+}
+export const CENTRE_TOL = 15; // cm: how close to the middle of a wall a unit has to come to click onto it
+/**
+ * A unit standing against a wall clicks onto the middle of that wall when its centre comes within tol of it, so a run
+ * can be built out evenly either side. Corner units, blind corners and anything out in the room are left alone.
+ * Returns { axis: 'x' | 'y', at } (the middle of the wall, in room coordinates) when it snapped, else null.
+ */
+export function snapToWallCentre(room, it, tol = CENTRE_TOL) {
+  const d = ITEMS[it.type];
+  if (it.type === 'radiator') { // a radiator against a wall clicks onto the middle of it as well
+    const rw = radiatorWall(room, it);
+    if (rw.gap > 25) return null;
+    if (rw.wall === 'n' || rw.wall === 's') {
+      const c = (room.w - it.w) / 2;
+      if (Math.abs(it.dx - c) <= tol) { it.dx = c; return { axis: 'x', at: room.w / 2 }; }
+    } else {
+      const c = (room.h - it.h) / 2;
+      if (Math.abs(it.dy - c) <= tol) { it.dy = c; return { axis: 'y', at: room.h / 2 }; }
+    }
+    return null;
+  }
+  if (!d?.facing || d.corner || d.blind) return null;
+  const rot = (it.rot || 0) % 360, NEAR = 25;
+  const against = rot === 0 ? it.dy <= NEAR : rot === 180 ? room.h - (it.dy + it.h) <= NEAR : rot === 90 ? room.w - (it.dx + it.w) <= NEAR : it.dx <= NEAR;
+  if (!against) return null;
+  if (rot % 180 === 0) {
+    const c = (room.w - it.w) / 2;
+    if (Math.abs(it.dx - c) <= tol) { it.dx = c; return { axis: 'x', at: room.w / 2 }; }
+  } else {
+    const c = (room.h - it.h) / 2;
+    if (Math.abs(it.dy - c) <= tol) { it.dy = c; return { axis: 'y', at: room.h / 2 }; }
+  }
+  return null;
+}
+
 /**
  * Units in the same run (base or wall level) snap flush against each other: the edge you bring
  * near another unit (within tol cm) closes up, and the fronts / backs line up too.
@@ -655,6 +694,27 @@ function endGaps(room, it) {
     case 270: return { left: south, right: it.dy };
     default: return { left: it.dx, right: east };
   }
+}
+
+/**
+ * A radiator turns to run along the wall it is nearest (north / south: across, east / west: up and down), keeping its
+ * centre where it is. Out in the room (more than 40 cm from any wall) it is left as it is, and so is one the user
+ * turned by hand (it.manual). Returns true when it turned.
+ */
+export function autoRadiator(room, it) {
+  if (it.type !== 'radiator' || it.manual) return false;
+  const L = Math.max(it.w, it.h), D = Math.min(it.w, it.h);
+  const cx = it.dx + it.w / 2, cy = it.dy + it.h / 2;
+  const [wall, gap] = [['n', cy], ['s', room.h - cy], ['w', cx], ['e', room.w - cx]].sort((a, b) => a[1] - b[1])[0];
+  if (gap - D / 2 > 40) return false;
+  const horizontal = wall === 'n' || wall === 's';
+  const w = horizontal ? L : D, h = horizontal ? D : L;
+  if (w === it.w && h === it.h) return false;
+  it.w = w;
+  it.h = h;
+  it.dx = cx - w / 2;
+  it.dy = cy - h / 2;
+  return true;
 }
 
 /** Turn a unit to face its wall (unless the user turned it by hand); a blind corner points its blind end into the nearest corner. */
